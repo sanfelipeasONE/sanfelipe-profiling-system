@@ -1,0 +1,12 @@
+# --- Python Backend ---
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/sfz_db.db     # Don't push the database file (we have seed.py to recreate it)
+.env
+.venv/
+
+# --- React Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.DS_Store
