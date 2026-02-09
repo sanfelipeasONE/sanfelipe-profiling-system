@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import api from '../api';
 import { User, Lock } from 'lucide-react';
-import sanFelipeSeal from '../assets/san_felipe_seal.png'; // Import the seal
+import sanFelipeSeal from '../assets/san_felipe_seal.png';
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -20,81 +20,103 @@ export default function Login({ onLogin }) {
 
     try {
       const response = await api.post('/token', formData);
-      
-      // Save Token and Role to storage
       localStorage.setItem('token', response.data.access_token);
       localStorage.setItem('role', response.data.role);
-      
-      onLogin(response.data.role); // Tell App we are in!
-    } catch (err) {
-      setError('Invalid Username or Password');
+      onLogin(response.data.role);
+    } catch {
+      setError('Invalid username or password');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-blue-900">
-      <div className="bg-white p-8 rounded-lg shadow-2xl w-96 transform transition-all hover:scale-105">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-slate-900 px-4">
+      
+      <div className="w-full max-w-md bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20">
         
-        {/* HEADER WITH SEAL AND NEW TITLE */}
-        <div className="text-center mb-8 flex flex-col items-center">
-          <img 
-            src={sanFelipeSeal} 
-            alt="LGU San Felipe Seal" 
-            className="w-24 h-24 mb-4 drop-shadow-md" 
+        {/* HEADER */}
+        <div className="flex flex-col items-center mb-8">
+          <img
+            src={sanFelipeSeal}
+            alt="LGU San Felipe Seal"
+            className="w-24 h-24 mb-4 drop-shadow-lg"
           />
-          <h1 className="text-2xl font-bold text-gray-800">LGU San Felipe</h1>
-          <p className="text-gray-500 text-sm">Residential Profile System</p>
+          <h1 className="text-2xl font-extrabold tracking-wide text-gray-800">
+            LGU San Felipe
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Resident Profiling System
+          </p>
         </div>
 
+        {/* ERROR */}
         {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4 text-sm">
+          <div className="mb-5 rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {/* FORM */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          
+          {/* USERNAME */}
           <div>
-            <label className="block text-gray-700 text-sm font-bold mb-2">Username</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Username
+            </label>
             <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-400"><User size={20} /></span>
-              <input 
-                type="text" 
+              <User className="absolute left-3 top-3 text-gray-400" size={18} />
+              <input
+                type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="admin"
+                className="w-full rounded-lg border border-gray-300 bg-white px-10 py-2.5 text-sm
+                           focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 outline-none"
                 required
               />
             </div>
           </div>
 
+          {/* PASSWORD */}
           <div>
-            <label className="block text-gray-700 text-sm font-bold mb-2">Password</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Password
+            </label>
             <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-400"><Lock size={20} /></span>
-              <input 
-                type="password" 
+              <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
+              <input
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="••••••"
+                placeholder="••••••••"
+                className="w-full rounded-lg border border-gray-300 bg-white px-10 py-2.5 text-sm
+                           focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 outline-none"
                 required
               />
             </div>
           </div>
 
-          <button 
-            type="submit" 
+          {/* BUTTON */}
+          <button
+            type="submit"
             disabled={loading}
-            className={`w-full text-white font-bold py-2 px-4 rounded transition duration-200 ${
-              loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-            }`}
+            className={`w-full rounded-lg py-2.5 text-sm font-bold tracking-wide transition-all
+              ${
+                loading
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-blue-700 hover:bg-blue-800 active:scale-[0.98]'
+              } text-white shadow-lg`}
           >
-            {loading ? "Verifying..." : "Sign In"}
+            {loading ? 'Verifying credentials…' : 'Sign In'}
           </button>
         </form>
+
+        {/* FOOTER */}
+        <p className="mt-8 text-center text-xs text-gray-500">
+          © {new Date().getFullYear()} LGU San Felipe • Authorized Personnel Only
+        </p>
       </div>
     </div>
   );
