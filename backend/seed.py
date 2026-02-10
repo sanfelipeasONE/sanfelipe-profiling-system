@@ -3,6 +3,7 @@ import models
 from passlib.context import CryptContext
 import os
 from dotenv import load_dotenv
+import sys
 
 # 1. SETUP
 load_dotenv()
@@ -43,6 +44,15 @@ initial_sectors = [
 ]
 
 def seed_data():
+    admin_pass = os.getenv("ADMIN_PASSWORD")
+    barangay_pass = os.getenv("BARANGAY_DEFAULT_PASSWORD")
+
+    # SAFETY CHECK
+    if not admin_pass or not barangay_pass:
+        print("❌ ERROR: Passwords not found in .env file.")
+        print("   Please set ADMIN_PASSWORD and BARANGAY_DEFAULT_PASSWORD in backend/.env")
+        sys.exit(1)
+        
     try:
         # --- 1. SEED BARANGAYS ---
         print("🌱 Seeding Barangays...")
@@ -72,35 +82,31 @@ def seed_data():
                 db.add(models.Sector(name=s_name))
         db.commit()
         
-        # --- 5. SEED USERS ---
         print("👤 Seeding Users...")
         
         # A. Create SUPER ADMIN
-        admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
         if not db.query(models.User).filter(models.User.username == "admin").first():
             hashed_pw = pwd_context.hash(admin_pass)
-            # Ensure your models.User has a 'role' column!
             admin_user = models.User(username="admin", hashed_password=hashed_pw, role="admin")
             db.add(admin_user)
-            print(f"   - Created Super Admin: 'admin' / '{admin_pass}'")
+            # DO NOT PRINT THE PASSWORD HERE
+            print(f"   - Created Super Admin: 'admin' (Password from .env)")
         
         # B. Create BARANGAY ACCOUNTS
-        # We lowercase and remove spaces for usernames (e.g., "Santo Niño" -> "santonino")
-        barangay_default_pass = "sanfelipe2026"
+        hashed_barangay_pw = pwd_context.hash(barangay_pass)
         
         for b_name in initial_barangays:
-            # Generate clean username
             username = b_name.lower().replace(" ", "").replace(".", "").replace("ñ", "n")
             
             if not db.query(models.User).filter(models.User.username == username).first():
-                hashed_pw = pwd_context.hash(barangay_default_pass)
                 new_user = models.User(
                     username=username, 
-                    hashed_password=hashed_pw, 
-                    role="barangay" # This assigns them the restricted role
+                    hashed_password=hashed_barangay_pw, 
+                    role="barangay"
                 )
                 db.add(new_user)
-                print(f"   - Created User: '{username}' / '{barangay_default_pass}'")
+                # DO NOT PRINT THE PASSWORD HERE EITHER
+                print(f"   - Created User: '{username}'")
 
         db.commit()
         print("✅ Seeding Complete!")
