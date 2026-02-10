@@ -36,7 +36,7 @@ export default function Login({ onLogin }) {
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center p-4 overflow-hidden">
       
-      {/* BACKGROUND IMAGE - The Municipal Hall */}
+      {/* BACKGROUND IMAGE */}
       <div 
         className="absolute inset-0 z-0"
         style={{
@@ -45,18 +45,19 @@ export default function Login({ onLogin }) {
           backgroundPosition: 'center',
         }}
       >
-        {/* Dark Gradient Overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-slate-900/80 to-black/60 backdrop-blur-[2px]"></div>
+        {/* Dark Red/Black Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-red-950/90 via-stone-900/80 to-black/70 backdrop-blur-[2px]"></div>
       </div>
 
       {/* MAIN CARD CONTAINER */}
-      <div className="relative z-10 w-full max-w-5xl bg-white/10 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-md border border-white/20 flex flex-col lg:flex-row">
+      <div className="relative z-10 w-full max-w-5xl bg-white/10 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-md border border-white/10 flex flex-col lg:flex-row">
         
-        {/* LEFT SIDE - Info & Branding (Glassy Look) */}
+        {/* LEFT SIDE - Info & Branding */}
         <div className="lg:w-5/12 p-10 flex flex-col justify-between text-white relative overflow-hidden">
-          {/* Decorative circles */}
-          <div className="absolute -top-10 -left-10 w-40 h-40 bg-blue-500/30 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-10 right-10 w-60 h-60 bg-indigo-500/20 rounded-full blur-3xl"></div>
+          
+          {/* Decorative circles (Warm Tones) */}
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-rose-500/30 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-10 right-10 w-60 h-60 bg-red-600/20 rounded-full blur-3xl"></div>
 
           <div className="relative z-10">
             {/* Header */}
@@ -71,20 +72,20 @@ export default function Login({ onLogin }) {
                     e.target.nextSibling.style.display = 'block';
                   }}
                 />
-                <User className="hidden text-blue-700" size={24} />
+                <User className="hidden text-rose-700" size={24} />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight">LGU San Felipe</h1>
-                <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">Official Portal</p>
+                <h1 className="text-xl font-bold tracking-tight text-white">LGU San Felipe</h1>
+                <p className="text-rose-200 text-xs font-medium uppercase tracking-wider">Official Portal</p>
               </div>
             </div>
 
             {/* Hero Text */}
             <div className="mt-8 space-y-4">
               <h2 className="text-3xl font-bold leading-tight">
-                Residential <span className="text-blue-300">Profiling System</span>
+                Residential <span className="text-rose-400">Profiling System</span>
               </h2>
-              <p className="text-blue-100 text-sm leading-relaxed opacity-90">
+              <p className="text-stone-200 text-sm leading-relaxed opacity-90">
                 Welcome to the centralized data management platform for the Municipality of San Felipe, Zambales. Secure, efficient, and reliable.
               </p>
             </div>
@@ -92,21 +93,21 @@ export default function Login({ onLogin }) {
 
           {/* Features / Footer Info */}
           <div className="relative z-10 mt-12 space-y-4">
-            <div className="flex items-center gap-3 text-sm text-blue-100">
-              <ShieldCheck className="w-5 h-5 text-blue-300" />
+            <div className="flex items-center gap-3 text-sm text-stone-100">
+              <ShieldCheck className="w-5 h-5 text-rose-400" />
               <span>Secure Data Encryption</span>
             </div>
-            <div className="flex items-center gap-3 text-sm text-blue-100">
-              <Activity className="w-5 h-5 text-blue-300" />
+            <div className="flex items-center gap-3 text-sm text-stone-100">
+              <Activity className="w-5 h-5 text-rose-400" />
               <span>Real-time Demographics</span>
             </div>
             <div className="pt-6 border-t border-white/10">
-              <p className="text-xs text-blue-200/60">© 2026 Municipality of San Felipe</p>
+              <p className="text-xs text-rose-100/60">© 2026 Municipality of San Felipe</p>
             </div>
           </div>
         </div>
 
-        {/* RIGHT SIDE - Login Form (Solid White) */}
+        {/* RIGHT SIDE - Login Form */}
         <div className="lg:w-7/12 bg-white p-8 md:p-12 flex flex-col justify-center">
           
           <div className="mb-8">
@@ -135,7 +136,7 @@ export default function Login({ onLogin }) {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400 sm:text-sm"
+                  className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400 sm:text-sm"
                   placeholder="Enter your username"
                 />
               </div>
@@ -153,13 +154,13 @@ export default function Login({ onLogin }) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400 sm:text-sm"
+                  className="block w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400 sm:text-sm"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -168,7 +169,7 @@ export default function Login({ onLogin }) {
 
             {/* Forgot Password Link */}
             <div className="flex justify-end">
-              <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline">
+              <a href="#" className="text-sm font-medium text-rose-600 hover:text-rose-700 hover:underline">
                 Forgot password?
               </a>
             </div>
@@ -177,7 +178,7 @@ export default function Login({ onLogin }) {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full relative overflow-hidden bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed group"
+              className="w-full relative overflow-hidden bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-red-500/30 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed group"
             >
               <span className="relative z-10 flex items-center justify-center gap-2">
                 {loading ? (

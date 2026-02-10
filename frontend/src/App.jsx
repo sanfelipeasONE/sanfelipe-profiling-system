@@ -1,121 +1,77 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
+import Sidebar from './components/Sidebar';
+import DashboardStats from './components/DashboardStats';
 import ResidentList from './components/ResidentList';
 import AddResidentForm from './components/AddResidentForm';
 import ProtectedRoute from './components/ProtectedRoute';
-import { LogOut, UserCircle } from 'lucide-react';
 import { useState } from 'react';
 
-// 1. DASHBOARD LAYOUT (The Main Page Logic)
 function DashboardLayout() {
   const navigate = useNavigate();
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [residentToEdit, setResidentToEdit] = useState(null); // State for editing
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [userRole, setUserRole] = useState(localStorage.getItem('role'));
+  const userRole = localStorage.getItem('role');
+  const [residentToEdit, setResidentToEdit] = useState(null);
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
-
-  // Function to start editing (Passed down to List)
   const handleEdit = (resident) => {
     setResidentToEdit(resident);
-    setShowAddForm(true);
+    navigate('/dashboard/create');
   };
 
-  // Function when form saves successfully
-  const handleSuccess = () => {
-    setShowAddForm(false);
-    setResidentToEdit(null); // Clear edit mode
-    setRefreshTrigger(prev => prev + 1); // Refresh list
-  };
+  const FormPage = () => (
+    // Replaced the wrapper with a cleaner one
+    <AddResidentForm 
+      residentToEdit={residentToEdit}
+      onSuccess={() => {
+        setResidentToEdit(null);
+        navigate('/dashboard/residents');
+      }}
+      onCancel={() => {
+        setResidentToEdit(null);
+        navigate('/dashboard/residents');
+      }}
+    />
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        
-        {/* HEADER */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">San Felipe Database</h1>
-            <p className="text-xs text-gray-500">Residential Profiling System v1.0</p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full text-blue-700 text-sm">
-              <UserCircle size={18} />
-              <span className="font-bold capitalize">{userRole} Account</span>
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-red-600 hover:text-red-800 font-medium text-sm"
-            >
-              <LogOut size={18} /> Logout
-            </button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      
+      {/* 1. SIDEBAR (Fixed Position) */}
+      <Sidebar userRole={userRole} />
 
-        {/* CONTENT */}
-        {showAddForm ? (
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">
-                  {residentToEdit ? "Edit Resident" : "Add New Resident"}
-                </h2>
-             </div>
-            <AddResidentForm 
-              residentToEdit={residentToEdit}
-              onSuccess={handleSuccess}
-              onCancel={() => {
-                setShowAddForm(false);
-                setResidentToEdit(null);
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            <div className="flex justify-end mb-4">
-              <button 
-                onClick={() => {
-                  setResidentToEdit(null);
-                  setShowAddForm(true);
-                }}
-                className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition flex items-center gap-2"
-              >
-                + Add Resident
-              </button>
-            </div>
-            <ResidentList 
-              key={refreshTrigger} 
-              userRole={userRole} 
-              onEdit={handleEdit} 
-            />
-          </>
-        )}
-      </div>
+      {/* 2. MAIN CONTENT WRAPPER 
+          - lg:ml-72 : Pushes content right on Desktop so sidebar doesn't cover it.
+          - pt-20 : Pushes content down on Mobile so header doesn't cover it.
+      */}
+      <main className="lg:ml-72 min-h-screen p-6 pt-20 lg:pt-8 transition-all duration-300">
+        <div className="max-w-7xl mx-auto">
+          <Routes>
+            <Route path="/" element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<DashboardStats />} />
+            <Route path="residents" element={<ResidentList userRole={userRole} onEdit={handleEdit} />} />
+            <Route path="create" element={<FormPage />} />
+          </Routes>
+        </div>
+      </main>
+
     </div>
   );
 }
 
-// 2. MAIN APP COMPONENT (The Router Logic)
+// --- MAIN APP ROUTER ---
 function App() {
   const navigate = useNavigate();
 
-  const handleLoginSuccess = (role) => {
-    navigate('/dashboard');
-  };
-
   return (
     <Routes>
-      <Route path="/login" element={<Login onLogin={handleLoginSuccess} />} />
-
+      <Route path="/login" element={<Login onLogin={() => navigate('/dashboard')} />} />
+      
+      {/* Protected Dashboard Routes */}
       <Route element={<ProtectedRoute />}>
-         <Route path="/dashboard" element={<DashboardLayout />} />
+         <Route path="/dashboard/*" element={<DashboardLayout />} />
       </Route>
 
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      {/* Catch-all redirect */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }
