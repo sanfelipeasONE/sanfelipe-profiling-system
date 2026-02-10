@@ -200,7 +200,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
             <InputGroup label="Birthdate" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
             <SelectGroup label="Sex" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required />
-            <SelectGroup label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widow/er', 'Separated', 'Live-in Partner']} required />
+            <SelectGroup label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed']} required />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

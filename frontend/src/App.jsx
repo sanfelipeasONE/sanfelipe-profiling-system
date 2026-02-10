@@ -9,14 +9,23 @@ import UserManagement from './components/UserManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 
-// --- 1. NEW: ADMIN-ONLY GUARD COMPONENT ---
-// This blocks non-admins and kicks them back to the dashboard
+// --- 1. UPDATED ADMIN ROUTE ---
+// Redirects to 'residents' instead of 'overview' to avoid infinite loops
 const AdminRoute = ({ children }) => {
   const role = localStorage.getItem('role');
   if (role !== 'admin') {
-    return <Navigate to="/dashboard/overview" replace />;
+    return <Navigate to="/dashboard/residents" replace />;
   }
   return children;
+};
+
+// --- 2. NEW: SMART DASHBOARD REDIRECT ---
+// Decides the landing page based on user role
+const DashboardHome = () => {
+  const role = localStorage.getItem('role');
+  return role === 'admin' 
+    ? <Navigate to="overview" replace /> 
+    : <Navigate to="residents" replace />;
 };
 
 function DashboardLayout() {
@@ -50,12 +59,23 @@ function DashboardLayout() {
       <main className="lg:ml-72 min-h-screen p-6 pt-20 lg:pt-8 transition-all duration-300">
         <div className="max-w-7xl mx-auto">
           <Routes>
-            <Route path="/" element={<Navigate to="overview" replace />} />
-            <Route path="overview" element={<DashboardStats />} />
+            {/* Use the smart redirect for the base /dashboard path */}
+            <Route path="/" element={<DashboardHome />} />
+            
+            {/* PROTECTED OVERVIEW: Only for Admins */}
+            <Route 
+              path="overview" 
+              element={
+                <AdminRoute>
+                  <DashboardStats />
+                </AdminRoute>
+              } 
+            />
+
             <Route path="residents" element={<ResidentList userRole={userRole} onEdit={handleEdit} />} />
             <Route path="create" element={<FormPage />} />
             
-            {/* --- 2. WRAP THE ROUTE WITH ADMIN ROUTE --- */}
+            {/* PROTECTED USER MANAGEMENT: Only for Admins */}
             <Route 
               path="users" 
               element={
@@ -64,8 +84,6 @@ function DashboardLayout() {
                 </AdminRoute>
               } 
             />
-            {/* ------------------------------------------ */}
-            
           </Routes>
         </div>
       </main>
@@ -82,16 +100,19 @@ function App() {
         path="/login" 
         element={
           <PublicRoute>
-            <Login onLogin={() => navigate('/dashboard/overview')} />
+            <Login onLogin={() => {
+                // Determine destination on login
+                const role = localStorage.getItem('role');
+                navigate(role === 'admin' ? '/dashboard/overview' : '/dashboard/residents');
+            }} />
           </PublicRoute>
         } 
       />
       
-      {/* ProtectedRoute ensures they are Logged In */}
       <Route element={<ProtectedRoute />}>
-         {/* AdminRoute (inside DashboardLayout) ensures they are Admin */}
          <Route path="/dashboard/*" element={<DashboardLayout />} />
-         <Route path="*" element={<Navigate to="/dashboard/overview" replace />} />
+         {/* Catch-all for logged in users: send them to their specific home */}
+         <Route path="*" element={<DashboardHome />} />
       </Route>
     </Routes>
   );
