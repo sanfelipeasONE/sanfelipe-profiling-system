@@ -93,14 +93,6 @@ export default function Login({ onLogin }) {
 
           {/* Features / Footer Info */}
           <div className="relative z-10 mt-12 space-y-4">
-            <div className="flex items-center gap-3 text-sm text-stone-100">
-              <ShieldCheck className="w-5 h-5 text-rose-400" />
-              <span>Secure Data Encryption</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-stone-100">
-              <Activity className="w-5 h-5 text-rose-400" />
-              <span>Real-time Demographics</span>
-            </div>
             <div className="pt-6 border-t border-white/10">
               <p className="text-xs text-rose-100/60">© 2026 Municipality of San Felipe</p>
             </div>

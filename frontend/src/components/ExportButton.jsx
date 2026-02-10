@@ -11,19 +11,19 @@ export default function ExportButton({ barangay }) {
       
       // 1. Request the file from Backend
       const response = await axios.get('http://localhost:8000/export/excel', {
-        params: { barangay: barangay }, // Sends ?barangay=Amagna
+        params: { barangay: barangay },
         headers: {
-          Authorization: `Bearer ${token}`, // Send the Token!
+          Authorization: `Bearer ${token}`,
         },
-        responseType: 'blob', // IMPORTANT: Tells axios this is a file, not JSON
+        responseType: 'blob',
       });
 
-      // 2. Create a "Hidden Link" to trigger download
+      // 2. Create a "Hidden Link"
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
       
-      // 3. Set the Filename (Optional: You can parse it from headers if needed)
+      // 3. Set the Filename
       const filename = barangay 
         ? `SanFelipe_MasterList_${barangay}.xlsx` 
         : `SanFelipe_MasterList_ALL.xlsx`;
@@ -32,7 +32,6 @@ export default function ExportButton({ barangay }) {
       document.body.appendChild(link);
       link.click();
       
-      // 4. Cleanup
       link.remove();
       window.URL.revokeObjectURL(url);
 

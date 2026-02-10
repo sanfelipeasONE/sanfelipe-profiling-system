@@ -53,7 +53,7 @@ export default function DashboardStats() {
     { name: 'Female', value: stats.total_female }
   ];
 
-  const GENDER_COLORS = ['#7f1d1d', '#b91c1c']; // Deep red shades
+  const GENDER_COLORS = ['#7f1d1d', '#b91c1c'];
 
   return (
     <div className="space-y-6">

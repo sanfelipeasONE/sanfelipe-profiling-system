@@ -41,7 +41,6 @@ const SelectGroup = ({ label, name, value, onChange, options, required = false }
 // -------------------------------------------------------------
 
 export default function AddResidentForm({ onSuccess, onCancel, residentToEdit }) {
-  // 1. ADDED other_sector_details to initial state
   const [formData, setFormData] = useState({
     last_name: '', first_name: '', middle_name: '', ext_name: '',
     house_no: '', purok: '', barangay: '',
@@ -84,7 +83,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         birthdate: residentToEdit.birthdate ? residentToEdit.birthdate.split('T')[0] : '',
         sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map(s => s.id) : [],
         family_members: residentToEdit.family_members || [],
-        // 2. ADDED population of other_sector_details on edit
         other_sector_details: residentToEdit.other_sector_details || ''
       });
     }
@@ -99,7 +97,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     const sectorId = parseInt(e.target.value);
     if (!sectorId) return;
     
-    // Logic to clear "other details" if "Others" is unchecked (Optional but recommended)
+    // Logic to clear
     const otherSector = sectorOptions.find(s => s.name.toLowerCase().includes('other'));
     const isUncheckingOther = otherSector && sectorId === otherSector.id && formData.sector_ids.includes(sectorId);
 
@@ -161,7 +159,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     }
   };
 
-  // Helper to check if "Others" is selected
+  // Helper to check
   const otherSector = sectorOptions.find(s => s.name.toLowerCase().includes('other'));
   const isOtherSelected = otherSector && formData.sector_ids.includes(otherSector.id);
 

@@ -58,23 +58,23 @@ class ResidentProfile(Base):
     # 3. DEMOGRAPHICS
     birthdate = Column(Date)
     sex = Column(String)
-    precinct_no = Column(String, nullable=True) # Added
+    precinct_no = Column(String, nullable=True) 
     
     # 4. STATUS & CONTACT
     civil_status = Column(String)
-    #religion = Column(String, nullable=True)    # Added
-    occupation = Column(String, nullable=True)  # Added
+    #religion = Column(String, nullable=True)   
+    occupation = Column(String, nullable=True)
     contact_no = Column(String, nullable=True)
 
-    # 5. SPOUSE / PARTNER (Split into parts to match form)
+    # 5. SPOUSE / PARTNER
     spouse_last_name = Column(String, nullable=True)
     spouse_first_name = Column(String, nullable=True)
     spouse_middle_name = Column(String, nullable=True)
     spouse_ext_name = Column(String, nullable=True)
 
-    # 6. SECTORS (Dynamic + Summary)
+    # 6. SECTORS
     other_sector_details = Column(String, nullable=True) 
-    sector_summary = Column(String, nullable=True) # Stores "Senior, PWD" string
+    sector_summary = Column(String, nullable=True)
 
     # System Fields
     is_active = Column(Boolean, default=True)

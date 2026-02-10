@@ -25,7 +25,7 @@ export default function Sidebar({ userRole = 'admin' }) {
     { label: 'Register Resident', path: '/dashboard/create', icon: UserPlus, role: 'all' },
   ];
 
-  // 2. Filter items based on the user's role INSIDE the component
+  // 2. Filter items
   const menuItems = allMenuItems.filter(item => {
     if (item.role === 'all') return true;
     if (item.role === 'admin' && userRole === 'admin') return true;

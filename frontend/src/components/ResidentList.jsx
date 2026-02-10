@@ -1,32 +1,29 @@
 import { useEffect, useState, Fragment } from 'react'; 
 import api from '../api';
-// 1. Added AlertTriangle for the modal icon
 import { Trash2, Edit, Search, Filter, ChevronDown, ChevronUp, Users, MapPin, Calendar, AlertTriangle, X } from 'lucide-react';
 import ExportButton from './ExportButton'; 
-// 2. Added Toast
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function ResidentList({ userRole, onEdit }) {
   const [residents, setResidents] = useState([]);
-  
-  // --- NEW STATES FOR EXPORT ---
   const [barangayList, setBarangayList] = useState([]);
   const [selectedBarangay, setSelectedBarangay] = useState(''); 
-  
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
-
-  // 3. New State for Delete Modal
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, residentId: null });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 1. Fetch Residents (List View)
-  const fetchResidents = async (search = '') => {
+  // 1. Fetch Residents
+  const fetchResidents = async (search = '', barangay = '') => {
     setLoading(true);
     try {
-      const query = search ? `?search=${search}` : '';
-      const response = await api.get(`/residents/${query}`);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (barangay) params.append('barangay', barangay);
+      
+      const queryString = params.toString() ? `?${params.toString()}` : '';
+      const response = await api.get(`/residents/${queryString}`);
       setResidents(response.data);
     } catch (error) {
       console.error('Error fetching residents:', error);
@@ -36,7 +33,6 @@ export default function ResidentList({ userRole, onEdit }) {
     }
   };
 
-  // 2. Fetch Barangays
   useEffect(() => {
     const fetchBarangays = async () => {
       try {
@@ -48,41 +44,37 @@ export default function ResidentList({ userRole, onEdit }) {
     };
     
     fetchBarangays();
-    fetchResidents(); 
+    fetchResidents(searchTerm, selectedBarangay); 
   }, []);
 
   const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-    fetchResidents(e.target.value);
+    const value = e.target.value;
+    setSearchTerm(value);
+    fetchResidents(value, selectedBarangay);
   };
 
   const handleBarangayChange = (e) => {
-    setSelectedBarangay(e.target.value);
+    const value = e.target.value;
+    setSelectedBarangay(value);
+    fetchResidents(searchTerm, value);
   };
 
-  // 4. OLD handleDelete replaced with these two functions:
-
-  // A. Opens the modal
   const promptDelete = (id, e) => {
-    e.stopPropagation(); // Prevent row toggle
+    e.stopPropagation();
     setDeleteModal({ isOpen: true, residentId: id });
   };
 
-  // B. Performs the actual API call
   const confirmDelete = async () => {
     if (!deleteModal.residentId) return;
-
     setIsDeleting(true);
     try {
       await api.delete(`/residents/${deleteModal.residentId}`);
       toast.success('Resident deleted successfully');
-      
-      // Close modal and refresh list
       setDeleteModal({ isOpen: false, residentId: null });
-      fetchResidents(searchTerm);
+      fetchResidents(searchTerm, selectedBarangay);
     } catch (error) {
       console.error(error);
-      toast.error('Failed to delete resident. Please try again.');
+      toast.error('Failed to delete resident.');
     } finally {
       setIsDeleting(false);
     }
@@ -99,7 +91,6 @@ export default function ResidentList({ userRole, onEdit }) {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
-      
       <Toaster position="top-center" />
 
       {/* HEADER TOOLBAR */}
@@ -109,28 +100,27 @@ export default function ResidentList({ userRole, onEdit }) {
           <p className="text-sm text-stone-500 mt-1">Manage and view all registered residents.</p>
         </div>
         
-        {/* RIGHT SIDE ACTIONS */}
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          
-          {/* A. BARANGAY DROPDOWN */}
-          <div className="relative">
-            <select
-              value={selectedBarangay}
-              onChange={handleBarangayChange}
-              className="appearance-none pl-4 pr-10 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-stone-700 cursor-pointer shadow-sm text-sm h-[42px]"
-            >
-              <option value="">All Barangays</option>
-              {barangayList.map((b) => (
-                <option key={b.id} value={b.name}>{b.name}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={14} />
-          </div>
+          {/* Only show the Barangay Filter dropdown if the user is an Admin */}
+          {userRole === 'admin' && (
+            <div className="relative">
+              <select
+                value={selectedBarangay}
+                onChange={handleBarangayChange}
+                className="appearance-none pl-4 pr-10 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-stone-700 cursor-pointer shadow-sm text-sm h-[42px]"
+              >
+                <option value="">All Barangays</option>
+                {barangayList.map((b) => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={14} />
+            </div>
+          )}
 
-          {/* B. EXPORT BUTTON */}
           <ExportButton barangay={selectedBarangay} />
 
-          {/* C. SEARCH INPUT */}
+          {/* SEARCH INPUT */}
           <div className="relative w-full md:w-64 group">
             <input 
               type="text" 
@@ -217,7 +207,6 @@ export default function ResidentList({ userRole, onEdit }) {
                             >
                               <Edit size={16} />
                             </button>
-                            {/* 5. Updated Delete Button Action */}
                             <button 
                               onClick={(e) => promptDelete(r.id, e)} 
                               className="p-2 text-stone-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all" 
@@ -238,8 +227,6 @@ export default function ResidentList({ userRole, onEdit }) {
                     <tr className="bg-stone-50/30 border-b border-stone-100 animate-in fade-in zoom-in-95 duration-200">
                       <td colSpan="6" className="p-0">
                         <div className="p-6 pl-16 grid grid-cols-1 md:grid-cols-2 gap-8 bg-gradient-to-br from-rose-50/40 to-stone-50/40 border-y border-rose-100/50 shadow-inner">
-                          
-                          {/* INFO COLUMN */}
                           <div className="space-y-4">
                             <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider mb-2 border-b border-rose-200 pb-2">
                               Personal Information
@@ -258,18 +245,8 @@ export default function ResidentList({ userRole, onEdit }) {
                                 <p className="font-medium text-stone-800">{r.precinct_no || 'N/A'}</p>
                               </div>
                             </div>
-
-                            {(r.civil_status === 'Married' || r.civil_status === 'Live-in Partner') && (
-                              <div className="mt-3 p-3 bg-white rounded-lg border border-rose-100 shadow-sm">
-                                <p className="text-xs text-rose-500 font-bold mb-1">SPOUSE / PARTNER</p>
-                                <p className="text-sm font-medium text-stone-800">
-                                  {r.spouse_first_name} {r.spouse_middle_name} {r.spouse_last_name} {r.spouse_ext_name}
-                                </p>
-                              </div>
-                            )}
                           </div>
 
-                          {/* FAMILY COLUMN */}
                           <div>
                             <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider mb-2 border-b border-rose-200 pb-2 flex items-center gap-2">
                               <Users size={14}/> Family Background
@@ -291,7 +268,6 @@ export default function ResidentList({ userRole, onEdit }) {
                               </div>
                             )}
                           </div>
-
                         </div>
                       </td>
                     </tr>
@@ -303,7 +279,7 @@ export default function ResidentList({ userRole, onEdit }) {
         </table>
       </div>
 
-      {/* 6. MODERN DELETE CONFIRMATION MODAL */}
+      {/* DELETE MODAL */}
       {deleteModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 slide-in-from-bottom-2 duration-300">
@@ -334,7 +310,6 @@ export default function ResidentList({ userRole, onEdit }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }

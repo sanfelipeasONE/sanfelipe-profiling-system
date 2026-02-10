@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
 import { UserPlus, Key, Trash2, Shield, User, Eye, EyeOff } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast'; // <--- 1. Import Toast
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -22,7 +22,7 @@ export default function UserManagement() {
       setUsers(res.data);
     } catch (err) {
       console.error("Failed to fetch users:", err);
-      toast.error("Could not load user list."); // Added error toast here for better UX
+      toast.error("Could not load user list.");
     } finally {
       setLoading(false);
     }
@@ -30,12 +30,10 @@ export default function UserManagement() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    // 2. Replaced Alert
     if (!newUser.username || !newUser.password) return toast.error("Please fill all fields");
     
     try {
       await api.post('/users/', newUser);
-      // 3. Replaced Alert
       toast.success("User Created Successfully!");
       
       setNewUser({ username: '', password: '', role: 'barangay' });
@@ -50,8 +48,6 @@ export default function UserManagement() {
   };
 
   const handleResetPassword = async (id, username) => {
-    // Note: prompt() is still used for input as replacing it requires a full UI Modal,
-    // but the feedback alerts are now Toasts.
     const newPass = window.prompt(`Enter new password for user '${username}':`);
     if (!newPass) return;
 

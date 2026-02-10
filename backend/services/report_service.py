@@ -37,10 +37,9 @@ def generate_household_excel(db: Session, barangay_name: str = None):
 
         total_members = 1 + len(r.family_members)
 
-        # --- KEY FIX: ENSURE BARANGAY IS IN THIS LIST ---
         data_list.append({
             'ID': r.id,
-            'Barangay': r.barangay,  # <--- CRITICAL FIELD
+            'Barangay': r.barangay,
             'House No': r.house_no,
             'Purok': r.purok,
             'Household Head': full_name.upper(),
@@ -60,7 +59,6 @@ def generate_household_excel(db: Session, barangay_name: str = None):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         
-        # Write data starting at Row 7 (index 6)
         df.to_excel(writer, sheet_name='Master_List', startrow=6, header=False, index=False)
 
         workbook = writer.book
@@ -86,7 +84,6 @@ def generate_household_excel(db: Session, barangay_name: str = None):
         worksheet.merge_range('A4:M4', title_text, fmt_title)
 
         # --- COLUMNS ---
-        # Ensure 'Barangay' is the second item here
         headers = ['ID', 'Barangay', 'House #', 'Purok', 'Household Head', 'Spouse', 'Sex', 'Age', 'Status', 'Occupation', 'Total', 'Sectors', 'Contact']
         
         for col, h in enumerate(headers):
@@ -94,7 +91,7 @@ def generate_household_excel(db: Session, barangay_name: str = None):
 
         # --- WIDTHS ---
         worksheet.set_column('A:A', 5, fmt_center)   # ID
-        worksheet.set_column('B:B', 15, fmt_center)  # Barangay (NEW)
+        worksheet.set_column('B:B', 15, fmt_center)  # Barangay
         worksheet.set_column('C:C', 25, fmt_center)  # House
         worksheet.set_column('D:D', 12, fmt_center)  # Purok
         worksheet.set_column('E:E', 35, fmt_text)    # Head

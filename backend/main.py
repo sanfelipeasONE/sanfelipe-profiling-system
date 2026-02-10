@@ -5,7 +5,6 @@ from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-
 # Authentication Imports
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
@@ -96,7 +95,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 #      USER MANAGEMENT (ADMIN ONLY)
 # ==========================================
 
-# 1. Define Schemas for User Creation/Reset
 class UserCreate(BaseModel):
     username: str
     password: str
@@ -105,23 +103,19 @@ class UserCreate(BaseModel):
 class UserPasswordReset(BaseModel):
     new_password: str
 
-# 2. CREATE USER (The missing part causing 405 error)
 @app.post("/users/", status_code=status.HTTP_201_CREATED)
 def create_user(
     user: UserCreate, 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Only Admin can create users
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can create users")
 
-    # Check if username taken
     existing_user = db.query(models.User).filter(models.User.username == user.username).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    # Hash Password & Save
     hashed_pw = pwd_context.hash(user.password)
     new_user = models.User(username=user.username, hashed_password=hashed_pw, role=user.role)
     
@@ -129,14 +123,12 @@ def create_user(
     db.commit()
     return {"message": f"User {user.username} created successfully"}
 
-# 3. GET ALL USERS
 @app.get("/users/")
 def get_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Access denied")
     return db.query(models.User).all()
 
-# 4. RESET PASSWORD
 @app.put("/users/{user_id}/reset-password")
 def reset_password(
     user_id: int,
@@ -174,10 +166,20 @@ def read_residents(
     skip: int = 0, 
     limit: int = 100, 
     search: str = None, 
+    barangay: str = Query(None), 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    return crud.get_residents(db, skip=skip, limit=limit, search=search)
+    # --- DATA ISOLATION LOGIC ---
+    if current_user.role != "admin":
+        # If not an admin, force the barangay filter to match the user's username
+        # (Assuming username 'rosete' matches the barangay name 'Rosete')
+        # We capitalize it to match your database entries
+        user_barangay = current_user.username.capitalize() 
+        return crud.get_residents(db, skip=skip, limit=limit, search=search, barangay=user_barangay)
+
+    # Admins can still use the dropdown filter or see everyone
+    return crud.get_residents(db, skip=skip, limit=limit, search=search, barangay=barangay)
 
 @app.get("/residents/{resident_id}", response_model=schemas.Resident)
 def read_resident(
@@ -219,7 +221,7 @@ def delete_resident(
         raise HTTPException(status_code=404, detail="Resident not found")
     return db_resident
 
-# --- NEW: EXCEL EXPORT ENDPOINT ---
+# --- EXCEL EXPORT ENDPOINT ---
 @app.get("/export/excel")
 def export_residents_excel(
     barangay: str = Query(None, description="Filter by Barangay Name"),
@@ -257,4 +259,8 @@ def get_stats(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # --- ADDED: ONLY ADMIN CAN SEE DASHBOARD STATS ---
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied to dashboard statistics")
+        
     return crud.get_dashboard_stats(db)

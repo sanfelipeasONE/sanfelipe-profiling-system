@@ -5,9 +5,10 @@ from sqlalchemy import or_, func
 def get_resident(db: Session, resident_id: int):
     return db.query(models.ResidentProfile).filter(models.ResidentProfile.id == resident_id).first()
 
-def get_residents(db: Session, skip: int = 0, limit: int = 100, search: str = None):
+def get_residents(db: Session, skip: int = 0, limit: int = 100, search: str = None, barangay: str = None):
     query = db.query(models.ResidentProfile)
     
+    # 1. Apply Search Filter (Last Name or First Name)
     if search:
         search_fmt = f"%{search}%"
         query = query.filter(
@@ -16,6 +17,11 @@ def get_residents(db: Session, skip: int = 0, limit: int = 100, search: str = No
                 models.ResidentProfile.first_name.ilike(search_fmt)
             )
         )
+    
+    # 2. NEW: Apply Barangay Filter
+    if barangay:
+        # This matches the exact name from your dropdown (e.g., "Rosete")
+        query = query.filter(models.ResidentProfile.barangay == barangay)
     
     return query.offset(skip).limit(limit).all()
 
