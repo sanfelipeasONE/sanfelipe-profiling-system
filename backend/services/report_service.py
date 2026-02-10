@@ -95,7 +95,7 @@ def generate_household_excel(db: Session, barangay_name: str = None):
         # --- WIDTHS ---
         worksheet.set_column('A:A', 5, fmt_center)   # ID
         worksheet.set_column('B:B', 15, fmt_center)  # Barangay (NEW)
-        worksheet.set_column('C:C', 10, fmt_center)  # House
+        worksheet.set_column('C:C', 25, fmt_center)  # House
         worksheet.set_column('D:D', 12, fmt_center)  # Purok
         worksheet.set_column('E:E', 35, fmt_text)    # Head
         worksheet.set_column('F:F', 25, fmt_text)    # Spouse
@@ -104,7 +104,7 @@ def generate_household_excel(db: Session, barangay_name: str = None):
         worksheet.set_column('J:J', 15, fmt_text)    # Occupation
         worksheet.set_column('K:K', 6, fmt_center)   # Total
         worksheet.set_column('L:L', 15, fmt_text)    # Sectors
-        worksheet.set_column('M:M', 12, fmt_center)  # Contact
+        worksheet.set_column('M:M', 25, fmt_center)  # Contact
 
         # --- FREEZE PANES ---
         worksheet.freeze_panes(6, 0) 

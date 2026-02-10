@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 import { X, Plus, Trash2, User, MapPin, Briefcase, Heart, Save, Phone, Fingerprint } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 
 // --- HELPER COMPONENTS ---
 const InputGroup = ({ label, name, value, onChange, type = "text", required = false, placeholder }) => (
-  <div className="space-y-1">
+  <div className="space-y-1 w-full">
     <label className="text-xs font-bold text-stone-500 uppercase">{label}</label>
     <input 
       type={type} 
@@ -40,6 +41,7 @@ const SelectGroup = ({ label, name, value, onChange, options, required = false }
 // -------------------------------------------------------------
 
 export default function AddResidentForm({ onSuccess, onCancel, residentToEdit }) {
+  // 1. ADDED other_sector_details to initial state
   const [formData, setFormData] = useState({
     last_name: '', first_name: '', middle_name: '', ext_name: '',
     house_no: '', purok: '', barangay: '',
@@ -47,7 +49,8 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     occupation: '', precinct_no: '', contact_no: '',
     spouse_last_name: '', spouse_first_name: '', spouse_middle_name: '', spouse_ext_name: '',
     sector_ids: [],
-    family_members: [] 
+    family_members: [],
+    other_sector_details: '' 
   });
 
   const [barangayOptions, setBarangayOptions] = useState([]);
@@ -68,6 +71,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         setSectorOptions(sRes.data);
       } catch (err) {
         console.error("Error loading options:", err);
+        toast.error("Failed to load form options.");
       }
     };
     fetchOptions();
@@ -79,7 +83,9 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         ...residentToEdit,
         birthdate: residentToEdit.birthdate ? residentToEdit.birthdate.split('T')[0] : '',
         sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map(s => s.id) : [],
-        family_members: residentToEdit.family_members || []
+        family_members: residentToEdit.family_members || [],
+        // 2. ADDED population of other_sector_details on edit
+        other_sector_details: residentToEdit.other_sector_details || ''
       });
     }
   }, [residentToEdit]);
@@ -92,12 +98,23 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const handleSectorChange = (e) => {
     const sectorId = parseInt(e.target.value);
     if (!sectorId) return;
+    
+    // Logic to clear "other details" if "Others" is unchecked (Optional but recommended)
+    const otherSector = sectorOptions.find(s => s.name.toLowerCase().includes('other'));
+    const isUncheckingOther = otherSector && sectorId === otherSector.id && formData.sector_ids.includes(sectorId);
+
     setFormData(prev => {
+      let newSectorIds;
+      let newOtherDetails = prev.other_sector_details;
+
       if (prev.sector_ids.includes(sectorId)) {
-        return { ...prev, sector_ids: prev.sector_ids.filter(id => id !== sectorId) };
+        newSectorIds = prev.sector_ids.filter(id => id !== sectorId);
+        if (isUncheckingOther) newOtherDetails = ''; // Clear text if unchecking
       } else {
-        return { ...prev, sector_ids: [...prev.sector_ids, sectorId] };
+        newSectorIds = [...prev.sector_ids, sectorId];
       }
+
+      return { ...prev, sector_ids: newSectorIds, other_sector_details: newOtherDetails };
     });
   };
 
@@ -127,23 +144,32 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     try {
       if (residentToEdit) {
         await api.put(`/residents/${residentToEdit.id}`, formData);
-        alert("Resident Updated!");
+        toast.success("Resident Updated Successfully!");
       } else {
         await api.post('/residents/', formData);
-        alert("Resident Added!");
+        toast.success("Resident Added Successfully!");
       }
-      onSuccess();
+      
+      setTimeout(() => {
+          onSuccess(); 
+      }, 1500);
+
     } catch (error) {
       console.error(error);
-      alert("Error saving data.");
-    } finally {
-      setLoading(false);
+      toast.error("Error saving data.");
+      setLoading(false); 
     }
   };
+
+  // Helper to check if "Others" is selected
+  const otherSector = sectorOptions.find(s => s.name.toLowerCase().includes('other'));
+  const isOtherSelected = otherSector && formData.sector_ids.includes(otherSector.id);
 
   return (
     <div className="max-w-5xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500"> 
       
+      <Toaster position="top-center" />
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-stone-900 tracking-tight">
           {residentToEdit ? "Edit Resident Profile" : "Register New Resident"}
@@ -317,6 +343,22 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
               );
             })}
           </div>
+
+          {/* 3. ADDED Dynamic Logic for "Other" Input */}
+          {isOtherSelected && (
+            <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+               <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-100">
+                  <InputGroup 
+                    label="Please Specify Other Sector" 
+                    name="other_sector_details" 
+                    value={formData.other_sector_details} 
+                    onChange={handleChange} 
+                    placeholder="e.g. Solo Parent etc."
+                    required={true} 
+                  />
+               </div>
+            </div>
+          )}
         </div>
 
         {/* FLOATING ACTION BAR */}

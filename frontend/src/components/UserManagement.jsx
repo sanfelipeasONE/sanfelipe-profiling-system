@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
-import { UserPlus, Key, Trash2, Shield, User, Eye, EyeOff } from 'lucide-react'; // <--- Added Eye icons
+import { UserPlus, Key, Trash2, Shield, User, Eye, EyeOff } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast'; // <--- 1. Import Toast
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -8,7 +9,6 @@ export default function UserManagement() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // New State for "Show Password" toggle
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
@@ -22,6 +22,7 @@ export default function UserManagement() {
       setUsers(res.data);
     } catch (err) {
       console.error("Failed to fetch users:", err);
+      toast.error("Could not load user list."); // Added error toast here for better UX
     } finally {
       setLoading(false);
     }
@@ -29,36 +30,47 @@ export default function UserManagement() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!newUser.username || !newUser.password) return alert("Please fill all fields");
+    // 2. Replaced Alert
+    if (!newUser.username || !newUser.password) return toast.error("Please fill all fields");
     
     try {
       await api.post('/users/', newUser);
-      alert("User Created Successfully!");
+      // 3. Replaced Alert
+      toast.success("User Created Successfully!");
+      
       setNewUser({ username: '', password: '', role: 'barangay' });
       setShowForm(false);
-      setShowPassword(false); // Reset visibility
+      setShowPassword(false);
       fetchUsers(); 
     } catch (err) {
       console.error(err);
-      alert("Failed to create user. Username might be taken.");
+      // 4. Replaced Alert
+      toast.error("Failed to create user. Username might be taken.");
     }
   };
 
   const handleResetPassword = async (id, username) => {
-    const newPass = prompt(`Enter new password for user '${username}':`);
+    // Note: prompt() is still used for input as replacing it requires a full UI Modal,
+    // but the feedback alerts are now Toasts.
+    const newPass = window.prompt(`Enter new password for user '${username}':`);
     if (!newPass) return;
 
     try {
       await api.put(`/users/${id}/reset-password`, { new_password: newPass });
-      alert("Password reset successfully.");
+      // 5. Replaced Alert
+      toast.success("Password reset successfully.");
     } catch (err) {
-      alert("Failed to reset password.");
+      // 6. Replaced Alert
+      toast.error("Failed to reset password.");
     }
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 animate-in fade-in">
       
+      {/* 7. Added Toaster Component */}
+      <Toaster position="top-center" reverseOrder={false} />
+
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
@@ -109,7 +121,7 @@ export default function UserManagement() {
                   <Key size={16} className="absolute left-3 top-3 text-stone-400" />
                   <input 
                     placeholder="••••••••" 
-                    type={showPassword ? "text" : "password"} // <--- Toggle Type
+                    type={showPassword ? "text" : "password"} 
                     className="w-full pl-9 pr-10 py-2.5 bg-white border border-stone-200 rounded-lg focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all text-sm"
                     value={newUser.password}
                     onChange={e => setNewUser({...newUser, password: e.target.value})}
