@@ -8,7 +8,7 @@ import {
   X, 
   ChevronRight,
   ShieldCheck,
-  Zap
+  Settings // <--- 1. Added Settings Icon
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -37,7 +37,7 @@ export default function Sidebar({ userRole = 'admin' }) {
 
   return (
     <>
-      {/* Mobile Header - Deep Red Background */}
+      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 w-full h-16 bg-[#1a0505] flex items-center justify-between px-5 z-40 border-b border-red-900/50">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-red-700 flex items-center justify-center shadow-lg shadow-red-900/50">
@@ -67,7 +67,7 @@ export default function Sidebar({ userRole = 'admin' }) {
         />
       )}
 
-      {/* Sidebar Container - Main Red Theme */}
+      {/* Sidebar Container */}
       <aside className={`
         fixed top-0 left-0 h-full w-[280px] 
         bg-[#1a0505] text-white z-50 
@@ -91,10 +91,10 @@ export default function Sidebar({ userRole = 'admin' }) {
             </div>
 
             <div className="flex flex-col">
-              <h1 className="font-bold text-[17px] text-white leading-tight">San Felipe</h1>
+              <h1 className="font-bold text-[17px] text-white leading-tight">LGU San Felipe</h1>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                <span className="text-[10px] font-bold text-red-300 uppercase tracking-widest">Official Portal</span>
+                <span className="text-[10px] font-bold text-red-300 uppercase tracking-widest">Province of Zambales</span>
               </div>
             </div>
           </div>
@@ -109,7 +109,9 @@ export default function Sidebar({ userRole = 'admin' }) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-8 px-5 space-y-2">
-          <div className="px-3 mb-4">
+          
+          {/* Main Menu Section */}
+          <div className="px-3 mb-2">
             <p className="text-[11px] font-bold text-red-300/60 uppercase tracking-widest">Main Menu</p>
           </div>
           
@@ -140,6 +142,38 @@ export default function Sidebar({ userRole = 'admin' }) {
               </button>
             );
           })}
+
+          {/* 2. ADMIN CONTROLS SECTION (Only for Admins) */}
+          {userRole === 'admin' && (
+            <>
+              <div className="px-3 mt-8 mb-2">
+                <p className="text-[11px] font-bold text-red-300/60 uppercase tracking-widest">Admin Controls</p>
+              </div>
+              
+              <button
+                onClick={() => handleNavigate('/dashboard/users')}
+                className={`
+                  w-full flex items-center justify-between px-4 py-3.5 rounded-xl
+                  transition-all duration-200 group
+                  ${location.pathname === '/dashboard/users'
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-900/40 ring-1 ring-white/10' 
+                    : 'text-red-200/70 hover:text-white hover:bg-red-900/30'
+                  }
+                `}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`
+                    ${location.pathname === '/dashboard/users' ? 'text-white' : 'text-red-400 group-hover:text-red-200'}
+                  `}>
+                    <Settings size={18} />
+                  </div>
+                  <span className="font-medium text-[14px] tracking-wide">User Management</span>
+                </div>
+                {location.pathname === '/dashboard/users' && <ChevronRight size={14} className="text-red-200" />}
+              </button>
+            </>
+          )}
+
         </nav>
 
         {/* Footer */}

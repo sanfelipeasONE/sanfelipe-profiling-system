@@ -76,7 +76,7 @@ export default function Login({ onLogin }) {
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tight text-white">LGU San Felipe</h1>
-                <p className="text-rose-200 text-xs font-medium uppercase tracking-wider">Official Portal</p>
+                <p className="text-rose-200 text-xs font-medium uppercase tracking-wider">Province of Zambales</p>
               </div>
             </div>
 
@@ -86,7 +86,7 @@ export default function Login({ onLogin }) {
                 Residential <span className="text-rose-400">Profiling System</span>
               </h2>
               <p className="text-stone-200 text-sm leading-relaxed opacity-90">
-                Welcome to the centralized data management platform for the Municipality of San Felipe, Zambales. Secure, efficient, and reliable.
+                Welcome to the residential profile system for the Municipality of San Felipe, Zambales.
               </p>
             </div>
           </div>
@@ -165,13 +165,6 @@ export default function Login({ onLogin }) {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-            </div>
-
-            {/* Forgot Password Link */}
-            <div className="flex justify-end">
-              <a href="#" className="text-sm font-medium text-rose-600 hover:text-rose-700 hover:underline">
-                Forgot password?
-              </a>
             </div>
 
             {/* Submit Button */}

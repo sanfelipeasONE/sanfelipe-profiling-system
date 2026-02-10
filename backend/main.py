@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query
-from fastapi.responses import StreamingResponse # <--- ADDED THIS
+from fastapi.responses import StreamingResponse 
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel # <--- ADDED THIS
 
 # Authentication Imports
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -14,7 +15,7 @@ from dotenv import load_dotenv
 
 import models, schemas, crud
 from database import engine, get_db
-from services import report_service # <--- ADDED THIS
+from services import report_service 
 
 # Create Tables
 models.Base.metadata.create_all(bind=engine)
@@ -90,7 +91,74 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer", "role": user.role}
 
-# --- PROTECTED API ENDPOINTS ---
+# ==========================================
+#      USER MANAGEMENT (ADMIN ONLY)
+# ==========================================
+
+# 1. Define Schemas for User Creation/Reset
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "barangay" 
+
+class UserPasswordReset(BaseModel):
+    new_password: str
+
+# 2. CREATE USER (The missing part causing 405 error)
+@app.post("/users/", status_code=status.HTTP_201_CREATED)
+def create_user(
+    user: UserCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Only Admin can create users
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can create users")
+
+    # Check if username taken
+    existing_user = db.query(models.User).filter(models.User.username == user.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+
+    # Hash Password & Save
+    hashed_pw = pwd_context.hash(user.password)
+    new_user = models.User(username=user.username, hashed_password=hashed_pw, role=user.role)
+    
+    db.add(new_user)
+    db.commit()
+    return {"message": f"User {user.username} created successfully"}
+
+# 3. GET ALL USERS
+@app.get("/users/")
+def get_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+    return db.query(models.User).all()
+
+# 4. RESET PASSWORD
+@app.put("/users/{user_id}/reset-password")
+def reset_password(
+    user_id: int,
+    password_data: UserPasswordReset,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can reset passwords")
+
+    user_to_edit = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user_to_edit:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_to_edit.hashed_password = pwd_context.hash(password_data.new_password)
+    db.commit()
+    
+    return {"message": f"Password for {user_to_edit.username} has been reset."}
+
+
+# ==========================================
+#      RESIDENT ENDPOINTS
+# ==========================================
 
 @app.post("/residents/", response_model=schemas.Resident)
 def create_resident(
@@ -155,15 +223,11 @@ def delete_resident(
 def export_residents_excel(
     barangay: str = Query(None, description="Filter by Barangay Name"),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user) # Locked to logged-in users
+    current_user: models.User = Depends(get_current_user) 
 ):
-    # 1. Generate the Excel file in memory
     excel_file = report_service.generate_household_excel(db, barangay_name=barangay)
-    
-    # 2. Create a filename
     filename = f"SanFelipe_Households_{barangay if barangay else 'All'}.xlsx"
     
-    # 3. Stream the response
     return StreamingResponse(
         excel_file,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
