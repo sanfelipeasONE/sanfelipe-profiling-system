@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse # <--- ADDED THIS
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +14,7 @@ from dotenv import load_dotenv
 
 import models, schemas, crud
 from database import engine, get_db
+from services import report_service # <--- ADDED THIS
 
 # Create Tables
 models.Base.metadata.create_all(bind=engine)
@@ -38,13 +40,12 @@ load_dotenv()
 # SECURITY CONFIGURATION
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-for-dev-only") 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 # Extended to 1 hour for convenience
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # --- AUTH HELPER FUNCTIONS ---
-
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -62,7 +63,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Decode the token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
@@ -70,7 +70,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
         
-    # Check if user exists in DB
     user = db.query(models.User).filter(models.User.username == username).first()
     if user is None:
         raise credentials_exception
@@ -79,98 +78,97 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 # --- LOGIN ENDPOINT ---
 @app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # 1. Check User
     user = db.query(models.User).filter(models.User.username == form_data.username).first()
-    
-    # 2. Check Password
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # 3. Create Token with ROLE included
     access_token = create_access_token(
-        data={
-            "sub": user.username, 
-            "role": user.role 
-        }
+        data={"sub": user.username, "role": user.role}
     )
     return {"access_token": access_token, "token_type": "bearer", "role": user.role}
 
 # --- PROTECTED API ENDPOINTS ---
 
-# 1. CREATE RESIDENT (Locked)
 @app.post("/residents/", response_model=schemas.Resident)
 def create_resident(
     resident: schemas.ResidentCreate, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user) # <--- LOCK ADDED
+    current_user: models.User = Depends(get_current_user)
 ):
     return crud.create_resident(db=db, resident=resident)
 
-# 2. READ ALL RESIDENTS (Locked)
 @app.get("/residents/", response_model=List[schemas.Resident])
 def read_residents(
     skip: int = 0, 
     limit: int = 100, 
     search: str = None, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user) # <--- LOCK ADDED
+    current_user: models.User = Depends(get_current_user)
 ):
     return crud.get_residents(db, skip=skip, limit=limit, search=search)
 
-# 3. READ ONE RESIDENT (Locked)
 @app.get("/residents/{resident_id}", response_model=schemas.Resident)
 def read_resident(
     resident_id: int, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user) # <--- LOCK ADDED
+    current_user: models.User = Depends(get_current_user)
 ):
     db_resident = crud.get_resident(db, resident_id=resident_id)
     if db_resident is None:
         raise HTTPException(status_code=404, detail="Resident not found")
     return db_resident
 
-# UPDATE RESIDENT
 @app.put("/residents/{resident_id}", response_model=schemas.Resident)
 def update_resident(
     resident_id: int, 
     resident: schemas.ResidentUpdate, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user) # Secure: Must be logged in
+    current_user: models.User = Depends(get_current_user)
 ):
-    # Call the CRUD function
     if current_user.role != "admin":
-        raise HTTPException(
-            status_code=403, 
-            detail="Access Denied: Only Admins can edit records."
-        )
+        raise HTTPException(status_code=403, detail="Access Denied")
 
     db_resident = crud.update_resident(db, resident_id=resident_id, resident_data=resident)
     if db_resident is None:
         raise HTTPException(status_code=404, detail="Resident not found")
     return db_resident
 
-# 4. DELETE RESIDENT (Locked + Admin Only)
 @app.delete("/residents/{resident_id}", response_model=schemas.Resident)
 def delete_resident(
     resident_id: int, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user) # <--- LOCK ADDED
+    current_user: models.User = Depends(get_current_user)
 ):
-    # ADMIN CHECK
     if current_user.role != "admin":
-        raise HTTPException(
-            status_code=403, 
-            detail="Access Denied: Only Admins can delete records."
-        )
+        raise HTTPException(status_code=403, detail="Access Denied")
 
     db_resident = crud.delete_resident(db, resident_id=resident_id)
     if db_resident is None:
         raise HTTPException(status_code=404, detail="Resident not found")
     return db_resident
+
+# --- NEW: EXCEL EXPORT ENDPOINT ---
+@app.get("/export/excel")
+def export_residents_excel(
+    barangay: str = Query(None, description="Filter by Barangay Name"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user) # Locked to logged-in users
+):
+    # 1. Generate the Excel file in memory
+    excel_file = report_service.generate_household_excel(db, barangay_name=barangay)
+    
+    # 2. Create a filename
+    filename = f"SanFelipe_Households_{barangay if barangay else 'All'}.xlsx"
+    
+    # 3. Stream the response
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # --- REFERENCE DATA ENDPOINTS ---
 @app.get("/barangays/", response_model=List[schemas.Barangay])

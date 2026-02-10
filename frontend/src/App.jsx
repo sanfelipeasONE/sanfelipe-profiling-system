@@ -65,13 +65,11 @@ function App() {
     <Routes>
       <Route path="/login" element={<Login onLogin={() => navigate('/dashboard')} />} />
       
-      {/* Protected Dashboard Routes */}
+      {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
          <Route path="/dashboard/*" element={<DashboardLayout />} />
+         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
-
-      {/* Catch-all redirect */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

@@ -1,13 +1,20 @@
 import { useEffect, useState, Fragment } from 'react'; 
 import api from '../api';
 import { Trash2, Edit, Search, Filter, ChevronDown, ChevronUp, Users, MapPin, Calendar } from 'lucide-react';
+import ExportButton from './ExportButton'; 
 
 export default function ResidentList({ userRole, onEdit }) {
   const [residents, setResidents] = useState([]);
+  
+  // --- NEW STATES FOR EXPORT ---
+  const [barangayList, setBarangayList] = useState([]);
+  const [selectedBarangay, setSelectedBarangay] = useState(''); // Default is empty (All)
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
 
+  // 1. Fetch Residents (List View)
   const fetchResidents = async (search = '') => {
     setLoading(true);
     try {
@@ -21,11 +28,31 @@ export default function ResidentList({ userRole, onEdit }) {
     }
   };
 
-  useEffect(() => { fetchResidents(); }, []);
+  // 2. Fetch Barangays for the Dropdown (Runs once on mount)
+  useEffect(() => {
+    const fetchBarangays = async () => {
+      try {
+        const response = await api.get('/barangays/');
+        setBarangayList(response.data);
+      } catch (error) {
+        console.error('Error fetching barangays:', error);
+      }
+    };
+    
+    fetchBarangays();
+    fetchResidents(); 
+  }, []);
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
     fetchResidents(e.target.value);
+  };
+
+  // 3. Handle Dropdown Change
+  const handleBarangayChange = (e) => {
+    setSelectedBarangay(e.target.value);
+    // Note: This currently only affects the EXPORT button.
+    // If you want the TABLE to filter too, you need to update your backend GET /residents endpoint.
   };
 
   const handleDelete = async (id) => {
@@ -49,6 +76,7 @@ export default function ResidentList({ userRole, onEdit }) {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+      
       {/* HEADER TOOLBAR */}
       <div className="p-6 border-b border-stone-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-stone-50/50">
         <div>
@@ -56,15 +84,38 @@ export default function ResidentList({ userRole, onEdit }) {
           <p className="text-sm text-stone-500 mt-1">Manage and view all registered residents.</p>
         </div>
         
-        <div className="relative w-full md:w-72 group">
-          <input 
-            type="text" 
-            placeholder="Search residents..." 
-            value={searchTerm}
-            onChange={handleSearch}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm group-hover:shadow-md text-stone-700 placeholder:text-stone-400"
-          />
-          <Search className="absolute left-3 top-3 text-stone-400 group-hover:text-rose-500 transition-colors" size={18} />
+        {/* RIGHT SIDE ACTIONS */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          
+          {/* A. BARANGAY DROPDOWN */}
+          <div className="relative">
+            <select
+              value={selectedBarangay}
+              onChange={handleBarangayChange}
+              className="appearance-none pl-4 pr-10 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-stone-700 cursor-pointer shadow-sm text-sm h-[42px]"
+            >
+              <option value="">All Barangays</option>
+              {barangayList.map((b) => (
+                <option key={b.id} value={b.name}>{b.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={14} />
+          </div>
+
+          {/* B. EXPORT BUTTON (Passes the selected barangay prop) */}
+          <ExportButton barangay={selectedBarangay} />
+
+          {/* C. SEARCH INPUT */}
+          <div className="relative w-full md:w-64 group">
+            <input 
+              type="text" 
+              placeholder="Search residents..." 
+              value={searchTerm}
+              onChange={handleSearch}
+              className="w-full pl-10 pr-4 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm group-hover:shadow-md text-stone-700 placeholder:text-stone-400 h-[42px]"
+            />
+            <Search className="absolute left-3 top-3 text-stone-400 group-hover:text-rose-500 transition-colors" size={18} />
+          </div>
         </div>
       </div>
 

@@ -1,16 +1,28 @@
 import { useState } from 'react';
-import { LayoutDashboard, Users, UserPlus, LogOut, Menu, X, ChevronRight } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Users, 
+  UserPlus, 
+  LogOut, 
+  Menu, 
+  X, 
+  ChevronRight,
+  ShieldCheck,
+  Zap
+} from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-export default function Sidebar({ userRole }) {
+export default function Sidebar({ userRole = 'admin' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
+  const logoUrl = "/san_felipe_seal.png"; 
+
   const menuItems = [
-    { label: 'Overview', path: '/dashboard/overview', icon: <LayoutDashboard size={20} /> },
-    { label: 'Resident Database', path: '/dashboard/residents', icon: <Users size={20} /> },
-    { label: 'Register Resident', path: '/dashboard/create', icon: <UserPlus size={20} /> },
+    { label: 'Overview', path: '/dashboard/overview', icon: <LayoutDashboard size={18} /> },
+    { label: 'Resident Database', path: '/dashboard/residents', icon: <Users size={18} /> },
+    { label: 'Register Resident', path: '/dashboard/create', icon: <UserPlus size={18} /> },
   ];
 
   const handleLogout = () => {
@@ -25,105 +37,129 @@ export default function Sidebar({ userRole }) {
 
   return (
     <>
-      {/* 1. MOBILE HEADER BAR (Visible only on small screens) */}
-      <div className="lg:hidden fixed top-0 left-0 w-full h-16 bg-stone-950 text-white flex items-center justify-between px-4 z-40 shadow-md border-b border-white/5">
+      {/* Mobile Header - Deep Red Background */}
+      <div className="lg:hidden fixed top-0 left-0 w-full h-16 bg-[#1a0505] flex items-center justify-between px-5 z-40 border-b border-red-900/50">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-red-600 to-rose-600 rounded flex items-center justify-center font-bold shadow-red-900/20">SF</div>
-          <span className="font-bold tracking-tight">San Felipe</span>
+          <div className="w-9 h-9 rounded-lg bg-red-700 flex items-center justify-center shadow-lg shadow-red-900/50">
+            <img 
+              src={logoUrl} 
+              alt="Seal" 
+              className="w-5 h-5 object-contain"
+              onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}
+            />
+            <ShieldCheck className="hidden w-5 h-5 text-red-100" />
+          </div>
+          <span className="font-semibold text-white text-[15px] tracking-tight">San Felipe</span>
         </div>
-        <button onClick={() => setIsOpen(true)} className="p-2 text-stone-300 hover:text-white transition-colors">
-          <Menu size={24} />
+        <button 
+          onClick={() => setIsOpen(true)} 
+          className="p-2 text-red-200 hover:text-white transition-all duration-200 rounded-lg hover:bg-red-500/20"
+        >
+          <Menu size={20} />
         </button>
       </div>
 
-      {/* 2. OVERLAY */}
+      {/* Overlay */}
       {isOpen && (
         <div 
           onClick={() => setIsOpen(false)}
-          className="fixed inset-0 bg-stone-950/60 z-40 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-red-950/80 backdrop-blur-sm z-40 lg:hidden"
         />
       )}
 
-      {/* 3. SIDEBAR */}
+      {/* Sidebar Container - Main Red Theme */}
       <aside className={`
-        fixed top-0 left-0 h-full w-72 
-        bg-stone-950 text-white z-50 shadow-2xl
-        border-r border-white/5
-        transition-transform duration-300 ease-in-out
+        fixed top-0 left-0 h-full w-[280px] 
+        bg-[#1a0505] text-white z-50 
+        border-r border-red-900/30 shadow-2xl shadow-black/50
+        transition-transform duration-300 ease-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
-        lg:translate-x-0 
+        lg:translate-x-0 flex flex-col
       `}>
-        {/* Background Gradient Mesh (Subtle) */}
-        <div className="absolute inset-0 bg-gradient-to-b from-stone-900 via-stone-950 to-black pointer-events-none -z-10"></div>
-        <div className="absolute top-0 left-0 w-full h-64 bg-red-900/10 blur-[80px] pointer-events-none -z-10"></div>
         
-        {/* HEADER */}
-        <div className="h-20 flex items-center justify-between px-6 border-b border-white/5 bg-white/[0.02]">
-          <div className="flex items-center gap-3">
-             <div className="w-10 h-10 bg-gradient-to-tr from-red-600 to-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/20 ring-1 ring-white/10">
-                <span className="font-bold text-lg text-white">SF</span>
-             </div>
-             <div>
-                <h1 className="font-bold text-lg tracking-tight">San Felipe</h1>
-                <p className="text-[10px] text-rose-200/80 uppercase tracking-widest font-semibold">Admin Portal</p>
-             </div>
+        {/* Header */}
+        <div className="relative h-[88px] flex items-center justify-between px-6 border-b border-red-900/30">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-red-600 to-red-800 rounded-xl flex items-center justify-center shadow-inner ring-1 ring-white/10">
+              <img 
+                src={logoUrl} 
+                alt="Seal" 
+                className="w-7 h-7 object-contain drop-shadow-md"
+                onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}
+              />
+              <ShieldCheck className="hidden w-6 h-6 text-white" />
+            </div>
+
+            <div className="flex flex-col">
+              <h1 className="font-bold text-[17px] text-white leading-tight">San Felipe</h1>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                <span className="text-[10px] font-bold text-red-300 uppercase tracking-widest">Official Portal</span>
+              </div>
+            </div>
           </div>
-          {/* Close Button (Mobile) */}
-          <button onClick={() => setIsOpen(false)} className="lg:hidden text-stone-400 hover:text-white transition-colors">
-            <X size={20} />
+
+          <button 
+            onClick={() => setIsOpen(false)} 
+            className="lg:hidden text-red-300 hover:text-white transition-all p-2 hover:bg-white/10 rounded-lg"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        {/* MENU */}
-        <nav className="p-4 space-y-2 mt-4">
-          <p className="px-4 text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Main Menu</p>
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-8 px-5 space-y-2">
+          <div className="px-3 mb-4">
+            <p className="text-[11px] font-bold text-red-300/60 uppercase tracking-widest">Main Menu</p>
+          </div>
+          
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <button
                 key={item.path}
                 onClick={() => handleNavigate(item.path)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${
-                  isActive 
-                    ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-900/30 ring-1 ring-white/20' 
-                    : 'text-stone-400 hover:bg-white/[0.06] hover:text-stone-100'
-                }`}
+                className={`
+                  w-full flex items-center justify-between px-4 py-3.5 rounded-xl
+                  transition-all duration-200 group
+                  ${isActive 
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-900/40 ring-1 ring-white/10' 
+                    : 'text-red-200/70 hover:text-white hover:bg-red-900/30'
+                  }
+                `}
               >
-                <div className="flex items-center gap-3">
-                  <span className={`${isActive ? 'text-white' : 'text-stone-500 group-hover:text-stone-300'}`}>
+                <div className="flex items-center gap-3.5">
+                  <div className={`
+                    ${isActive ? 'text-white' : 'text-red-400 group-hover:text-red-200'}
+                  `}>
                     {item.icon}
-                  </span>
-                  <span className="font-medium text-sm">{item.label}</span>
+                  </div>
+                  <span className="font-medium text-[14px] tracking-wide">{item.label}</span>
                 </div>
-                {isActive && <ChevronRight size={16} className="text-rose-100 opacity-70" />}
+                {isActive && <ChevronRight size={14} className="text-red-200" />}
               </button>
             );
           })}
         </nav>
 
-        {/* FOOTER */}
-        <div className="absolute bottom-0 w-full p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm">
-          <div className="flex items-center gap-3 mb-4 px-2">
-             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-700 to-stone-600 flex items-center justify-center font-bold text-sm border border-stone-600 ring-2 ring-stone-900">
-                {userRole === 'admin' ? 'A' : 'B'}
-             </div>
-             <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-stone-100 capitalize truncate">{userRole}</p>
-                <div className="flex items-center gap-1.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <p className="text-xs text-stone-400">Online</p>
-                </div>
-             </div>
+        {/* Footer */}
+        <div className="p-5 border-t border-red-900/30 bg-[#160404]">
+          <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-red-950/30 border border-red-900/20">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-red-500 to-orange-500 flex items-center justify-center text-white font-bold ring-2 ring-[#1a0505]">
+              {userRole.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-white truncate capitalize">{userRole} Account</p>
+              <p className="text-[10px] text-red-300/70 font-medium">System Active</p>
+            </div>
           </div>
+
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 bg-stone-800 hover:bg-red-950/50 text-stone-400 hover:text-red-400 py-2.5 rounded-lg transition-all text-sm font-semibold border border-transparent hover:border-red-900/30"
+            className="w-full mt-3 flex items-center justify-center gap-2.5 py-3 rounded-xl text-red-300/60 hover:text-red-200 hover:bg-red-900/20 transition-all duration-200 border border-transparent hover:border-red-900/30"
           >
-            <LogOut size={16} /> 
-            <span>Sign Out</span>
+            <LogOut size={15} /> 
+            <span className="text-xs font-semibold uppercase tracking-wider">Sign Out</span>
           </button>
         </div>
 
