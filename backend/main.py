@@ -199,25 +199,34 @@ def create_resident(
 ):
     return crud.create_resident(db=db, resident=resident)
 
-@app.get("/residents/", response_model=List[schemas.Resident])
+# main.py
+
+@app.get("/residents/")
 def read_residents(
     skip: int = 0, 
-    limit: int = 100, 
+    limit: int = 20, 
     search: str = None, 
     barangay: str = Query(None), 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # --- DATA ISOLATION LOGIC ---
+    # Determine filter scope based on isolation logic
+    filter_barangay = barangay
     if current_user.role != "admin":
-        # If not an admin, force the barangay filter to match the user's username
-        # (Assuming username 'rosete' matches the barangay name 'Rosete')
-        # We capitalize it to match your database entries
-        user_barangay = current_user.username.capitalize() 
-        return crud.get_residents(db, skip=skip, limit=limit, search=search, barangay=user_barangay)
+        # Force staff to see only their assigned barangay
+        filter_barangay = current_user.username.capitalize()
 
-    # Admins can still use the dropdown filter or see everyone
-    return crud.get_residents(db, skip=skip, limit=limit, search=search, barangay=barangay)
+    # 1. Get total for the pagination UI
+    total = crud.get_resident_count(db, search=search, barangay=filter_barangay)
+    
+    # 2. Get the specific chunk of residents
+    residents = crud.get_residents(db, skip=skip, limit=limit, search=search, barangay=filter_barangay)
+
+    # 3. RETURN OBJECT, NOT LIST
+    return {
+        "items": residents,
+        "total": total
+    }
 
 @app.get("/residents/{resident_id}", response_model=schemas.Resident)
 def read_resident(

@@ -5,10 +5,11 @@ from sqlalchemy import or_, func
 def get_resident(db: Session, resident_id: int):
     return db.query(models.ResidentProfile).filter(models.ResidentProfile.id == resident_id).first()
 
-def get_residents(db: Session, skip: int = 0, limit: int = 100, search: str = None, barangay: str = None):
+# --- FIX: Added Count Function for Pagination ---
+def get_resident_count(db: Session, search: str = None, barangay: str = None):
     query = db.query(models.ResidentProfile)
     
-    # 1. Apply Search Filter (Last Name or First Name)
+    # Apply Search Filter
     if search:
         search_fmt = f"%{search}%"
         query = query.filter(
@@ -18,12 +19,33 @@ def get_residents(db: Session, skip: int = 0, limit: int = 100, search: str = No
             )
         )
     
-    # 2. NEW: Apply Barangay Filter
+    # Apply Barangay Filter
     if barangay:
-        # This matches the exact name from your dropdown (e.g., "Rosete")
+        query = query.filter(models.ResidentProfile.barangay == barangay)
+        
+    return query.count()
+
+# --- FIX: Updated Fetcher with Pagination & Strict Filtering ---
+def get_residents(db: Session, skip: int = 0, limit: int = 20, search: str = None, barangay: str = None):
+    query = db.query(models.ResidentProfile)
+    
+    # 1. Apply Search Filter
+    if search:
+        search_fmt = f"%{search}%"
+        query = query.filter(
+            or_(
+                models.ResidentProfile.last_name.ilike(search_fmt),
+                models.ResidentProfile.first_name.ilike(search_fmt)
+            )
+        )
+    
+    # 2. Apply Barangay Filter
+    if barangay:
+        # Ensures exact match (Case Sensitive by default in Postgres, which is good for "Rosete" vs "rosete")
         query = query.filter(models.ResidentProfile.barangay == barangay)
     
-    return query.offset(skip).limit(limit).all()
+    # 3. Apply Pagination & Sort by Newest First
+    return query.order_by(models.ResidentProfile.id.desc()).offset(skip).limit(limit).all()
 
 def create_resident(db: Session, resident: schemas.ResidentCreate):
     try:
@@ -34,7 +56,7 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         sector_ids = resident_data.pop("sector_ids", [])
         resident_data.pop("sector_summary", None)
         
-        # Create the "sector_summary" string
+        # Create the "sector_summary" string for quick display
         sector_names_list = []
         if sector_ids:
             selected_sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
@@ -52,7 +74,7 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         db.commit()
         db.refresh(db_resident)
 
-        # Associate Sectors
+        # Associate Sectors (Many-to-Many)
         if sector_ids:
             sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
             db_resident.sectors = sectors
@@ -77,28 +99,28 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         return None
 
     # 2. Update Basic Fields
-    # We convert the input data to a dictionary, excluding the complex lists
+    # Convert input data to dictionary, excluding complex lists
     update_data = resident_data.dict(exclude={'sector_ids', 'family_members'})
     
     for key, value in update_data.items():
-        setattr(db_resident, key, value) # Update the field
+        setattr(db_resident, key, value) 
 
     # 3. Update Sectors (Clear old, Add new)
-    db_resident.sectors.clear() # Remove all existing sectors
-    for s_id in resident_data.sector_ids:
-        sector = db.query(models.Sector).filter(models.Sector.id == s_id).first()
-        if sector:
-            db_resident.sectors.append(sector)
+    db_resident.sectors.clear() 
+    if resident_data.sector_ids:
+        new_sectors = db.query(models.Sector).filter(models.Sector.id.in_(resident_data.sector_ids)).all()
+        db_resident.sectors = new_sectors
+
+        # Update summary string
+        db_resident.sector_summary = ", ".join([s.name for s in new_sectors])
 
     # 4. Update Family Members (Delete old, Add new)
-    # First, delete all existing family members for this person
     db.query(models.FamilyMember).filter(models.FamilyMember.profile_id == resident_id).delete()
     
-    # Then add the new list
     for fm_data in resident_data.family_members:
         new_fm = models.FamilyMember(
             **fm_data.dict(),
-            profile_id=resident_id # Link to this resident
+            profile_id=resident_id 
         )
         db.add(new_fm)
 
@@ -130,12 +152,9 @@ def get_dashboard_stats(db: Session):
         models.ResidentProfile.barangay, func.count(models.ResidentProfile.id)
     ).group_by(models.ResidentProfile.barangay).all()
     
-    # Convert list of tuples to dictionary { "Amagna": 150, "Apostol": 200 }
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
     # 4. Count by Sector (Group By)
-    # This is trickier because it's a Many-to-Many relationship. 
-    # We query the link table directly or join.
     sector_counts = db.query(
         models.Sector.name, func.count(models.resident_sectors.c.resident_id)
     ).join(models.resident_sectors).group_by(models.Sector.name).all()
