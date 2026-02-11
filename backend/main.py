@@ -323,26 +323,18 @@ def get_stats(
 @app.get("/system/fix-ghost-records")
 def fix_ghost_records(db: Session = Depends(get_db)):
     try:
-        # Attempt 1: Try updating 'residents' table
-        query = text("UPDATE residents SET barangay = 'Rosete' WHERE barangay IS NULL OR barangay = 'San Felipe';")
+        # Targeted fix for 'resident_profiles'
+        # This moves any 'San Felipe' or NULL records to 'Rosete'
+        query = text("UPDATE resident_profiles SET barangay = 'Rosete' WHERE barangay IS NULL OR barangay = 'San Felipe';")
+        
         db.execute(query)
         db.commit()
-        return {"status": "success", "message": "Fixed using 'residents' table"}
+        
+        return {"status": "success", "message": "Successfully moved ghost records to 'Rosete'!"}
         
     except Exception as e:
-        # CRITICAL FIX: Rollback the failed transaction so we can try again
-        db.rollback() 
-        
-        try:
-            # Attempt 2: Try updating 'resident_profiles' table
-            query_backup = text("UPDATE resident_profiles SET barangay = 'Rosete' WHERE barangay IS NULL OR barangay = 'San Felipe';")
-            db.execute(query_backup)
-            db.commit()
-            return {"status": "success", "message": "Fixed using 'resident_profiles' table"}
-            
-        except Exception as e2:
-            # If both fail, print the actual error
-            return {"status": "error", "detail": f"Both attempts failed. Error: {str(e2)}"}
+        db.rollback() # Important: Reset if anything goes wrong
+        return {"status": "error", "detail": str(e)}
         
 @app.get("/debug/tables")
 def debug_tables(db: Session = Depends(get_db)):
