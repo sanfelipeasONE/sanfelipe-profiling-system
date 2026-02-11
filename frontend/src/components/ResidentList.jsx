@@ -1,32 +1,28 @@
-import { useEffect, useState, Fragment } from 'react'; 
+import { useEffect, useState, Fragment } from 'react';
 import api from '../api';
-import { Trash2, Edit, Search, Filter, ChevronDown, ChevronUp, Users, MapPin, Calendar, AlertTriangle, X } from 'lucide-react';
-import ExportButton from './ExportButton'; 
+import { Trash2, Edit, Search, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, Loader2, Filter, Phone, Fingerprint, Heart, User } from 'lucide-react';
+import ExportButton from './ExportButton';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function ResidentList({ userRole, onEdit }) {
   const [residents, setResidents] = useState([]);
   const [barangayList, setBarangayList] = useState([]);
-  const [selectedBarangay, setSelectedBarangay] = useState(''); 
+  const [selectedBarangay, setSelectedBarangay] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [expandedRow, setExpandedRow] = useState(null);
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, residentId: null });
+  const [expandedRow, setExpandedRow] = useState(null); // Tracks which ID is expanded
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, residentId: null, name: '' });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 1. Fetch Residents
   const fetchResidents = async (search = '', barangay = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (barangay) params.append('barangay', barangay);
-      
-      const queryString = params.toString() ? `?${params.toString()}` : '';
-      const response = await api.get(`/residents/${queryString}`);
+      const response = await api.get(`/residents/?${params.toString()}`);
       setResidents(response.data);
     } catch (error) {
-      console.error('Error fetching residents:', error);
       toast.error("Failed to load residents.");
     } finally {
       setLoading(false);
@@ -38,47 +34,11 @@ export default function ResidentList({ userRole, onEdit }) {
       try {
         const response = await api.get('/barangays/');
         setBarangayList(response.data);
-      } catch (error) {
-        console.error('Error fetching barangays:', error);
-      }
+      } catch (err) { console.error(err); }
     };
-    
     fetchBarangays();
-    fetchResidents(searchTerm, selectedBarangay); 
+    fetchResidents();
   }, []);
-
-  const handleSearch = (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    fetchResidents(value, selectedBarangay);
-  };
-
-  const handleBarangayChange = (e) => {
-    const value = e.target.value;
-    setSelectedBarangay(value);
-    fetchResidents(searchTerm, value);
-  };
-
-  const promptDelete = (id, e) => {
-    e.stopPropagation();
-    setDeleteModal({ isOpen: true, residentId: id });
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteModal.residentId) return;
-    setIsDeleting(true);
-    try {
-      await api.delete(`/residents/${deleteModal.residentId}`);
-      toast.success('Resident deleted successfully');
-      setDeleteModal({ isOpen: false, residentId: null });
-      fetchResidents(searchTerm, selectedBarangay);
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to delete resident.');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -89,231 +49,206 @@ export default function ResidentList({ userRole, onEdit }) {
     setExpandedRow(expandedRow === id ? null : id);
   };
 
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await api.delete(`/residents/${deleteModal.residentId}`);
+      toast.success('Resident removed');
+      setDeleteModal({ isOpen: false, residentId: null, name: '' });
+      fetchResidents(searchTerm, selectedBarangay);
+    } catch (err) { toast.error('Error deleting record.'); }
+    finally { setIsDeleting(false); }
+  };
+
+  // --- RENDER DETAIL COMPONENT ---
+  const ResidentDetails = ({ r }) => (
+    <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone-50/50 border-t border-stone-100 animate-in slide-in-from-top-2 duration-300">
+      <div className="space-y-4">
+        <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
+          <User size={14} /> Personal Details
+        </h4>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] text-stone-400 uppercase font-bold">Civil Status</p>
+            <p className="text-sm font-semibold text-stone-700">{r.civil_status || 'N/A'}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-stone-400 uppercase font-bold">Contact No.</p>
+            <p className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
+              <Phone size={12} /> {r.contact_no || 'N/A'}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-stone-400 uppercase font-bold">Precinct No.</p>
+            <p className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
+              <Fingerprint size={12} /> {r.precinct_no || 'N/A'}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-4">
+        <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
+          <Heart size={14} /> Family Background
+        </h4>
+        {r.family_members?.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {r.family_members.map((fm, i) => (
+              <div key={i} className="px-3 py-1.5 bg-white border border-stone-200 rounded-lg shadow-sm text-xs">
+                <span className="font-bold text-stone-800">{fm.first_name} {fm.last_name}</span>
+                <span className="ml-2 text-stone-400 italic">({fm.relationship})</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-stone-400 italic">No family members recorded.</p>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-4 animate-in fade-in duration-500">
       <Toaster position="top-center" />
 
-      {/* HEADER TOOLBAR */}
-      <div className="p-6 border-b border-stone-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-stone-50/50">
-        <div>
-          <h2 className="text-xl font-bold text-stone-900 tracking-tight">Resident Database</h2>
-          <p className="text-sm text-stone-500 mt-1">Manage and view all registered residents.</p>
+      {/* SEARCH & FILTERS */}
+      <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 md:p-6 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-stone-900">Resident Database</h2>
+            <p className="text-xs text-stone-500">Manage community records.</p>
+          </div>
+          <ExportButton barangay={selectedBarangay} />
         </div>
-        
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          {/* Only show the Barangay Filter dropdown if the user is an Admin */}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="relative group">
+            <input 
+              type="text" 
+              placeholder="Search by name..." 
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); fetchResidents(e.target.value, selectedBarangay); }}
+              className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-100 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none text-sm"
+            />
+            <Search className="absolute left-3 top-3.5 text-stone-400 group-focus-within:text-rose-500" size={18} />
+          </div>
+
           {userRole === 'admin' && (
             <div className="relative">
               <select
                 value={selectedBarangay}
-                onChange={handleBarangayChange}
-                className="appearance-none pl-4 pr-10 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-stone-700 cursor-pointer shadow-sm text-sm h-[42px]"
+                onChange={(e) => { setSelectedBarangay(e.target.value); fetchResidents(searchTerm, e.target.value); }}
+                className="w-full appearance-none pl-10 pr-10 py-3 bg-stone-50 border border-stone-100 rounded-xl outline-none text-sm focus:ring-2 focus:ring-rose-500/20"
               >
                 <option value="">All Barangays</option>
-                {barangayList.map((b) => (
-                  <option key={b.id} value={b.name}>{b.name}</option>
-                ))}
+                {barangayList.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
               </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={14} />
+              <Filter className="absolute left-3 top-3.5 text-stone-400" size={16} />
+              <ChevronDown className="absolute right-3 top-3.5 text-stone-400" size={14} />
             </div>
           )}
-
-          <ExportButton barangay={selectedBarangay} />
-
-          {/* SEARCH INPUT */}
-          <div className="relative w-full md:w-64 group">
-            <input 
-              type="text" 
-              placeholder="Search residents..." 
-              value={searchTerm}
-              onChange={handleSearch}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm group-hover:shadow-md text-stone-700 placeholder:text-stone-400 h-[42px]"
-            />
-            <Search className="absolute left-3 top-3 text-stone-400 group-hover:text-rose-500 transition-colors" size={18} />
-          </div>
         </div>
       </div>
 
-      {/* TABLE */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-stone-50/80 border-b border-stone-100">
-              <th className="w-12 py-4 px-4"></th>
-              <th className="py-4 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Name / Occupation</th>
-              <th className="py-4 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Birthdate</th>
-              <th className="py-4 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Address</th>
-              <th className="py-4 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Sector Status</th>
-              <th className="py-4 px-4 text-center text-xs font-bold text-stone-400 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-100">
-            {loading ? (
-              <tr><td colSpan="6" className="text-center py-12 text-stone-400">Loading data...</td></tr>
-            ) : residents.length === 0 ? (
-              <tr><td colSpan="6" className="text-center py-12 text-stone-400 italic">No residents found.</td></tr>
-            ) : (
-              residents.map((r) => (
+      {/* MOBILE LIST */}
+      <div className="block md:hidden space-y-3">
+        {loading ? (
+          <div className="py-10 text-center text-stone-400"><Loader2 className="animate-spin mx-auto mb-2" /> Loading...</div>
+        ) : residents.map((r) => (
+          <div key={r.id} className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+            <div className="p-5 space-y-4" onClick={() => toggleRow(r.id)}>
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-stone-900">{r.last_name}, {r.first_name}</h3>
+                  <p className="text-xs text-rose-600 font-bold uppercase tracking-wide">{r.occupation || "Unemployed"}</p>
+                </div>
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => onEdit(r)} className="p-2 bg-stone-50 text-stone-500 rounded-lg"><Edit size={16}/></button>
+                  <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: r.first_name })} className="p-2 bg-red-50 text-red-500 rounded-lg"><Trash2 size={16}/></button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-[11px] text-stone-500 uppercase font-bold tracking-wider">
+                <div className="flex items-center gap-2"><MapPin size={14}/> {r.barangay}</div>
+                <div className="flex items-center gap-2"><Calendar size={14}/> {formatDate(r.birthdate)}</div>
+              </div>
+              <div className="flex justify-center text-stone-300">
+                {expandedRow === r.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </div>
+            </div>
+            {expandedRow === r.id && <ResidentDetails r={r} />}
+          </div>
+        ))}
+      </div>
+
+      {/* DESKTOP TABLE */}
+      <div className="hidden md:block bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-stone-50/50 border-b border-stone-100 text-[10px] uppercase font-black text-stone-400 tracking-widest">
+                <th className="py-4 px-6 w-12"></th>
+                <th className="py-4 px-6">Resident Info</th>
+                <th className="py-4 px-6">Address</th>
+                <th className="py-4 px-6">Sectors</th>
+                <th className="py-4 px-6 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-50">
+              {residents.map((r) => (
                 <Fragment key={r.id}>
                   <tr 
+                    className={`hover:bg-stone-50/40 transition-colors cursor-pointer ${expandedRow === r.id ? 'bg-rose-50/20' : ''}`}
                     onClick={() => toggleRow(r.id)}
-                    className={`group hover:bg-rose-50/30 transition-colors cursor-pointer ${expandedRow === r.id ? 'bg-rose-50/40' : ''}`} 
                   >
-                    <td className="pl-6 text-stone-400 group-hover:text-rose-500 transition-colors">
+                    <td className="py-4 px-6 text-stone-300">
                       {expandedRow === r.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="font-bold text-stone-900 text-sm">
-                        {r.last_name}, {r.first_name} <span className="text-stone-400 font-normal">{r.ext_name}</span>
-                      </div>
-                      <div className="text-xs text-rose-600 font-medium mt-0.5 flex items-center gap-1">
-                        {r.occupation || "N/A"}
-                      </div>
+                    <td className="py-4 px-6">
+                      <p className="text-sm font-bold text-stone-800">{r.last_name}, {r.first_name} {r.ext_name}</p>
+                      <p className="text-[10px] text-rose-500 font-bold uppercase">{r.occupation || "N/A"}</p>
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm text-stone-600 flex items-center gap-1.5">
-                          <Calendar size={12} className="text-stone-400"/> {formatDate(r.birthdate)}
-                        </span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-stone-100 text-stone-600 w-fit">
-                          {r.sex}
-                        </span>
-                      </div>
+                    <td className="py-4 px-6">
+                      <p className="text-sm text-stone-600">{r.purok}, {r.barangay}</p>
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="text-sm text-stone-600 flex items-center gap-1.5">
-                          <MapPin size={12} className="text-stone-400"/>
-                          {r.house_no} {r.purok}
-                      </div>
-                      <div className="text-xs text-stone-400 ml-4">{r.barangay}</div>
+                    <td className="py-4 px-6">
+                      <span className="text-[10px] px-2 py-1 rounded-full bg-stone-100 font-bold text-stone-500 uppercase">
+                        {r.sector_summary || "None"}
+                      </span>
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="flex flex-col gap-1.5">
-                        {r.sector_summary ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-100 shadow-sm shadow-rose-100/50 w-fit">
-                            {r.sector_summary}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-stone-400 italic">None</span>
-                        )}
-                        
-                        {r.other_sector_details && (
-                          <div className="text-[10px] font-bold text-stone-500 uppercase flex items-center gap-1 ml-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
-                            Details: {r.other_sector_details}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-center gap-2">
-                        {userRole === 'admin' ? (
-                          <>
-                            <button 
-                              onClick={() => onEdit(r)} 
-                              className="p-2 text-stone-500 hover:text-rose-600 hover:bg-rose-100 rounded-lg transition-all" 
-                              title="Edit"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button 
-                              onClick={(e) => promptDelete(r.id, e)} 
-                              className="p-2 text-stone-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all" 
-                              title="Delete"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        ) : (
-                          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide bg-stone-100 px-2 py-1 rounded">Read Only</span>
-                        )}
+                        <button onClick={() => onEdit(r)} className="p-2 text-stone-400 hover:text-rose-600 transition-colors"><Edit size={16}/></button>
+                        <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: r.first_name })} className="p-2 text-stone-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
                       </div>
                     </td>
                   </tr>
-
-                  {/* EXPANDED DETAILS */}
                   {expandedRow === r.id && (
-                    <tr className="bg-stone-50/30 border-b border-stone-100 animate-in fade-in zoom-in-95 duration-200">
-                      <td colSpan="6" className="p-0">
-                        <div className="p-6 pl-16 grid grid-cols-1 md:grid-cols-2 gap-8 bg-gradient-to-br from-rose-50/40 to-stone-50/40 border-y border-rose-100/50 shadow-inner">
-                          <div className="space-y-4">
-                            <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider mb-2 border-b border-rose-200 pb-2">
-                              Personal Information
-                            </h4>
-                            <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-sm">
-                              <div>
-                                <p className="text-xs text-stone-500 uppercase">Civil Status</p>
-                                <p className="font-medium text-stone-800">{r.civil_status}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-stone-500 uppercase">Contact No</p>
-                                <p className="font-medium text-stone-800">{r.contact_no || 'N/A'}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-stone-500 uppercase">Precinct No</p>
-                                <p className="font-medium text-stone-800">{r.precinct_no || 'N/A'}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider mb-2 border-b border-rose-200 pb-2 flex items-center gap-2">
-                              <Users size={14}/> Family Background
-                            </h4>
-                            {r.family_members && r.family_members.length > 0 ? (
-                              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                                {r.family_members.map((fm, idx) => (
-                                  <div key={idx} className="flex items-center justify-between p-2 bg-white rounded-lg border border-stone-100 text-sm shadow-sm hover:border-rose-200 transition-colors">
-                                    <span className="font-medium text-stone-700">{fm.first_name} {fm.last_name}</span>
-                                    <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full uppercase">
-                                      {fm.relationship}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-4 border-2 border-dashed border-stone-200 rounded-lg text-stone-400 text-sm">
-                                No family members recorded
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                    <tr>
+                      <td colSpan="5" className="p-0 border-b border-stone-100">
+                        <ResidentDetails r={r} />
                       </td>
                     </tr>
                   )}
                 </Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* DELETE MODAL */}
+      {/* MODERN DELETE MODAL */}
       {deleteModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 slide-in-from-bottom-2 duration-300">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-stone-900 mb-2">Delete Resident?</h3>
-              <p className="text-sm text-stone-500 mb-6">
-                Are you sure you want to delete this resident record? This action cannot be undone.
-              </p>
-              <div className="flex gap-3 w-full">
-                <button
-                  onClick={() => setDeleteModal({ isOpen: false, residentId: null })}
-                  className="flex-1 py-2.5 px-4 bg-white border border-stone-200 text-stone-700 font-bold rounded-xl hover:bg-stone-50 transition-colors"
-                >
-                  Cancel
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })}></div>
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 duration-200 shadow-2xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3"><AlertCircle size={32}/></div>
+              <h3 className="text-xl font-bold text-stone-900">Delete Record?</h3>
+              <p className="text-sm text-stone-500 mt-2 mb-8">Permanently remove <span className="font-bold text-stone-800">{deleteModal.name}</span>?</p>
+              <div className="space-y-3">
+                <button onClick={confirmDelete} className="w-full py-3.5 bg-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-200">
+                  {isDeleting ? "Deleting..." : "Confirm Delete"}
                 </button>
-                <button
-                  onClick={confirmDelete}
-                  disabled={isDeleting}
-                  className="flex-1 py-2.5 px-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-500/30 flex justify-center items-center"
-                >
-                  {isDeleting ? "Deleting..." : "Yes, Delete"}
-                </button>
+                <button onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })} className="w-full py-3.5 text-stone-400 font-bold">Cancel</button>
               </div>
             </div>
           </div>

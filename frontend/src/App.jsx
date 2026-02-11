@@ -6,8 +6,8 @@ import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import DashboardStats from './components/DashboardStats';
 import ResidentList from './components/ResidentList';
-import RegisterResident from './components/AddResidentForm'; // Ensure filename matches exactly
-import UserManagement from './components/UserManagement';   // Ensure filename matches exactly
+import AddResidentForm from './components/AddResidentForm'; 
+import UserManagement from './components/UserManagement';
 
 /**
  * DashboardLayout
@@ -30,23 +30,37 @@ const DashboardLayout = ({ userRole, onLogout }) => {
 };
 
 export default function App() {
-  // Initialize state from localStorage to persist login on refresh
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [role, setRole] = useState(localStorage.getItem('role') || 'staff');
 
+  // --- EDITING STATE LOGIC ---
+  // This tracks if we are currently editing a resident and who it is.
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentResident, setCurrentResident] = useState(null);
+
   /**
-   * handleLogin
-   * Called by Login.jsx after a successful 200 OK from the cloud backend.
+   * handleEditInitiated
+   * Triggered when the Edit button is clicked in ResidentList.
    */
+  const handleEditInitiated = (resident) => {
+    setCurrentResident(resident);
+    setIsEditing(true); // This switches the view in the Route
+  };
+
+  /**
+   * handleFinishEditing
+   * Returns the view to the list after a successful save or cancel.
+   */
+  const handleFinishEditing = () => {
+    setIsEditing(false);
+    setCurrentResident(null);
+  };
+
   const handleLogin = (newRole) => {
     setRole(newRole);
     setToken(localStorage.getItem('token'));
   };
 
-  /**
-   * handleLogout
-   * Clears all local data and returns user to the login screen.
-   */
   const handleLogout = () => {
     localStorage.clear();
     setToken(null);
@@ -55,9 +69,7 @@ export default function App() {
 
   return (
     <Routes>
-      {/* PUBLIC ROUTE: Login 
-        If already logged in, redirect straight to the dashboard.
-      */}
+      {/* PUBLIC ROUTE: Login */}
       <Route 
         path="/login" 
         element={
@@ -69,9 +81,7 @@ export default function App() {
         } 
       />
 
-      {/* PROTECTED ROUTES: Dashboard 
-        If no token exists, redirect any attempt to /dashboard back to /login.
-      */}
+      {/* PROTECTED ROUTES: Dashboard */}
       <Route 
         path="/dashboard" 
         element={
@@ -82,7 +92,7 @@ export default function App() {
           )
         }
       >
-        {/* Sub-routes mapped to your sidebar menu */}
+        {/* Sub-route: Overview (Admin Only) */}
         <Route 
           path="overview" 
           element={
@@ -93,15 +103,37 @@ export default function App() {
             )
           } 
         />
-        <Route path="residents" element={<ResidentList userRole={role} />} />
-        <Route path="create" element={<RegisterResident />} />
+
+        {/* Sub-route: Residents
+            Uses a conditional to show either the LIST or the EDIT FORM
+        */}
+        <Route 
+          path="residents" 
+          element={
+            !isEditing ? (
+              <ResidentList 
+                userRole={role} 
+                onEdit={handleEditInitiated} 
+              />
+            ) : (
+              <AddResidentForm 
+                residentToEdit={currentResident} 
+                onSuccess={handleFinishEditing} 
+                onCancel={handleFinishEditing} 
+              />
+            )
+          } 
+        />
+
+        {/* Sub-route: Register (Always a fresh form) */}
+        <Route path="create" element={<AddResidentForm onSuccess={handleFinishEditing} />} />
+        
+        {/* Sub-route: User Management */}
         <Route path="users" element={<UserManagement />} />
         
-        {/* Default redirect: /dashboard -> /dashboard/overview */}
         <Route index element={<Navigate to="/dashboard/overview" replace />} />
       </Route>
 
-      {/* CATCH-ALL: Any unknown URL goes back to login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

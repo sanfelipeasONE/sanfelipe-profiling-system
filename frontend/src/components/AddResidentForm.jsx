@@ -6,39 +6,28 @@ import toast, { Toaster } from 'react-hot-toast';
 // --- HELPER COMPONENTS ---
 const InputGroup = ({ label, name, value, onChange, type = "text", required = false, placeholder }) => (
   <div className="space-y-1 w-full">
-    <label className="text-xs font-bold text-stone-500 uppercase">{label}</label>
+    <label className="text-[10px] font-bold text-stone-500 uppercase">{label}</label>
     <input 
-      type={type} 
-      name={name} 
-      value={value || ''} 
-      onChange={onChange} 
-      required={required}
-      placeholder={placeholder}
-      className="w-full p-3 bg-stone-50 border border-transparent focus:bg-white focus:border-rose-500 rounded-xl transition-all outline-none font-medium placeholder:text-stone-400 text-stone-800" 
+      type={type} name={name} value={value || ''} onChange={onChange} required={required} placeholder={placeholder}
+      className="w-full p-3 bg-stone-50 border border-transparent focus:bg-white focus:border-rose-500 rounded-xl transition-all outline-none text-sm text-stone-800" 
     />
   </div>
 );
 
 const SelectGroup = ({ label, name, value, onChange, options, required = false }) => (
-  <div className="space-y-1">
-    <label className="text-xs font-bold text-stone-500 uppercase">{label}</label>
+  <div className="space-y-1 w-full">
+    <label className="text-[10px] font-bold text-stone-500 uppercase">{label}</label>
     <select 
-      name={name} 
-      value={value || ''} 
-      onChange={onChange} 
-      required={required}
-      className="w-full p-3 bg-white border border-stone-200 rounded-xl focus:border-rose-500 outline-none text-stone-700 appearance-none focus:ring-2 focus:ring-rose-500/10 transition-all"
+      name={name} value={value || ''} onChange={onChange} required={required}
+      className="w-full p-3 bg-white border border-stone-200 rounded-xl focus:border-rose-500 outline-none text-sm appearance-none"
     >
       <option value="">Select...</option>
       {options.map((opt) => (
-        <option key={opt.id || opt} value={opt.name || opt}>
-          {opt.name || opt}
-        </option>
+        <option key={opt.id || opt} value={opt.name || opt}>{opt.name || opt}</option>
       ))}
     </select>
   </div>
 );
-// -------------------------------------------------------------
 
 export default function AddResidentForm({ onSuccess, onCancel, residentToEdit }) {
   const [formData, setFormData] = useState({
@@ -47,9 +36,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     birthdate: '', sex: '', civil_status: '',
     occupation: '', precinct_no: '', contact_no: '',
     spouse_last_name: '', spouse_first_name: '', spouse_middle_name: '', spouse_ext_name: '',
-    sector_ids: [],
-    family_members: [],
-    other_sector_details: '' 
+    sector_ids: [], family_members: [], other_sector_details: '' 
   });
 
   const [barangayOptions, setBarangayOptions] = useState([]);
@@ -61,17 +48,12 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     const fetchOptions = async () => {
       try {
         const [bRes, pRes, sRes] = await Promise.all([
-          api.get('/barangays/'),
-          api.get('/puroks/'),
-          api.get('/sectors/')
+          api.get('/barangays/'), api.get('/puroks/'), api.get('/sectors/')
         ]);
         setBarangayOptions(bRes.data);
         setPurokOptions(pRes.data);
         setSectorOptions(sRes.data);
-      } catch (err) {
-        console.error("Error loading options:", err);
-        toast.error("Failed to load form options.");
-      }
+      } catch (err) { toast.error("Failed to load options."); }
     };
     fetchOptions();
   }, []);
@@ -82,58 +64,46 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         ...residentToEdit,
         birthdate: residentToEdit.birthdate ? residentToEdit.birthdate.split('T')[0] : '',
         sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map(s => s.id) : [],
-        family_members: residentToEdit.family_members || [],
-        other_sector_details: residentToEdit.other_sector_details || ''
+        family_members: residentToEdit.family_members || []
       });
     }
   }, [residentToEdit]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const newState = { ...prev, [name]: value };
+      // Clear spouse info if status changes to Single or Widowed
+      if (name === "civil_status" && value !== "Married") {
+        newState.spouse_last_name = '';
+        newState.spouse_first_name = '';
+        newState.spouse_middle_name = '';
+        newState.spouse_ext_name = '';
+      }
+      return newState;
+    });
   };
 
-  const handleSectorChange = (e) => {
-    const sectorId = parseInt(e.target.value);
-    if (!sectorId) return;
-    
-    // Logic to clear
-    const otherSector = sectorOptions.find(s => s.name.toLowerCase().includes('other'));
-    const isUncheckingOther = otherSector && sectorId === otherSector.id && formData.sector_ids.includes(sectorId);
-
-    setFormData(prev => {
-      let newSectorIds;
-      let newOtherDetails = prev.other_sector_details;
-
-      if (prev.sector_ids.includes(sectorId)) {
-        newSectorIds = prev.sector_ids.filter(id => id !== sectorId);
-        if (isUncheckingOther) newOtherDetails = ''; // Clear text if unchecking
-      } else {
-        newSectorIds = [...prev.sector_ids, sectorId];
-      }
-
-      return { ...prev, sector_ids: newSectorIds, other_sector_details: newOtherDetails };
-    });
+  const handleSectorToggle = (id) => {
+    setFormData(prev => ({
+      ...prev,
+      sector_ids: prev.sector_ids.includes(id) 
+        ? prev.sector_ids.filter(sid => sid !== id) 
+        : [...prev.sector_ids, id]
+    }));
   };
 
   const addFamilyMember = () => {
     setFormData(prev => ({
       ...prev,
-      family_members: [...prev.family_members, { first_name: '', last_name: '', relationship: '', birthdate: '' }]
-    }));
-  };
-
-  const removeFamilyMember = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      family_members: prev.family_members.filter((_, i) => i !== index)
+      family_members: [...prev.family_members, { first_name: '', last_name: '', relationship: '' }]
     }));
   };
 
   const handleFamilyChange = (index, field, value) => {
-    const updatedMembers = [...formData.family_members];
-    updatedMembers[index][field] = value;
-    setFormData(prev => ({ ...prev, family_members: updatedMembers }));
+    const updated = [...formData.family_members];
+    updated[index][field] = value;
+    setFormData({ ...formData, family_members: updated });
   };
 
   const handleSubmit = async (e) => {
@@ -142,230 +112,130 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     try {
       if (residentToEdit) {
         await api.put(`/residents/${residentToEdit.id}`, formData);
-        toast.success("Resident Updated Successfully!");
+        toast.success("Profile Updated!");
       } else {
         await api.post('/residents/', formData);
-        toast.success("Resident Added Successfully!");
+        toast.success("Resident Registered!");
       }
-      
-      setTimeout(() => {
-          onSuccess(); 
-      }, 1500);
-
-    } catch (error) {
-      console.error(error);
-      toast.error("Error saving data.");
-      setLoading(false); 
-    }
+      setTimeout(onSuccess, 1500);
+    } catch (error) { toast.error("Error saving data."); setLoading(false); }
   };
 
-  // Helper to check
-  const otherSector = sectorOptions.find(s => s.name.toLowerCase().includes('other'));
-  const isOtherSelected = otherSector && formData.sector_ids.includes(otherSector.id);
+  const isOtherSelected = sectorOptions.find(s => s.name.toLowerCase().includes('other') && formData.sector_ids.includes(s.id));
 
   return (
-    <div className="max-w-5xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500"> 
-      
+    <div className="w-full pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500"> 
       <Toaster position="top-center" />
-
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">
-          {residentToEdit ? "Edit Resident Profile" : "Register New Resident"}
+      
+      <div className="mb-6 px-1">
+        <h1 className="text-xl md:text-2xl font-bold text-stone-900">
+          {residentToEdit ? "Edit Profile" : "Register Resident"}
         </h1>
-        <p className="text-stone-500 text-sm mt-1">Fill in the details below to add a record to the database.</p>
+        <p className="text-stone-500 text-xs mt-1">Fields with * are required.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 pb-24">
+      <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* CARD 1: PERSONAL INFO */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-100 relative overflow-hidden group hover:shadow-md transition-shadow">
-          <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
-          
-          <div className="flex items-center gap-3 mb-6 border-b border-stone-100 pb-4">
-            <div className="p-2 bg-rose-50 rounded-lg text-rose-600">
-              <User size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-stone-900">Personal Information</h3>
+        {/* PERSONAL INFO SECTION */}
+        <section className="bg-white p-5 md:p-8 rounded-2xl border border-stone-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-2 border-b border-stone-50 pb-4">
+            <User className="text-rose-500" size={20} />
+            <h3 className="font-bold text-stone-800">Personal Information</h3>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-            <InputGroup label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required placeholder="Dela Cruz" />
-            <InputGroup label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required placeholder="Juan" />
-            <InputGroup label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="Santos" />
-            <InputGroup label="Ext (Jr/Sr)" name="ext_name" value={formData.ext_name} onChange={handleChange} placeholder="Jr." />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <InputGroup label="Last Name *" name="last_name" value={formData.last_name} onChange={handleChange} required />
+            <InputGroup label="First Name *" name="first_name" value={formData.first_name} onChange={handleChange} required />
+            <InputGroup label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleChange} />
+            <InputGroup label="Ext." name="ext_name" value={formData.ext_name} onChange={handleChange} placeholder="Jr/Sr" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-            <InputGroup label="Birthdate" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
-            <SelectGroup label="Sex" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required />
-            <SelectGroup label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed']} required />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <InputGroup label="Birthdate *" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
+            <SelectGroup label="Sex *" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required />
+            <SelectGroup label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed']} required />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-             <div className="space-y-1 relative">
-                <label className="text-xs font-bold text-stone-500 uppercase flex items-center gap-1"><Briefcase size={12}/> Occupation</label>
-                <input name="occupation" value={formData.occupation} onChange={handleChange} className="w-full p-3 bg-stone-50 rounded-xl outline-none focus:ring-2 focus:ring-rose-100 border border-transparent focus:bg-white focus:border-rose-500 transition-all text-stone-800" placeholder="e.g. Farmer" />
-             </div>
-             <div className="space-y-1 relative">
-                <label className="text-xs font-bold text-stone-500 uppercase flex items-center gap-1"><Phone size={12}/> Contact No</label>
-                <input name="contact_no" value={formData.contact_no} onChange={handleChange} className="w-full p-3 bg-stone-50 rounded-xl outline-none focus:ring-2 focus:ring-rose-100 border border-transparent focus:bg-white focus:border-rose-500 transition-all text-stone-800" placeholder="0912..." />
-             </div>
-             <div className="space-y-1 relative">
-                <label className="text-xs font-bold text-stone-500 uppercase flex items-center gap-1"><Fingerprint size={12}/> Precinct No</label>
-                <input name="precinct_no" value={formData.precinct_no} onChange={handleChange} className="w-full p-3 bg-stone-50 rounded-xl outline-none focus:ring-2 focus:ring-rose-100 border border-transparent focus:bg-white focus:border-rose-500 transition-all text-stone-800" placeholder="0012A" />
-             </div>
-          </div>
-        </div>
-
-        {/* CARD 2: ADDRESS */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-100 relative overflow-hidden group hover:shadow-md transition-shadow">
-          <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
-          
-          <div className="flex items-center gap-3 mb-6 border-b border-stone-100 pb-4">
-             <div className="p-2 bg-red-50 rounded-lg text-red-600">
-               <MapPin size={24} />
-             </div>
-             <h3 className="text-lg font-bold text-stone-900">Address Details</h3>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="space-y-1">
-               <label className="text-xs font-bold text-stone-500 uppercase">House No.</label>
-               <input name="house_no" value={formData.house_no} onChange={handleChange} className="w-full p-3 bg-stone-50 rounded-xl outline-none focus:ring-2 focus:ring-red-100 border border-transparent focus:bg-white focus:border-red-500 transition-all text-stone-800" placeholder="#123" />
-            </div>
-            <div className="space-y-1">
-               <label className="text-xs font-bold text-stone-500 uppercase">Purok / Sitio</label>
-               <select name="purok" value={formData.purok} onChange={handleChange} className="w-full p-3 bg-stone-50 rounded-xl outline-none focus:ring-2 focus:ring-red-100 border border-transparent focus:bg-white focus:border-red-500 transition-all text-stone-800 appearance-none" required>
-                 <option value="">Select Purok...</option>
-                 {purokOptions.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-               </select>
-            </div>
-            <div className="space-y-1">
-               <label className="text-xs font-bold text-stone-500 uppercase">Barangay</label>
-               <select name="barangay" value={formData.barangay} onChange={handleChange} className="w-full p-3 bg-stone-50 rounded-xl outline-none focus:ring-2 focus:ring-red-100 border border-transparent focus:bg-white focus:border-red-500 transition-all text-stone-800 appearance-none" required>
-                 <option value="">Select Barangay...</option>
-                 {barangayOptions.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-               </select>
-            </div>
-          </div>
-        </div>
-
-        {/* CARD 3: FAMILY */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-100 relative overflow-hidden group hover:shadow-md transition-shadow">
-          <div className="absolute top-0 left-0 w-1 h-full bg-rose-400"></div>
-
-          <div className="flex items-center justify-between mb-6 border-b border-stone-100 pb-4">
-            <div className="flex items-center gap-3">
-               <div className="p-2 bg-rose-50 rounded-lg text-rose-500">
-                 <Heart size={24} />
-               </div>
-               <h3 className="text-lg font-bold text-stone-900">Family Background</h3>
-            </div>
-            <button type="button" onClick={addFamilyMember} className="flex items-center gap-2 bg-rose-50 text-rose-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-rose-100 transition-colors border border-rose-100">
-              <Plus size={16} /> Add Member
-            </button>
-          </div>
-
-          {/* SPOUSE SECTION */}
+          {/* DYNAMIC SPOUSE SECTION */}
           {(formData.civil_status === 'Married' || formData.civil_status === 'Live-in Partner') && (
-            <div className="mb-6 p-5 bg-rose-50/40 rounded-2xl border border-rose-100">
-               <h4 className="text-xs font-bold text-rose-600 uppercase mb-3">Spouse / Partner</h4>
-               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <input name="spouse_last_name" placeholder="Last Name" value={formData.spouse_last_name} onChange={handleChange} className="p-3 bg-white border border-rose-200 rounded-lg text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 text-stone-700" />
-                  <input name="spouse_first_name" placeholder="First Name" value={formData.spouse_first_name} onChange={handleChange} className="p-3 bg-white border border-rose-200 rounded-lg text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 text-stone-700" />
-                  <input name="spouse_middle_name" placeholder="Middle Name" value={formData.spouse_middle_name} onChange={handleChange} className="p-3 bg-white border border-rose-200 rounded-lg text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 text-stone-700" />
-                  <input name="spouse_ext_name" placeholder="Ext" value={formData.spouse_ext_name} onChange={handleChange} className="p-3 bg-white border border-rose-200 rounded-lg text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 text-stone-700" />
-               </div>
+            <div className="p-5 bg-rose-50/40 rounded-2xl border border-rose-100 animate-in zoom-in-95 duration-300">
+              <h4 className="text-xs font-bold text-rose-600 uppercase mb-3 flex items-center gap-2">
+                <Heart size={14} /> Spouse / Partner Information
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <InputGroup label="Spouse Last Name" name="spouse_last_name" value={formData.spouse_last_name} onChange={handleChange} />
+                <InputGroup label="Spouse First Name" name="spouse_first_name" value={formData.spouse_first_name} onChange={handleChange} />
+                <InputGroup label="Spouse Middle Name" name="spouse_middle_name" value={formData.spouse_middle_name} onChange={handleChange} />
+                <InputGroup label="Spouse Ext." name="spouse_ext_name" value={formData.spouse_ext_name} onChange={handleChange} />
+              </div>
             </div>
           )}
 
-          {/* FAMILY LIST */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <InputGroup label="Occupation" name="occupation" value={formData.occupation} onChange={handleChange} />
+            <InputGroup label="Contact No" name="contact_no" value={formData.contact_no} onChange={handleChange} />
+            <InputGroup label="Precinct No" name="precinct_no" value={formData.precinct_no} onChange={handleChange} />
+          </div>
+        </section>
+
+        {/* ADDRESS SECTION */}
+        <section className="bg-white p-5 md:p-8 rounded-2xl border border-stone-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-2 border-b border-stone-50 pb-4">
+            <MapPin className="text-red-500" size={20} />
+            <h3 className="font-bold text-stone-800">Address</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <InputGroup label="House No." name="house_no" value={formData.house_no} onChange={handleChange} />
+            <SelectGroup label="Purok *" name="purok" value={formData.purok} onChange={handleChange} options={purokOptions} required />
+            <SelectGroup label="Barangay *" name="barangay" value={formData.barangay} onChange={handleChange} options={barangayOptions} required />
+          </div>
+        </section>
+
+        {/* FAMILY SECTION */}
+        <section className="bg-white p-5 md:p-8 rounded-2xl border border-stone-100 shadow-sm space-y-6">
+          <div className="flex justify-between items-center border-b border-stone-50 pb-4">
+            <div className="flex items-center gap-2">
+              <Plus className="text-rose-400" size={20} />
+              <h3 className="font-bold text-stone-800">Other Family Members</h3>
+            </div>
+            <button type="button" onClick={addFamilyMember} className="text-xs font-bold bg-rose-50 text-rose-600 px-4 py-2 rounded-xl">+ Add Member</button>
+          </div>
           <div className="space-y-3">
             {formData.family_members.map((member, index) => (
-              <div key={index} className="flex flex-col md:flex-row gap-3 items-end bg-stone-50 p-3 rounded-xl border border-stone-100">
-                <div className="flex-1 w-full">
-                  <span className="text-[10px] text-stone-400 uppercase font-bold pl-1">First Name</span>
-                  <input value={member.first_name} onChange={(e) => handleFamilyChange(index, 'first_name', e.target.value)} className="w-full p-2 bg-white border border-stone-200 rounded-lg text-sm outline-none focus:border-rose-400" />
-                </div>
-                <div className="flex-1 w-full">
-                  <span className="text-[10px] text-stone-400 uppercase font-bold pl-1">Last Name</span>
-                  <input value={member.last_name} onChange={(e) => handleFamilyChange(index, 'last_name', e.target.value)} className="w-full p-2 bg-white border border-stone-200 rounded-lg text-sm outline-none focus:border-rose-400" />
-                </div>
-                <div className="w-full md:w-48">
-                   <span className="text-[10px] text-stone-400 uppercase font-bold pl-1">Relationship</span>
-                   <select value={member.relationship} onChange={(e) => handleFamilyChange(index, 'relationship', e.target.value)} className="w-full p-2 bg-white border border-stone-200 rounded-lg text-sm outline-none focus:border-rose-400">
-                     <option value="">Select...</option>
-                     <option value="Son">Son</option>
-                     <option value="Daughter">Daughter</option>
-                     <option value="Mother">Mother</option>
-                     <option value="Father">Father</option>
-                     <option value="Sibling">Sibling</option>
-                   </select>
-                </div>
-                <button type="button" onClick={() => removeFamilyMember(index)} className="p-2.5 text-stone-400 hover:text-red-500 bg-white hover:bg-red-50 border border-stone-200 hover:border-red-200 rounded-lg transition-all shadow-sm">
-                  <Trash2 size={18} />
-                </button>
+              <div key={index} className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-4 bg-stone-50 rounded-xl items-end relative">
+                <InputGroup label="First Name" value={member.first_name} onChange={(e) => handleFamilyChange(index, 'first_name', e.target.value)} />
+                <InputGroup label="Last Name" value={member.last_name} onChange={(e) => handleFamilyChange(index, 'last_name', e.target.value)} />
+                <SelectGroup label="Relationship" value={member.relationship} onChange={(e) => handleFamilyChange(index, 'relationship', e.target.value)} options={['Son', 'Daughter', 'Mother', 'Father', 'Sibling']} />
+                <button type="button" onClick={() => setFormData({...formData, family_members: formData.family_members.filter((_, i) => i !== index)})} className="p-3 text-red-500 hover:bg-red-50 rounded-xl w-fit"><Trash2 size={18}/></button>
               </div>
             ))}
-            {formData.family_members.length === 0 && (
-              <p className="text-center text-stone-400 text-sm py-4 italic">No other family members added.</p>
-            )}
           </div>
-        </div>
+        </section>
 
-        {/* CARD 4: SECTORS */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-100 relative overflow-hidden group hover:shadow-md transition-shadow">
-          <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
-          
-          <div className="flex items-center gap-3 mb-6 border-b border-stone-100 pb-4">
-             <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-               <Briefcase size={24} />
-             </div>
-             <h3 className="text-lg font-bold text-stone-900">Sector Affiliation</h3>
+        {/* SECTORS SECTION */}
+        <section className="bg-white p-5 md:p-8 rounded-2xl border border-stone-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-2 border-b border-stone-50 pb-4">
+            <Briefcase className="text-orange-500" size={20} />
+            <h3 className="font-bold text-stone-800">Sector Affiliation</h3>
           </div>
-
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {sectorOptions.map((s) => {
-              const isChecked = formData.sector_ids.includes(s.id);
-              return (
-                <label key={s.id} className={`
-                  relative flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none
-                  ${isChecked ? 'bg-gradient-to-r from-red-600 to-rose-600 border-red-600 text-white shadow-lg shadow-red-500/30' : 'bg-white border-stone-200 text-stone-600 hover:border-rose-300 hover:bg-rose-50/30'}
-                `}>
-                  <input type="checkbox" value={s.id} checked={isChecked} onChange={handleSectorChange} className="hidden" />
-                  <div className={`w-5 h-5 rounded flex items-center justify-center border ${isChecked ? 'bg-white border-white text-rose-600' : 'border-stone-300 bg-stone-50'}`}>
-                    {isChecked && <div className="w-2.5 h-2.5 bg-rose-600 rounded-sm" />}
-                  </div>
-                  <span className="text-sm font-bold">{s.name}</span>
-                </label>
-              );
-            })}
+            {sectorOptions.map((s) => (
+              <label key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.sector_ids.includes(s.id) ? 'bg-rose-600 border-rose-600 text-white' : 'bg-white border-stone-200 text-stone-600'}`}>
+                <input type="checkbox" className="hidden" checked={formData.sector_ids.includes(s.id)} onChange={() => handleSectorToggle(s.id)} />
+                <span className="text-xs font-bold uppercase">{s.name}</span>
+              </label>
+            ))}
           </div>
-
-          {/* 3. ADDED Dynamic Logic for "Other" Input */}
           {isOtherSelected && (
-            <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-               <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-100">
-                  <InputGroup 
-                    label="Please Specify Other Sector" 
-                    name="other_sector_details" 
-                    value={formData.other_sector_details} 
-                    onChange={handleChange} 
-                    placeholder="e.g. Solo Parent etc."
-                    required={true} 
-                  />
-               </div>
-            </div>
+            <InputGroup label="Specify Other Sector" name="other_sector_details" value={formData.other_sector_details} onChange={handleChange} placeholder="e.g. Solo Parent" />
           )}
-        </div>
+        </section>
 
         {/* FLOATING ACTION BAR */}
-        <div className="fixed bottom-0 right-0 w-full md:w-[calc(100%-18rem)] bg-white/90 backdrop-blur-md border-t border-stone-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-end gap-4 z-50">
-          <button type="button" onClick={onCancel} className="px-6 py-2.5 rounded-xl font-bold text-stone-600 hover:bg-stone-100 transition-colors flex items-center gap-2">
-            <X size={20} /> Cancel
-          </button>
-          <button type="submit" disabled={loading} className="px-8 py-2.5 rounded-xl font-bold bg-gradient-to-r from-red-600 to-rose-600 text-white hover:shadow-lg hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-            {loading ? "Saving..." : <><Save size={20} /> Save Resident Profile</>}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t flex flex-col sm:flex-row justify-end gap-3 z-50 shadow-lg">
+          <button type="button" onClick={onCancel} className="w-full sm:w-auto px-8 py-3 font-bold text-stone-500 hover:bg-stone-50 rounded-xl transition-colors">Cancel</button>
+          <button type="submit" disabled={loading} className="w-full sm:w-auto px-12 py-3 bg-red-600 text-white rounded-xl font-bold shadow-xl shadow-red-200 hover:bg-red-700 active:scale-95 transition-all">
+            {loading ? "Saving..." : "Save Record"}
           </button>
         </div>
 

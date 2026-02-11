@@ -10,7 +10,7 @@ export default function ExportButton({ barangay }) {
       const token = localStorage.getItem('token');
       
       // 1. Request the file from Backend
-      const response = await axios.get('http://localhost:8000/export/excel', {
+      const response = await axios.get('https://sanfelipe-profiling-system-production.up.railway.app/export/excel', {
         params: { barangay: barangay },
         headers: {
           Authorization: `Bearer ${token}`,
