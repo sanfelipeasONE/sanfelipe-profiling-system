@@ -321,19 +321,22 @@ def get_stats(
     return crud.get_dashboard_stats(db)
 
 @app.get("/system/fix-ghost-records")
-def fix_ghost_records(db: Session = Depends(get_db)):
+def fix_ghost_records(
+    target_barangay: str = Query(..., description="The name of the barangay to assign records to (e.g., Faranal)"),
+    db: Session = Depends(get_db)
+):
     try:
-        # Targeted fix for 'resident_profiles'
-        # This moves any 'San Felipe' or NULL records to 'Rosete'
-        query = text("UPDATE resident_profiles SET barangay = 'Rosete' WHERE barangay IS NULL OR barangay = 'San Felipe';")
+        # Dynamic SQL: Moves 'San Felipe' or NULL records to the specific target_barangay
+        # WARNING: This moves ALL current ghost records to this one target.
+        sql = text(f"UPDATE resident_profiles SET barangay = '{target_barangay}' WHERE barangay IS NULL OR barangay = 'San Felipe';")
         
-        db.execute(query)
+        result = db.execute(sql)
         db.commit()
         
-        return {"status": "success", "message": "Successfully moved ghost records to 'Rosete'!"}
+        return {"status": "success", "message": f"Moved ghost records to '{target_barangay}'!"}
         
     except Exception as e:
-        db.rollback() # Important: Reset if anything goes wrong
+        db.rollback()
         return {"status": "error", "detail": str(e)}
         
 @app.get("/debug/tables")
