@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy import text
 
 # Authentication Imports
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -318,3 +319,26 @@ def get_stats(
         raise HTTPException(status_code=403, detail="Access denied to dashboard statistics")
         
     return crud.get_dashboard_stats(db)
+
+@app.get("/system/fix-ghost-records")
+def fix_ghost_records(db: Session = Depends(get_db)):
+    try:
+        # This SQL command forces all "San Felipe" or NULL records to belong to "Rosete"
+        # We use raw SQL to avoid model naming issues (Resident vs ResidentProfile)
+        
+        # 1. Try updating the 'residents' table (standard naming)
+        query = text("UPDATE residents SET barangay = 'Rosete' WHERE barangay IS NULL OR barangay = 'San Felipe';")
+        db.execute(query)
+        db.commit()
+        
+        return {"status": "success", "message": "Database fixed! Records moved to Rosete."}
+        
+    except Exception as e:
+        # If table name is different (e.g., resident_profiles), try that:
+        try:
+            query_backup = text("UPDATE resident_profiles SET barangay = 'Rosete' WHERE barangay IS NULL OR barangay = 'San Felipe';")
+            db.execute(query_backup)
+            db.commit()
+            return {"status": "success", "message": "Database fixed (using resident_profiles table)!"}
+        except Exception as e2:
+            return {"status": "error", "detail": str(e2)}

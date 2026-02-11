@@ -20,7 +20,7 @@ const DashboardLayout = ({ userRole, onLogout }) => {
       <Sidebar userRole={userRole} onLogout={onLogout} />
       
       {/* Main Content Area - Fill remaining space and scrollable */}
-      <main className="flex-1 ml-[260px] h-full overflow-y-auto transition-all duration-300">
+      <main className="flex-1 lg:ml-[260px] h-full overflow-y-auto transition-all duration-300">
         <div className="p-8 max-w-7xl mx-auto">
           <Outlet />
         </div>
@@ -56,10 +56,12 @@ export default function App() {
     setCurrentResident(null);
   };
 
-  const handleLogin = (newRole) => {
-    setRole(newRole);
-    setToken(localStorage.getItem('token'));
-  };
+  const handleLogin = (newRole, username) => {
+  localStorage.setItem('role', newRole);
+  localStorage.setItem('username', username);
+  setRole(newRole);
+  setToken(localStorage.getItem('token'));
+};
 
   const handleLogout = () => {
     localStorage.clear();

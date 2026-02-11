@@ -1,6 +1,10 @@
 import { useEffect, useState, Fragment } from 'react';
 import api from '../api';
-import { Trash2, Edit, Search, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, Loader2, Filter, Phone, Fingerprint, Heart, User } from 'lucide-react';
+import { 
+  Trash2, Edit, Search, ChevronDown, ChevronUp, MapPin, 
+  Calendar, AlertCircle, Loader2, Filter, Phone, 
+  Fingerprint, Heart, User, ChevronLeft, ChevronRight 
+} from 'lucide-react';
 import ExportButton from './ExportButton';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -10,18 +14,44 @@ export default function ResidentList({ userRole, onEdit }) {
   const [selectedBarangay, setSelectedBarangay] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [expandedRow, setExpandedRow] = useState(null); // Tracks which ID is expanded
+  const [expandedRow, setExpandedRow] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, residentId: null, name: '' });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchResidents = async (search = '', barangay = '') => {
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const pageSize = 20;
+
+  const fetchResidents = async (search = '', barangay = '', page = 1) => {
     setLoading(true);
+    const skip = (page - 1) * pageSize;
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
-      if (barangay) params.append('barangay', barangay);
+      
+      // Determine filter scope
+      let filterBarangay = barangay;
+      if (userRole !== 'admin') {
+        const storedUsername = localStorage.getItem('username') || '';
+        filterBarangay = storedUsername.charAt(0).toUpperCase() + storedUsername.slice(1).toLowerCase();
+      }
+      
+      if (filterBarangay) params.append('barangay', filterBarangay);
+      params.append('skip', skip);
+      params.append('limit', pageSize);
+
       const response = await api.get(`/residents/?${params.toString()}`);
-      setResidents(response.data);
+      
+      // If your backend returns a pagination object { items, total }
+      if (response.data.items) {
+        setResidents(response.data.items);
+        setTotalItems(response.data.total);
+      } else {
+        // Fallback for non-paginated backend responses
+        setResidents(response.data);
+        setTotalItems(response.data.length);
+      }
     } catch (error) {
       toast.error("Failed to load residents.");
     } finally {
@@ -36,9 +66,27 @@ export default function ResidentList({ userRole, onEdit }) {
         setBarangayList(response.data);
       } catch (err) { console.error(err); }
     };
+
     fetchBarangays();
-    fetchResidents();
-  }, []);
+
+    // Initial load with isolation check
+    const initialBarangay = userRole !== 'admin' ? localStorage.getItem('username') : '';
+    fetchResidents(searchTerm, initialBarangay, currentPage);
+  }, [userRole, currentPage]);
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    setCurrentPage(1); // Reset to first page on search
+    fetchResidents(val, selectedBarangay, 1);
+  };
+
+  const handleBarangayFilter = (e) => {
+    const val = e.target.value;
+    setSelectedBarangay(val);
+    setCurrentPage(1);
+    fetchResidents(searchTerm, val, 1);
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -55,12 +103,13 @@ export default function ResidentList({ userRole, onEdit }) {
       await api.delete(`/residents/${deleteModal.residentId}`);
       toast.success('Resident removed');
       setDeleteModal({ isOpen: false, residentId: null, name: '' });
-      fetchResidents(searchTerm, selectedBarangay);
+      fetchResidents(searchTerm, selectedBarangay, currentPage);
     } catch (err) { toast.error('Error deleting record.'); }
     finally { setIsDeleting(false); }
   };
 
-  // --- RENDER DETAIL COMPONENT ---
+  const totalPages = Math.ceil(totalItems / pageSize);
+
   const ResidentDetails = ({ r }) => (
     <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone-50/50 border-t border-stone-100 animate-in slide-in-from-top-2 duration-300">
       <div className="space-y-4">
@@ -126,7 +175,7 @@ export default function ResidentList({ userRole, onEdit }) {
               type="text" 
               placeholder="Search by name..." 
               value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); fetchResidents(e.target.value, selectedBarangay); }}
+              onChange={handleSearchChange}
               className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-100 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none text-sm"
             />
             <Search className="absolute left-3 top-3.5 text-stone-400 group-focus-within:text-rose-500" size={18} />
@@ -136,7 +185,7 @@ export default function ResidentList({ userRole, onEdit }) {
             <div className="relative">
               <select
                 value={selectedBarangay}
-                onChange={(e) => { setSelectedBarangay(e.target.value); fetchResidents(searchTerm, e.target.value); }}
+                onChange={handleBarangayFilter}
                 className="w-full appearance-none pl-10 pr-10 py-3 bg-stone-50 border border-stone-100 rounded-xl outline-none text-sm focus:ring-2 focus:ring-rose-500/20"
               >
                 <option value="">All Barangays</option>
@@ -149,38 +198,15 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
       </div>
 
-      {/* MOBILE LIST */}
-      <div className="block md:hidden space-y-3">
-        {loading ? (
-          <div className="py-10 text-center text-stone-400"><Loader2 className="animate-spin mx-auto mb-2" /> Loading...</div>
-        ) : residents.map((r) => (
-          <div key={r.id} className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-            <div className="p-5 space-y-4" onClick={() => toggleRow(r.id)}>
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-stone-900">{r.last_name}, {r.first_name}</h3>
-                  <p className="text-xs text-rose-600 font-bold uppercase tracking-wide">{r.occupation || "Unemployed"}</p>
-                </div>
-                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => onEdit(r)} className="p-2 bg-stone-50 text-stone-500 rounded-lg"><Edit size={16}/></button>
-                  <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: r.first_name })} className="p-2 bg-red-50 text-red-500 rounded-lg"><Trash2 size={16}/></button>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-[11px] text-stone-500 uppercase font-bold tracking-wider">
-                <div className="flex items-center gap-2"><MapPin size={14}/> {r.barangay}</div>
-                <div className="flex items-center gap-2"><Calendar size={14}/> {formatDate(r.birthdate)}</div>
-              </div>
-              <div className="flex justify-center text-stone-300">
-                {expandedRow === r.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-              </div>
-            </div>
-            {expandedRow === r.id && <ResidentDetails r={r} />}
+      {/* TABLE SECTION */}
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-50 flex flex-col items-center justify-center">
+            <Loader2 className="animate-spin text-rose-600 mb-2" size={32} />
+            <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Syncing Records...</span>
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* DESKTOP TABLE */}
-      <div className="hidden md:block bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -193,49 +219,82 @@ export default function ResidentList({ userRole, onEdit }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-50">
-              {residents.map((r) => (
-                <Fragment key={r.id}>
-                  <tr 
-                    className={`hover:bg-stone-50/40 transition-colors cursor-pointer ${expandedRow === r.id ? 'bg-rose-50/20' : ''}`}
-                    onClick={() => toggleRow(r.id)}
-                  >
-                    <td className="py-4 px-6 text-stone-300">
-                      {expandedRow === r.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-sm font-bold text-stone-800">{r.last_name}, {r.first_name} {r.ext_name}</p>
-                      <p className="text-[10px] text-rose-500 font-bold uppercase">{r.occupation || "N/A"}</p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-sm text-stone-600">{r.purok}, {r.barangay}</p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="text-[10px] px-2 py-1 rounded-full bg-stone-100 font-bold text-stone-500 uppercase">
-                        {r.sector_summary || "None"}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-center gap-2">
-                        <button onClick={() => onEdit(r)} className="p-2 text-stone-400 hover:text-rose-600 transition-colors"><Edit size={16}/></button>
-                        <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: r.first_name })} className="p-2 text-stone-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedRow === r.id && (
-                    <tr>
-                      <td colSpan="5" className="p-0 border-b border-stone-100">
-                        <ResidentDetails r={r} />
+              {residents.length === 0 && !loading ? (
+                <tr><td colSpan="5" className="py-20 text-center text-stone-400 italic">No records found.</td></tr>
+              ) : (
+                residents.map((r) => (
+                  <Fragment key={r.id}>
+                    <tr 
+                      className={`hover:bg-stone-50/40 transition-colors cursor-pointer ${expandedRow === r.id ? 'bg-rose-50/20' : ''}`}
+                      onClick={() => toggleRow(r.id)}
+                    >
+                      <td className="py-4 px-6 text-stone-300">
+                        {expandedRow === r.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </td>
+                      <td className="py-4 px-6">
+                        <p className="text-sm font-bold text-stone-800">{r.last_name}, {r.first_name} {r.ext_name}</p>
+                        <p className="text-[10px] text-rose-500 font-bold uppercase">{r.occupation || "N/A"}</p>
+                      </td>
+                      <td className="py-4 px-6">
+                        <p className="text-sm text-stone-600">{r.purok}, {r.barangay}</p>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="text-[10px] px-2 py-1 rounded-full bg-stone-100 font-bold text-stone-500 uppercase">
+                          {r.sector_summary || "None"}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-center gap-2">
+                          <button onClick={() => onEdit(r)} className="p-2 text-stone-400 hover:text-rose-600 transition-colors"><Edit size={16}/></button>
+                          <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: r.first_name })} className="p-2 text-stone-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                        </div>
                       </td>
                     </tr>
-                  )}
-                </Fragment>
-              ))}
+                    {expandedRow === r.id && (
+                      <tr>
+                        <td colSpan="5" className="p-0 border-b border-stone-100">
+                          <ResidentDetails r={r} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* MODERN DELETE MODAL */}
+      {/* PAGINATION CONTROLS */}
+      <div className="flex items-center justify-between px-6 py-4 bg-white border border-stone-100 rounded-2xl shadow-sm">
+        <p className="text-xs text-stone-500 font-medium">
+          Showing <span className="font-bold text-stone-900">{residents.length}</span> of <span className="font-bold text-stone-900">{totalItems}</span> residents
+        </p>
+        
+        <div className="flex items-center gap-2">
+          <button 
+            disabled={currentPage === 1 || loading}
+            onClick={() => setCurrentPage(prev => prev - 1)}
+            className="p-2 hover:bg-stone-50 disabled:opacity-30 transition-colors rounded-lg border border-stone-100"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          
+          <span className="text-[10px] font-bold px-4 py-2 bg-stone-50 rounded-lg border border-stone-100 uppercase tracking-widest text-stone-600">
+            Page {currentPage} of {totalPages || 1}
+          </span>
+
+          <button 
+            disabled={currentPage >= totalPages || loading}
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="p-2 hover:bg-stone-50 disabled:opacity-30 transition-colors rounded-lg border border-stone-100"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* DELETE MODAL */}
       {deleteModal.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })}></div>
