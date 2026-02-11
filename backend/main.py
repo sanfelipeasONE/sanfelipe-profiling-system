@@ -343,3 +343,16 @@ def fix_ghost_records(db: Session = Depends(get_db)):
         except Exception as e2:
             # If both fail, print the actual error
             return {"status": "error", "detail": f"Both attempts failed. Error: {str(e2)}"}
+        
+@app.get("/debug/tables")
+def debug_tables(db: Session = Depends(get_db)):
+    try:
+        # Ask PostgreSQL for a list of all table names
+        query = text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+        result = db.execute(query).fetchall()
+        
+        # Return the list so you can see it in your browser
+        tables = [row[0] for row in result]
+        return {"status": "success", "tables": tables}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
