@@ -69,7 +69,11 @@ class ResidentBase(BaseModel):
     civil_status: Optional[str] = None
     occupation: Optional[str] = None
     
-    # Removed: birthplace, citizenship, sss_no, tin_no, philhealth_no, covid_status, voter_status
+    # Spouse/Partner Info
+    spouse_last_name: Optional[str] = None
+    spouse_first_name: Optional[str] = None
+    spouse_middle_name: Optional[str] = None
+    spouse_ext_name: Optional[str] = None
     
     # Contact / Govt IDs
     contact_no: Optional[str] = None

@@ -54,18 +54,24 @@ class ResidentProfile(Base):
     house_no = Column(String, nullable=True)
     purok = Column(String, index=True)
     barangay = Column(String, index=True)
+    
+    # 3 Spouse/Partner
+    spouse_last_name = Column(String, nullable=True)
+    spouse_first_name = Column(String, nullable=True)
+    spouse_middle_name = Column(String, nullable=True)
+    spouse_ext_name = Column(String, nullable=True)
 
-    # 3. DEMOGRAPHICS
+    # 4. DEMOGRAPHICS
     birthdate = Column(Date)
     sex = Column(String)
     civil_status = Column(String, nullable=True)
     precinct_no = Column(String, nullable=True)
     
-    # 4. WORK & CONTACT
+    # 5. WORK & CONTACT
     occupation = Column(String, nullable=True)
     contact_no = Column(String, nullable=True)
 
-    # 5. SECTORS (Text Summary)
+    # 6. SECTORS (Text Summary)
     other_sector_details = Column(String, nullable=True) 
     sector_summary = Column(String, nullable=True)
 

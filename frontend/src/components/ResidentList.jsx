@@ -1,9 +1,9 @@
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, Fragment, useMemo } from 'react';
 import api from '../api';
 import { 
-  Trash2, Edit, Search, ChevronDown, ChevronUp, MapPin, 
-  Calendar, AlertCircle, Loader2, Filter, Phone, 
-  Fingerprint, Heart, User, ChevronLeft, ChevronRight 
+  Trash2, Edit, Search, ChevronDown, ChevronUp, 
+  Loader2, Filter, Phone, Fingerprint, Heart, User, 
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight 
 } from 'lucide-react';
 import ExportButton from './ExportButton';
 import toast, { Toaster } from 'react-hot-toast';
@@ -15,31 +15,71 @@ export default function ResidentList({ userRole, onEdit }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
+  
+  // Modal State
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, residentId: null, name: '' });
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const pageSize = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20); // Added dynamic page size
 
-  const fetchResidents = async (search = '', barangay = '', page = 1) => {
+  // --- MODERN PAGINATION LOGIC ---
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  const paginationRange = useMemo(() => {
+    const siblingCount = 1; // How many numbers to show next to current page
+    const totalPageNumbers = siblingCount + 5;
+
+    // Case 1: If the number of pages is less than the page numbers we want to show
+    if (totalPages <= totalPageNumbers) {
+      return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+    }
+
+    const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
+    const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
+
+    const shouldShowLeftDots = leftSiblingIndex > 2;
+    const shouldShowRightDots = rightSiblingIndex < totalPages - 2;
+
+    const firstPageIndex = 1;
+    const lastPageIndex = totalPages;
+
+    // Case 2: No left dots, but right dots
+    if (!shouldShowLeftDots && shouldShowRightDots) {
+      const leftItemCount = 3 + 2 * siblingCount;
+      const leftRange = Array.from({ length: leftItemCount }, (_, idx) => idx + 1);
+      return [...leftRange, '...', totalPages];
+    }
+
+    // Case 3: No right dots, but left dots
+    if (shouldShowLeftDots && !shouldShowRightDots) {
+      const rightItemCount = 3 + 2 * siblingCount;
+      const rightRange = Array.from({ length: rightItemCount }, (_, idx) => totalPages - rightItemCount + idx + 1);
+      return [firstPageIndex, '...', ...rightRange];
+    }
+
+    // Case 4: Both left and right dots
+    if (shouldShowLeftDots && shouldShowRightDots) {
+      const middleRange = Array.from({ length: rightSiblingIndex - leftSiblingIndex + 1 }, (_, idx) => leftSiblingIndex + idx);
+      return [firstPageIndex, '...', ...middleRange, '...', lastPageIndex];
+    }
+  }, [totalItems, itemsPerPage, currentPage]);
+
+  const fetchResidents = async (search = '', barangay = '', page = 1, limit = 20) => {
     setLoading(true);
-    const skip = (page - 1) * pageSize;
+    const skip = (page - 1) * limit;
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       
-      // --- FIX: RELY ON BACKEND MAPPING ---
-      // We ONLY send the barangay filter if the user is an ADMIN.
-      // If the user is Staff, we send NOTHING. The backend will automatically 
-      // detect their token and force the correct barangay (e.g. "Santo Niño").
       if (userRole === 'admin' && barangay) {
         params.append('barangay', barangay);
       }
       
       params.append('skip', skip);
-      params.append('limit', pageSize);
+      params.append('limit', limit);
 
       const response = await api.get(`/residents/?${params.toString()}`);
       
@@ -64,25 +104,31 @@ export default function ResidentList({ userRole, onEdit }) {
         setBarangayList(response.data);
       } catch (err) { console.error(err); }
     };
-
     fetchBarangays();
 
-    // Initial load
-    fetchResidents(searchTerm, selectedBarangay, currentPage);
-  }, [userRole, currentPage]); // Removing selectedBarangay from dependency to prevent double fetch on mount
+    fetchResidents(searchTerm, selectedBarangay, currentPage, itemsPerPage);
+  }, [userRole, currentPage, itemsPerPage]); // Added itemsPerPage dependency
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchTerm(val);
     setCurrentPage(1); 
-    fetchResidents(val, selectedBarangay, 1);
+    fetchResidents(val, selectedBarangay, 1, itemsPerPage);
   };
 
   const handleBarangayFilter = (e) => {
     const val = e.target.value;
     setSelectedBarangay(val);
     setCurrentPage(1);
-    fetchResidents(searchTerm, val, 1);
+    fetchResidents(searchTerm, val, 1, itemsPerPage);
+  };
+
+  // Handle changing rows per page
+  const handleLimitChange = (e) => {
+    const newLimit = parseInt(e.target.value);
+    setItemsPerPage(newLimit);
+    setCurrentPage(1); // Reset to page 1 to avoid out of bounds
+    // fetchResidents is handled by useEffect
   };
 
   const toggleRow = (id) => {
@@ -95,13 +141,12 @@ export default function ResidentList({ userRole, onEdit }) {
       await api.delete(`/residents/${deleteModal.residentId}`);
       toast.success('Resident removed');
       setDeleteModal({ isOpen: false, residentId: null, name: '' });
-      fetchResidents(searchTerm, selectedBarangay, currentPage);
+      fetchResidents(searchTerm, selectedBarangay, currentPage, itemsPerPage);
     } catch (err) { toast.error('Error deleting record.'); }
     finally { setIsDeleting(false); }
   };
 
-  const totalPages = Math.ceil(totalItems / pageSize);
-
+  // Subcomponent for Details
   const ResidentDetails = ({ r }) => (
     <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone-50/50 border-t border-stone-100 animate-in slide-in-from-top-2 duration-300">
       <div className="space-y-4">
@@ -173,7 +218,6 @@ export default function ResidentList({ userRole, onEdit }) {
             <Search className="absolute left-3 top-3.5 text-stone-400 group-focus-within:text-rose-500" size={18} />
           </div>
 
-          {/* ONLY ADMIN CAN SEE BARANGAY DROPDOWN */}
           {userRole === 'admin' && (
             <div className="relative">
               <select
@@ -192,7 +236,7 @@ export default function ResidentList({ userRole, onEdit }) {
       </div>
 
       {/* TABLE SECTION */}
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden relative">
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden relative min-h-[400px]">
         {loading && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-50 flex flex-col items-center justify-center">
             <Loader2 className="animate-spin text-rose-600 mb-2" size={32} />
@@ -258,28 +302,95 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
       </div>
 
-      {/* PAGINATION */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white border border-stone-100 rounded-2xl shadow-sm">
-        <p className="text-xs text-stone-500 font-medium">
-          Showing <span className="font-bold text-stone-900">{residents.length}</span> of <span className="font-bold text-stone-900">{totalItems}</span> residents
-        </p>
-        <div className="flex items-center gap-2">
+      {/* MODERN PAGINATION */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white border border-stone-100 rounded-2xl shadow-sm">
+        
+        {/* Left: Rows Per Page */}
+        <div className="flex items-center gap-3 text-xs text-stone-500 order-2 md:order-1">
+          <span>Rows per page:</span>
+          <div className="relative">
+            <select 
+              value={itemsPerPage}
+              onChange={handleLimitChange}
+              className="appearance-none bg-stone-50 border border-stone-200 rounded-lg py-1.5 pl-3 pr-8 font-semibold text-stone-700 outline-none focus:ring-2 focus:ring-rose-500/20"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <ChevronDown size={12} className="absolute right-2 top-2.5 text-stone-400 pointer-events-none"/>
+          </div>
+          <span className="hidden md:inline border-l border-stone-200 pl-3 ml-1">
+            Total {totalItems}
+          </span>
+        </div>
+
+        {/* Right: Pagination Controls */}
+        <div className="flex items-center gap-1 order-1 md:order-2">
+          {/* First Page */}
+          <button 
+            disabled={currentPage === 1 || loading}
+            onClick={() => setCurrentPage(1)}
+            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+            title="First Page"
+          >
+            <ChevronsLeft size={16} />
+          </button>
+          
+          {/* Prev Page */}
           <button 
             disabled={currentPage === 1 || loading}
             onClick={() => setCurrentPage(prev => prev - 1)}
-            className="p-2 hover:bg-stone-50 disabled:opacity-30 transition-colors rounded-lg border border-stone-100"
+            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={16} />
           </button>
-          <span className="text-[10px] font-bold px-4 py-2 bg-stone-50 rounded-lg border border-stone-100 uppercase tracking-widest text-stone-600">
-            Page {currentPage} of {totalPages || 1}
-          </span>
+
+          {/* Numbered Buttons */}
+          <div className="flex items-center gap-1 px-2">
+            {paginationRange?.map((pageNumber, idx) => {
+              // Render Ellipsis
+              if (pageNumber === '...') {
+                return <span key={idx} className="text-stone-400 px-2 text-xs">...</span>;
+              }
+              
+              // Render Page Number
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentPage(pageNumber)}
+                  className={`
+                    min-w-[32px] h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all
+                    ${pageNumber === currentPage 
+                      ? 'bg-rose-500 text-white shadow-md shadow-rose-200' 
+                      : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+                    }
+                  `}
+                >
+                  {pageNumber}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Next Page */}
           <button 
-            disabled={currentPage >= totalPages || loading}
+            disabled={currentPage === totalPages || loading}
             onClick={() => setCurrentPage(prev => prev + 1)}
-            className="p-2 hover:bg-stone-50 disabled:opacity-30 transition-colors rounded-lg border border-stone-100"
+            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={16} />
+          </button>
+
+          {/* Last Page */}
+          <button 
+            disabled={currentPage === totalPages || loading}
+            onClick={() => setCurrentPage(totalPages)}
+            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+            title="Last Page"
+          >
+            <ChevronsRight size={16} />
           </button>
         </div>
       </div>
@@ -289,8 +400,9 @@ export default function ResidentList({ userRole, onEdit }) {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })}></div>
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 duration-200 shadow-2xl">
+            {/* ... modal content ... */}
             <div className="text-center">
-              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3"><AlertCircle size={32}/></div>
+              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3"><Trash2 size={32}/></div>
               <h3 className="text-xl font-bold text-stone-900">Delete Record?</h3>
               <p className="text-sm text-stone-500 mt-2 mb-8">Permanently remove <span className="font-bold text-stone-800">{deleteModal.name}</span>?</p>
               <div className="space-y-3">

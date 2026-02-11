@@ -74,11 +74,30 @@ export default function DashboardStats({ userRole }) {
           <div className="h-64 md:h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barangayData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tick={{fontSize: 10}} interval={0} angle={-45} textAnchor="end" height={60} />
-                <YAxis tick={{fontSize: 10}} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#991b1b" radius={[4, 4, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{fontSize: 11, fill: '#78716c'}} 
+                  interval={0} 
+                  angle={-45} 
+                  textAnchor="end" 
+                  height={70}
+                  stroke="#d6d3d1"
+                />
+                <YAxis tick={{fontSize: 11, fill: '#78716c'}} stroke="#d6d3d1" />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: '#1c1917',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}
+                  cursor={{fill: '#fef2f2'}}
+                />
+                <Bar dataKey="value" fill="#991b1b" radius={[8, 8, 0, 0]} maxBarSize={60} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -89,11 +108,34 @@ export default function DashboardStats({ userRole }) {
           <div className="h-64 md:h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={genderData} innerRadius="60%" outerRadius="80%" paddingAngle={5} dataKey="value">
+                <Pie 
+                  data={genderData} 
+                  innerRadius="60%" 
+                  outerRadius="80%" 
+                  paddingAngle={5} 
+                  dataKey="value"
+                  strokeWidth={0}
+                >
                   {genderData.map((_, i) => <Cell key={i} fill={GENDER_COLORS[i % GENDER_COLORS.length]} />)}
                 </Pie>
-                <Tooltip />
-                <Legend iconType="circle" wrapperStyle={{fontSize: '12px'}} />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: '#1c1917',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}
+                />
+                <Legend 
+                  iconType="circle" 
+                  wrapperStyle={{fontSize: '13px', paddingTop: '20px'}}
+                  formatter={(value, entry) => (
+                    <span className="text-stone-700 font-medium">{value}</span>
+                  )}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -105,11 +147,11 @@ export default function DashboardStats({ userRole }) {
 
 function StatCard({ title, value, icon }) {
   return (
-    <div className="bg-white p-5 rounded-2xl border border-stone-200 flex items-center gap-4">
-      <div className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-700 rounded-xl">{icon}</div>
+    <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center gap-4">
+      <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 text-red-700 rounded-xl shadow-sm">{icon}</div>
       <div>
         <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">{title}</p>
-        <p className="text-xl font-bold text-stone-900">{(value || 0).toLocaleString()}</p>
+        <p className="text-2xl font-bold text-stone-900">{(value || 0).toLocaleString()}</p>
       </div>
     </div>
   );

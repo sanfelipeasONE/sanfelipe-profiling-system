@@ -4,16 +4,16 @@ import { X, Plus, Trash2, User, MapPin, Briefcase, Heart, Save, Phone, Fingerpri
 import toast, { Toaster } from 'react-hot-toast';
 
 // Helper: Enhanced to support disabled state
-const SelectGroup = ({ label, name, value, onChange, options, required = false, disabled = false }) => (
+const SelectGroup = ({ label, name, value, onChange, options, required = false, disabled = false, placeholder }) => (
   <div className="space-y-1 w-full">
     <label className="text-[10px] font-bold text-stone-500 uppercase">{label}</label>
     <select 
       name={name} value={value || ''} onChange={onChange} required={required} disabled={disabled}
-      className={`w-full p-3 border border-stone-200 rounded-xl focus:border-rose-500 outline-none text-sm appearance-none
-        ${disabled ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-white text-stone-800'}
+      className={`w-full p-3 border rounded-xl focus:border-rose-500 outline-none text-sm appearance-none
+        ${disabled ? 'bg-stone-200 text-stone-500 cursor-not-allowed border-stone-300' : 'bg-white text-stone-800 border-stone-200'}
       `}
     >
-      <option value="">{disabled ? "Auto-Assigned" : "Select..."}</option>
+      <option value="">{placeholder || (disabled ? "Auto-Assigned" : "Select...")}</option>
       {options.map((opt) => (
         <option key={opt.id || opt} value={opt.name || opt}>{opt.name || opt}</option>
       ))}
@@ -26,20 +26,23 @@ const InputGroup = ({ label, name, value, onChange, type = "text", required = fa
     <label className="text-[10px] font-bold text-stone-500 uppercase">{label}</label>
     <input 
       type={type} name={name} value={value || ''} onChange={onChange} required={required} placeholder={placeholder}
-      className="w-full p-3 bg-stone-50 border border-transparent focus:bg-white focus:border-rose-500 rounded-xl transition-all outline-none text-sm text-stone-800" 
+      className="w-full p-3 bg-stone-50 border border-transparent focus:bg-white focus:border-rose-500 rounded-xl transition-all outline-none text-sm text-stone-800 placeholder:text-stone-400" 
     />
   </div>
 );
 
+// Initial empty form state
+const getInitialFormState = () => ({
+  last_name: '', first_name: '', middle_name: '', ext_name: '',
+  house_no: '', purok: '', barangay: '',
+  birthdate: '', sex: '', civil_status: '',
+  occupation: '', precinct_no: '', contact_no: '',
+  spouse_last_name: '', spouse_first_name: '', spouse_middle_name: '', spouse_ext_name: '',
+  sector_ids: [], family_members: [], other_sector_details: '' 
+});
+
 export default function AddResidentForm({ onSuccess, onCancel, residentToEdit }) {
-  const [formData, setFormData] = useState({
-    last_name: '', first_name: '', middle_name: '', ext_name: '',
-    house_no: '', purok: '', barangay: '',
-    birthdate: '', sex: '', civil_status: '',
-    occupation: '', precinct_no: '', contact_no: '',
-    spouse_last_name: '', spouse_first_name: '', spouse_middle_name: '', spouse_ext_name: '',
-    sector_ids: [], family_members: [], other_sector_details: '' 
-  });
+  const [formData, setFormData] = useState(getInitialFormState());
 
   const [barangayOptions, setBarangayOptions] = useState([]);
   const [purokOptions, setPurokOptions] = useState([]);
@@ -110,6 +113,10 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     setFormData({ ...formData, family_members: updated });
   };
 
+  const resetForm = () => {
+    setFormData(getInitialFormState());
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -117,12 +124,24 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       if (residentToEdit) {
         await api.put(`/residents/${residentToEdit.id}`, formData);
         toast.success("Profile Updated!");
+        setTimeout(onSuccess, 1500);
       } else {
         await api.post('/residents/', formData);
         toast.success("Resident Registered!");
+        // Reset form after successful creation (not for edits)
+        setTimeout(() => {
+          resetForm();
+          // Scroll to top for better UX
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          setLoading(false);
+          // Call onSuccess to refresh the data
+          onSuccess();
+        }, 1500);
       }
-      setTimeout(onSuccess, 1500);
-    } catch (error) { toast.error("Error saving data."); setLoading(false); }
+    } catch (error) { 
+      toast.error("Error saving data."); 
+      setLoading(false); 
+    }
   };
 
   const isOtherSelected = sectorOptions.find(s => s.name.toLowerCase().includes('other') && formData.sector_ids.includes(s.id));
@@ -148,16 +167,16 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <InputGroup label="Last Name *" name="last_name" value={formData.last_name} onChange={handleChange} required />
-            <InputGroup label="First Name *" name="first_name" value={formData.first_name} onChange={handleChange} required />
-            <InputGroup label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleChange} />
-            <InputGroup label="Ext." name="ext_name" value={formData.ext_name} onChange={handleChange} placeholder="Jr/Sr" />
+            <InputGroup label="Last Name *" name="last_name" value={formData.last_name} onChange={handleChange} required placeholder="Dela Cruz" />
+            <InputGroup label="First Name *" name="first_name" value={formData.first_name} onChange={handleChange} required placeholder="Juan" />
+            <InputGroup label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="Santos" />
+            <InputGroup label="Ext." name="ext_name" value={formData.ext_name} onChange={handleChange} placeholder="Jr/Sr/III" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <InputGroup label="Birthdate *" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
-            <SelectGroup label="Sex *" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required />
-            <SelectGroup label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed']} required />
+            <SelectGroup label="Sex *" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required placeholder="Choose gender" />
+            <SelectGroup label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed']} required placeholder="Choose status" />
           </div>
 
           {(formData.civil_status === 'Married' || formData.civil_status === 'Live-in Partner') && (
@@ -166,18 +185,18 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                 <Heart size={14} /> Spouse / Partner Information
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <InputGroup label="Spouse Last Name" name="spouse_last_name" value={formData.spouse_last_name} onChange={handleChange} />
-                <InputGroup label="Spouse First Name" name="spouse_first_name" value={formData.spouse_first_name} onChange={handleChange} />
-                <InputGroup label="Spouse Middle Name" name="spouse_middle_name" value={formData.spouse_middle_name} onChange={handleChange} />
-                <InputGroup label="Spouse Ext." name="spouse_ext_name" value={formData.spouse_ext_name} onChange={handleChange} />
+                <InputGroup label="Spouse Last Name" name="spouse_last_name" value={formData.spouse_last_name} onChange={handleChange} placeholder="Last name" />
+                <InputGroup label="Spouse First Name" name="spouse_first_name" value={formData.spouse_first_name} onChange={handleChange} placeholder="First name" />
+                <InputGroup label="Spouse Middle Name" name="spouse_middle_name" value={formData.spouse_middle_name} onChange={handleChange} placeholder="Middle name" />
+                <InputGroup label="Spouse Ext." name="spouse_ext_name" value={formData.spouse_ext_name} onChange={handleChange} placeholder="Jr/Sr" />
               </div>
             </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <InputGroup label="Occupation" name="occupation" value={formData.occupation} onChange={handleChange} />
-            <InputGroup label="Contact No" name="contact_no" value={formData.contact_no} onChange={handleChange} />
-            <InputGroup label="Precinct No" name="precinct_no" value={formData.precinct_no} onChange={handleChange} />
+            <InputGroup label="Occupation" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="e.g. Teacher, Farmer" />
+            <InputGroup label="Contact No" name="contact_no" value={formData.contact_no} onChange={handleChange} placeholder="09XX-XXX-XXXX" />
+            <InputGroup label="Precinct No" name="precinct_no" value={formData.precinct_no} onChange={handleChange} placeholder="e.g. 0001A" />
           </div>
         </section>
 
@@ -188,8 +207,8 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
             <h3 className="font-bold text-stone-800">Address</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <InputGroup label="House No." name="house_no" value={formData.house_no} onChange={handleChange} />
-            <SelectGroup label="Purok *" name="purok" value={formData.purok} onChange={handleChange} options={purokOptions} required />
+            <InputGroup label="House No." name="house_no" value={formData.house_no} onChange={handleChange} placeholder="e.g. Block 1 Lot 23" />
+            <SelectGroup label="Purok *" name="purok" value={formData.purok} onChange={handleChange} options={purokOptions} required placeholder="Select purok" />
             
             {/* --- FIX: DISABLE BARANGAY SELECTION FOR STAFF --- */}
             {/* If user is Admin, they can select. If Staff, it's disabled. */}
@@ -201,6 +220,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
               options={barangayOptions} 
               required={userRole === 'admin'} 
               disabled={userRole !== 'admin'} 
+              placeholder={userRole === 'admin' ? "Select barangay" : "Assigned by system"}
             />
           </div>
         </section>
@@ -212,15 +232,15 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
               <Plus className="text-rose-400" size={20} />
               <h3 className="font-bold text-stone-800">Other Family Members</h3>
             </div>
-            <button type="button" onClick={addFamilyMember} className="text-xs font-bold bg-rose-50 text-rose-600 px-4 py-2 rounded-xl">+ Add Member</button>
+            <button type="button" onClick={addFamilyMember} className="text-xs font-bold bg-rose-50 text-rose-600 px-4 py-2 rounded-xl hover:bg-rose-100 transition-colors">+ Add Member</button>
           </div>
           <div className="space-y-3">
             {formData.family_members.map((member, index) => (
               <div key={index} className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-4 bg-stone-50 rounded-xl items-end relative">
-                <InputGroup label="First Name" value={member.first_name} onChange={(e) => handleFamilyChange(index, 'first_name', e.target.value)} />
-                <InputGroup label="Last Name" value={member.last_name} onChange={(e) => handleFamilyChange(index, 'last_name', e.target.value)} />
-                <SelectGroup label="Relationship" value={member.relationship} onChange={(e) => handleFamilyChange(index, 'relationship', e.target.value)} options={['Son', 'Daughter', 'Mother', 'Father', 'Sibling']} />
-                <button type="button" onClick={() => setFormData({...formData, family_members: formData.family_members.filter((_, i) => i !== index)})} className="p-3 text-red-500 hover:bg-red-50 rounded-xl w-fit"><Trash2 size={18}/></button>
+                <InputGroup label="First Name" value={member.first_name} onChange={(e) => handleFamilyChange(index, 'first_name', e.target.value)} placeholder="First name" />
+                <InputGroup label="Last Name" value={member.last_name} onChange={(e) => handleFamilyChange(index, 'last_name', e.target.value)} placeholder="Last name" />
+                <SelectGroup label="Relationship" value={member.relationship} onChange={(e) => handleFamilyChange(index, 'relationship', e.target.value)} options={['Son', 'Daughter', 'Mother', 'Father', 'Sibling']} placeholder="Choose relation" />
+                <button type="button" onClick={() => setFormData({...formData, family_members: formData.family_members.filter((_, i) => i !== index)})} className="p-3 text-red-500 hover:bg-red-50 rounded-xl w-fit transition-colors"><Trash2 size={18}/></button>
               </div>
             ))}
           </div>
@@ -234,21 +254,21 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {sectorOptions.map((s) => (
-              <label key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.sector_ids.includes(s.id) ? 'bg-rose-600 border-rose-600 text-white' : 'bg-white border-stone-200 text-stone-600'}`}>
+              <label key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.sector_ids.includes(s.id) ? 'bg-rose-600 border-rose-600 text-white' : 'bg-white border-stone-200 text-stone-600 hover:border-stone-300'}`}>
                 <input type="checkbox" className="hidden" checked={formData.sector_ids.includes(s.id)} onChange={() => handleSectorToggle(s.id)} />
                 <span className="text-xs font-bold uppercase">{s.name}</span>
               </label>
             ))}
           </div>
           {isOtherSelected && (
-            <InputGroup label="Specify Other Sector" name="other_sector_details" value={formData.other_sector_details} onChange={handleChange} placeholder="e.g. Solo Parent" />
+            <InputGroup label="Specify Other Sector" name="other_sector_details" value={formData.other_sector_details} onChange={handleChange} placeholder="e.g. Solo Parent, Overseas Worker" />
           )}
         </section>
 
-        {/* ACTIONS */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t flex flex-col sm:flex-row justify-end gap-3 z-50 shadow-lg">
+        {/* ACTIONS - Fixed positioning to respect sidebar */}
+        <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-stone-200 flex flex-col sm:flex-row justify-end gap-3 z-50 shadow-lg">
           <button type="button" onClick={onCancel} className="w-full sm:w-auto px-8 py-3 font-bold text-stone-500 hover:bg-stone-50 rounded-xl transition-colors">Cancel</button>
-          <button type="submit" disabled={loading} className="w-full sm:w-auto px-12 py-3 bg-red-600 text-white rounded-xl font-bold shadow-xl shadow-red-200 hover:bg-red-700 active:scale-95 transition-all">
+          <button type="submit" disabled={loading} className="w-full sm:w-auto px-12 py-3 bg-red-600 text-white rounded-xl font-bold shadow-xl shadow-red-200 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             {loading ? "Saving..." : "Save Record"}
           </button>
         </div>

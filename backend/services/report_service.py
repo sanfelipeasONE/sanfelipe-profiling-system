@@ -27,18 +27,15 @@ def generate_household_excel(db: Session, barangay_name: str = None):
     # 2. TRANSFORM DATA
     data_list = []
     for r in residents:
-        # Format Middle Initial
+        # Format Household Head Name
         mi = f"{r.middle_name[0]}." if r.middle_name else ""
         full_name = f"{r.last_name}, {r.first_name} {mi} {r.ext_name or ''}".strip()
         
-        # --- FIX: FIND SPOUSE DYNAMICALLY ---
-        # Since we removed specific spouse columns, we look inside family_members
+        # Format Spouse Name (Using the direct database columns we restored)
         spouse_name = ""
-        spouse = next((m for m in r.family_members if m.relationship and m.relationship.lower() in ['spouse', 'husband', 'wife', 'partner', 'live-in partner']), None)
-        
-        if spouse:
-            s_mi = f"{spouse.middle_name[0]}." if spouse.middle_name else ""
-            spouse_name = f"{spouse.last_name}, {spouse.first_name} {s_mi}".strip()
+        if r.spouse_first_name:
+             s_mi = f"{r.spouse_middle_name[0]}." if r.spouse_middle_name else ""
+             spouse_name = f"{r.spouse_last_name}, {r.spouse_first_name} {s_mi} {r.spouse_ext_name or ''}".strip()
 
         # Count total members (Head + Family)
         total_members = 1 + len(r.family_members)
@@ -54,7 +51,7 @@ def generate_household_excel(db: Session, barangay_name: str = None):
             'Age': calculate_age(r.birthdate),
             'Civil Status': r.civil_status,
             'Occupation': r.occupation,
-            'Total Members': total_members,
+            'Total': total_members,
             'Sectors': r.sector_summary,
             'Contact': r.contact_no,
         })
