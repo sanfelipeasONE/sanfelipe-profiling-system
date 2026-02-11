@@ -31,7 +31,7 @@ def generate_household_excel(db: Session, barangay_name: str = None):
         mi = f"{r.middle_name[0]}." if r.middle_name else ""
         full_name = f"{r.last_name}, {r.first_name} {mi} {r.ext_name or ''}".strip()
         
-        # Format Spouse Name (Using the direct database columns we restored)
+        # Format Spouse Name
         spouse_name = ""
         if r.spouse_first_name:
              s_mi = f"{r.spouse_middle_name[0]}." if r.spouse_middle_name else ""
@@ -49,8 +49,8 @@ def generate_household_excel(db: Session, barangay_name: str = None):
             'Spouse': spouse_name.upper(),
             'Sex': r.sex,
             'Age': calculate_age(r.birthdate),
-            'Civil Status': r.civil_status,
-            'Religion': r.religion,
+            'Status': r.civil_status,      # Renamed key to match header for clarity
+            'Religion': r.religion,        # <--- Added Religion Data
             'Occupation': r.occupation,
             'Total': total_members,
             'Sectors': r.sector_summary,
@@ -83,21 +83,23 @@ def generate_household_excel(db: Session, barangay_name: str = None):
         fmt_text = workbook.add_format({'border': 1, 'align': 'left', 'valign': 'vcenter', 'indent': 1, 'font_size': 10})
 
         # --- HEADERS (ROWS 1-4) ---
-        worksheet.merge_range('A1:M1', 'REPUBLIC OF THE PHILIPPINES', fmt_sub)
-        worksheet.merge_range('A2:M2', 'PROVINCE OF ZAMBALES', fmt_sub)
-        worksheet.merge_range('A3:M3', 'MUNICIPALITY OF SAN FELIPE', fmt_title)
+        # UPDATED: Merge range extended from M to N (14 columns)
+        worksheet.merge_range('A1:N1', 'REPUBLIC OF THE PHILIPPINES', fmt_sub)
+        worksheet.merge_range('A2:N2', 'PROVINCE OF ZAMBALES', fmt_sub)
+        worksheet.merge_range('A3:N3', 'MUNICIPALITY OF SAN FELIPE', fmt_title)
         
         title_text = f"MASTER LIST - {barangay_name.upper()}" if barangay_name else "MASTER LIST - ALL BARANGAYS"
-        worksheet.merge_range('A4:M4', title_text, fmt_title)
+        worksheet.merge_range('A4:N4', title_text, fmt_title)
 
         # --- COLUMN HEADERS (ROW 5) ---
-        # Match these to the keys in data_list
-        headers = ['ID', 'Barangay', 'House #', 'Purok', 'Household Head', 'Spouse', 'Sex', 'Age', 'Status', 'Occupation', 'Total', 'Sectors', 'Contact']
+        # UPDATED: Added 'Religion' to the headers list
+        headers = ['ID', 'Barangay', 'House #', 'Purok', 'Household Head', 'Spouse', 'Sex', 'Age', 'Status', 'Religion', 'Occupation', 'Total', 'Sectors', 'Contact']
         
         for col, h in enumerate(headers):
             worksheet.write(4, col, h, fmt_header)
 
         # --- SET COLUMN WIDTHS ---
+        # Adjusted columns to account for new field
         worksheet.set_column('A:A', 5, fmt_center)   # ID
         worksheet.set_column('B:B', 15, fmt_center)  # Barangay
         worksheet.set_column('C:C', 10, fmt_center)  # House No
@@ -106,20 +108,27 @@ def generate_household_excel(db: Session, barangay_name: str = None):
         worksheet.set_column('F:F', 25, fmt_text)    # Spouse
         worksheet.set_column('G:H', 6, fmt_center)   # Sex/Age
         worksheet.set_column('I:I', 12, fmt_center)  # Status
-        worksheet.set_column('J:J', 15, fmt_text)    # Occupation
-        worksheet.set_column('K:K', 8, fmt_center)   # Total
-        worksheet.set_column('L:L', 20, fmt_text)    # Sectors
-        worksheet.set_column('M:M', 15, fmt_center)  # Contact
+        worksheet.set_column('J:J', 15, fmt_center)  # Religion (New Column)
+        worksheet.set_column('K:K', 15, fmt_text)    # Occupation (Shifted)
+        worksheet.set_column('L:L', 8, fmt_center)   # Total (Shifted)
+        worksheet.set_column('M:M', 20, fmt_text)    # Sectors (Shifted)
+        worksheet.set_column('N:N', 15, fmt_center)  # Contact (Shifted)
 
         # --- APPLY BORDERS TO DATA ROWS ---
-        # We loop through the data rows to apply the border format
+        # Loop through data rows to apply formatting
         for row_idx in range(len(df)):
             worksheet.set_row(5 + row_idx, None, fmt_center) # Apply center default
-            # Overwrite specific columns with left alignment
+            
+            # Overwrite specific columns with left alignment (Indices shifted)
+            # Head (E=4), Spouse (F=5)
             worksheet.write(5 + row_idx, 4, df.iloc[row_idx]['Household Head'], fmt_text)
             worksheet.write(5 + row_idx, 5, df.iloc[row_idx]['Spouse'], fmt_text)
-            worksheet.write(5 + row_idx, 9, df.iloc[row_idx]['Occupation'], fmt_text)
-            worksheet.write(5 + row_idx, 11, df.iloc[row_idx]['Sectors'], fmt_text)
+            
+            # Occupation is now at index 10 (Column K)
+            worksheet.write(5 + row_idx, 10, df.iloc[row_idx]['Occupation'], fmt_text)
+            
+            # Sectors is now at index 12 (Column M)
+            worksheet.write(5 + row_idx, 12, df.iloc[row_idx]['Sectors'], fmt_text)
 
     output.seek(0)
     return output

@@ -58,9 +58,9 @@ export default function ResidentList({ userRole, onEdit }) {
       const middleRange = Array.from({ length: rightSiblingIndex - leftSiblingIndex + 1 }, (_, idx) => leftSiblingIndex + idx);
       return [firstPageIndex, '...', ...middleRange, '...', lastPageIndex];
     }
-  }, [totalItems, itemsPerPage, currentPage]);
+  }, [totalItems, itemsPerPage, currentPage, totalPages]);
 
-  const fetchResidents = async (search = '', barangay = '', page = 1, limit = 20) => {
+  const fetchResidents = async (search = searchTerm, barangay = selectedBarangay, page = currentPage, limit = itemsPerPage) => {
     setLoading(true);
     const skip = (page - 1) * limit;
     try {
@@ -93,21 +93,20 @@ export default function ResidentList({ userRole, onEdit }) {
       } catch (err) { console.error(err); }
     };
     fetchBarangays();
-    fetchResidents(searchTerm, selectedBarangay, currentPage, itemsPerPage);
-  }, [userRole, currentPage, itemsPerPage]);
+  }, []);
+
+  useEffect(() => {
+    fetchResidents();
+  }, [userRole, currentPage, itemsPerPage, selectedBarangay, searchTerm]);
 
   const handleSearchChange = (e) => {
-    const val = e.target.value;
-    setSearchTerm(val);
+    setSearchTerm(e.target.value);
     setCurrentPage(1); 
-    fetchResidents(val, selectedBarangay, 1, itemsPerPage);
   };
 
   const handleBarangayFilter = (e) => {
-    const val = e.target.value;
-    setSelectedBarangay(val);
+    setSelectedBarangay(e.target.value);
     setCurrentPage(1);
-    fetchResidents(searchTerm, val, 1, itemsPerPage);
   };
 
   const handleLimitChange = (e) => {
@@ -125,12 +124,14 @@ export default function ResidentList({ userRole, onEdit }) {
       await api.delete(`/residents/${deleteModal.residentId}`);
       toast.success('Resident removed');
       setDeleteModal({ isOpen: false, residentId: null, name: '' });
-      fetchResidents(searchTerm, selectedBarangay, currentPage, itemsPerPage);
-    } catch (err) { toast.error('Error deleting record.'); }
-    finally { setIsDeleting(false); }
+      fetchResidents();
+    } catch (err) { 
+        toast.error('Error deleting record.'); 
+    } finally { 
+        setIsDeleting(false); 
+    }
   };
 
-  // --- UPDATED ResidentDetails WITH RELIGION AND SPOUSE ---
   const ResidentDetails = ({ r }) => (
     <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone-50/50 border-t border-stone-100 animate-in slide-in-from-top-2 duration-300">
       <div className="space-y-6">
@@ -143,7 +144,6 @@ export default function ResidentList({ userRole, onEdit }) {
               <p className="text-[10px] text-stone-400 uppercase font-bold">Civil Status</p>
               <p className="text-sm font-semibold text-stone-700">{r.civil_status || 'N/A'}</p>
             </div>
-            {/* --- ADDED RELIGION HERE --- */}
             <div>
               <p className="text-[10px] text-stone-400 uppercase font-bold">Religion</p>
               <p className="text-sm font-semibold text-stone-700">{r.religion || 'N/A'}</p>
@@ -163,7 +163,6 @@ export default function ResidentList({ userRole, onEdit }) {
           </div>
         </div>
 
-        {/* Spouse Section remains active */}
         {(r.spouse_first_name || r.spouse_last_name) && (
           <div className="space-y-3 pt-4 border-t border-stone-100">
             <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
@@ -200,9 +199,44 @@ export default function ResidentList({ userRole, onEdit }) {
   );
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-500">
+    /* We add "relative" and "mt-0" to ensure the modal stays inside this content box and matches the top */
+    <div className="relative mt-0 space-y-4 animate-in fade-in duration-500">
       <Toaster position="top-center" />
 
+      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {deleteModal.isOpen && (
+        /* Changed "fixed" to "absolute" so it stays within the ResidentList boundaries and doesn't cover the sidebar */
+        <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-stone-900">Delete Record?</h3>
+            <p className="text-sm text-stone-500 mt-2">
+              Are you sure you want to delete <span className="font-bold text-stone-800">{deleteModal.name}</span>? 
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })}
+                className="flex-1 py-2.5 rounded-xl border border-stone-200 text-stone-600 text-sm font-semibold hover:bg-stone-50 transition-colors"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                disabled={isDeleting}
+              >
+                {isDeleting ? <Loader2 size={16} className="animate-spin" /> : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Database Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 md:p-6 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -243,6 +277,7 @@ export default function ResidentList({ userRole, onEdit }) {
 
       <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden relative min-h-[400px]">
         {loading && (
+          /* Loader also changed to absolute to stay inside the table container */
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-50 flex flex-col items-center justify-center">
             <Loader2 className="animate-spin text-rose-600 mb-2" size={32} />
             <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Syncing Records...</span>
@@ -288,7 +323,7 @@ export default function ResidentList({ userRole, onEdit }) {
                       <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-center gap-2">
                           <button onClick={() => onEdit(r)} className="p-2 text-stone-400 hover:text-rose-600 transition-colors"><Edit size={16}/></button>
-                          <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: r.first_name })} className="p-2 text-stone-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                          <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: `${r.first_name} ${r.last_name}` })} className="p-2 text-stone-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
                         </div>
                       </td>
                     </tr>
@@ -307,6 +342,7 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
       </div>
 
+      {/* Pagination Footer */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white border border-stone-100 rounded-2xl shadow-sm">
         <div className="flex items-center gap-3 text-xs text-stone-500 order-2 md:order-1">
           <span>Rows per page:</span>

@@ -33,26 +33,25 @@ export default function UserManagement() {
   useEffect(() => { fetchUsers(); }, []);
 
   const handleCreate = async (e) => {
-  e.preventDefault();
-  setIsSubmitting(true); // Disable the button immediately
-  try {
-    const res = await api.post('/users/', newUser);
-    toast.success("Account Deployed!");
-    setShowForm(false);
-    fetchUsers();
-  } catch (err) { 
-    // Check if the error is actually an auth error
-    if (err.response?.status === 401) {
-      toast.error("Session expired. Please log in again.");
-    } else {
-      toast.error(err.response?.data?.detail || "Creation failed.");
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await api.post('/users/', newUser);
+      toast.success("Account Deployed!");
+      setShowForm(false);
+      setNewUser({ username: '', password: '', role: 'barangay' }); // Reset form
+      fetchUsers();
+    } catch (err) { 
+      if (err.response?.status === 401) {
+        toast.error("Session expired. Please log in again.");
+      } else {
+        toast.error(err.response?.data?.detail || "Creation failed.");
+      }
+    } finally { 
+      setIsSubmitting(false); 
     }
-  } finally { 
-    setIsSubmitting(false); 
-  }
-};
+  };
 
-  // Modern Reset Logic
   const handleConfirmReset = async () => {
     if (!resetModal.newPassword) return toast.error("Please enter a new password");
     setIsSubmitting(true);
@@ -70,26 +69,23 @@ export default function UserManagement() {
   };
 
   const handleDeleteAccount = async () => {
-  setIsSubmitting(true);
-  try {
-    // 1. Verify the URL matches your FastAPI @app.delete route
-    await api.delete(`/users/${deleteModal.userId}`); 
-    
-    toast.success("Account permanently removed");
-    setDeleteModal({ isOpen: false, userId: null, username: '' });
-    fetchUsers();
-  } catch (err) {
-    // 2. This will tell you if it's a "Foreign Key" error or "404 Not Found"
-    const errorMessage = err.response?.data?.detail || "Error deleting account.";
-    toast.error(errorMessage);
-    console.error("Delete Error:", err.response?.data);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    setIsSubmitting(true);
+    try {
+      await api.delete(`/users/${deleteModal.userId}`); 
+      toast.success("Account permanently removed");
+      setDeleteModal({ isOpen: false, userId: null, username: '' });
+      fetchUsers();
+    } catch (err) {
+      const errorMessage = err.response?.data?.detail || "Error deleting account.";
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-10 animate-in fade-in duration-500">
+    /* Change 1: Added "relative mt-0" to keep modals and layout inside the dashboard content */
+    <div className="relative mt-0 max-w-5xl mx-auto space-y-6 pb-10 animate-in fade-in duration-500">
       <Toaster position="top-right" />
 
       {/* HEADER */}
@@ -181,9 +177,10 @@ export default function UserManagement() {
 
       {/* MODERN RESET PASSWORD MODAL */}
       {resetModal.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm animate-in fade-in" onClick={() => setResetModal({ ...resetModal, isOpen: false })}></div>
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 shadow-2xl border border-stone-100">
+        /* Change 2: Changed "fixed" to "absolute" and ensured inset-0 matches relative parent */
+        <div className="absolute inset-0 z-[100] flex items-start justify-center p-4 pt-20">
+          <div className="absolute inset-0 bg-stone-900/20 backdrop-blur-sm animate-in fade-in" onClick={() => setResetModal({ ...resetModal, isOpen: false })}></div>
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 shadow-2xl border border-stone-100 h-fit">
             <div className="text-center">
               <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><Lock size={32}/></div>
               <h3 className="text-xl font-bold text-stone-900">Reset Password</h3>
@@ -219,9 +216,10 @@ export default function UserManagement() {
 
       {/* MODERN DELETE MODAL */}
       {deleteModal.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm animate-in fade-in" onClick={() => setDeleteModal({ isOpen: false, userId: null, username: '' })}></div>
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 shadow-2xl border border-stone-100">
+        /* Change 3: Changed "fixed" to "absolute" to prevent sidebar overlap */
+        <div className="absolute inset-0 z-[100] flex items-start justify-center p-4 pt-20">
+          <div className="absolute inset-0 bg-stone-900/20 backdrop-blur-sm animate-in fade-in" onClick={() => setDeleteModal({ isOpen: false, userId: null, username: '' })}></div>
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 shadow-2xl border border-stone-100 h-fit">
             <div className="text-center">
               <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3"><AlertCircle size={32}/></div>
               <h3 className="text-xl font-bold text-stone-900">Delete Account?</h3>
