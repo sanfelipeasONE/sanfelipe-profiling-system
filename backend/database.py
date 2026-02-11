@@ -8,14 +8,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get database URL from environment
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not SQLALCHEMY_DATABASE_URL:
+if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set.")
 
 print("Connecting to database...")
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL, 
+    pool_size=5,         # Keep only 5 connections open
+    max_overflow=10,     # Allow 10 temporary extra connections
+    pool_timeout=30,     # Wait 30s before giving up
+    pool_recycle=1800    # Refresh connections every 30 mins
+)
 
 SessionLocal = sessionmaker(
     autocommit=False,
