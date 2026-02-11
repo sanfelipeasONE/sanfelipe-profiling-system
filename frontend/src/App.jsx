@@ -1,38 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
-// --- IMPORTS (Connect your Real Files here) ---
+// --- REAL COMPONENT IMPORTS ---
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
+import DashboardStats from './components/DashboardStats';
+import ResidentList from './components/ResidentList';
+import RegisterResident from './components/AddResidentForm'; // Ensure filename matches exactly
+import UserManagement from './components/UserManagement';   // Ensure filename matches exactly
 
-// IMPORT YOUR REAL PAGES
-// (Make sure these file names match what is in your folder!)
-import ResidentList from './components/ResidentList'; 
-import RegisterResident from './components/AddResidentForm'; 
-import UserManagement from './components/UserManagement'; 
-// If you don't have an Overview.jsx yet, keep the placeholder below, or create one.
-
-// --- PLACEHOLDERS (Keep these only if you don't have the file yet) ---
-const Overview = () => (
-  <div className="p-10">
-    <h1 className="text-3xl font-bold text-gray-800 mb-4">Dashboard Overview</h1>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-gray-500 text-sm font-bold uppercase">Total Residents</h3>
-        <p className="text-4xl font-bold text-red-600 mt-2">Loading...</p>
-      </div>
-      {/* You can add more stats widgets here later */}
-    </div>
-  </div>
-);
-
-// --- LAYOUT ---
+/**
+ * DashboardLayout
+ * Wraps protected routes with the Sidebar and a scrollable main content area.
+ */
 const DashboardLayout = ({ userRole, onLogout }) => {
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Sidebar - Fixed width */}
       <Sidebar userRole={userRole} onLogout={onLogout} />
-      <main className="flex-1 ml-[260px] overflow-auto transition-all duration-300">
-        <div className="p-8">
+      
+      {/* Main Content Area - Fill remaining space and scrollable */}
+      <main className="flex-1 ml-[260px] h-full overflow-y-auto transition-all duration-300">
+        <div className="p-8 max-w-7xl mx-auto">
           <Outlet />
         </div>
       </main>
@@ -40,16 +29,24 @@ const DashboardLayout = ({ userRole, onLogout }) => {
   );
 };
 
-// --- MAIN APP ---
 export default function App() {
+  // Initialize state from localStorage to persist login on refresh
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [role, setRole] = useState(localStorage.getItem('role') || 'staff');
 
+  /**
+   * handleLogin
+   * Called by Login.jsx after a successful 200 OK from the cloud backend.
+   */
   const handleLogin = (newRole) => {
     setRole(newRole);
     setToken(localStorage.getItem('token'));
   };
 
+  /**
+   * handleLogout
+   * Clears all local data and returns user to the login screen.
+   */
   const handleLogout = () => {
     localStorage.clear();
     setToken(null);
@@ -58,28 +55,53 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Login Route */}
+      {/* PUBLIC ROUTE: Login 
+        If already logged in, redirect straight to the dashboard.
+      */}
       <Route 
         path="/login" 
-        element={!token ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard/overview" replace />} 
+        element={
+          !token ? (
+            <Login onLogin={handleLogin} />
+          ) : (
+            <Navigate to="/dashboard/overview" replace />
+          )
+        } 
       />
 
-      {/* Dashboard Routes */}
+      {/* PROTECTED ROUTES: Dashboard 
+        If no token exists, redirect any attempt to /dashboard back to /login.
+      */}
       <Route 
         path="/dashboard" 
-        element={token ? <DashboardLayout userRole={role} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+        element={
+          token ? (
+            <DashboardLayout userRole={role} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       >
-        <Route path="overview" element={<Overview />} />
-        
-        {/* REAL COMPONENTS LINKED HERE */}
+        {/* Sub-routes mapped to your sidebar menu */}
+        <Route 
+          path="overview" 
+          element={
+            role === 'admin' ? (
+              <DashboardStats />
+            ) : (
+              <Navigate to="/dashboard/residents" replace />
+            )
+          } 
+        />
         <Route path="residents" element={<ResidentList userRole={role} />} />
         <Route path="create" element={<RegisterResident />} />
         <Route path="users" element={<UserManagement />} />
         
+        {/* Default redirect: /dashboard -> /dashboard/overview */}
         <Route index element={<Navigate to="/dashboard/overview" replace />} />
       </Route>
 
-      {/* Catch-all */}
+      {/* CATCH-ALL: Any unknown URL goes back to login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
