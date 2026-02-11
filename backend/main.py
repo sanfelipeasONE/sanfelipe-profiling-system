@@ -323,22 +323,23 @@ def get_stats(
 @app.get("/system/fix-ghost-records")
 def fix_ghost_records(db: Session = Depends(get_db)):
     try:
-        # This SQL command forces all "San Felipe" or NULL records to belong to "Rosete"
-        # We use raw SQL to avoid model naming issues (Resident vs ResidentProfile)
-        
-        # 1. Try updating the 'residents' table (standard naming)
+        # Attempt 1: Try updating 'residents' table
         query = text("UPDATE residents SET barangay = 'Rosete' WHERE barangay IS NULL OR barangay = 'San Felipe';")
         db.execute(query)
         db.commit()
-        
-        return {"status": "success", "message": "Database fixed! Records moved to Rosete."}
+        return {"status": "success", "message": "Fixed using 'residents' table"}
         
     except Exception as e:
-        # If table name is different (e.g., resident_profiles), try that:
+        # CRITICAL FIX: Rollback the failed transaction so we can try again
+        db.rollback() 
+        
         try:
+            # Attempt 2: Try updating 'resident_profiles' table
             query_backup = text("UPDATE resident_profiles SET barangay = 'Rosete' WHERE barangay IS NULL OR barangay = 'San Felipe';")
             db.execute(query_backup)
             db.commit()
-            return {"status": "success", "message": "Database fixed (using resident_profiles table)!"}
+            return {"status": "success", "message": "Fixed using 'resident_profiles' table"}
+            
         except Exception as e2:
-            return {"status": "error", "detail": str(e2)}
+            # If both fail, print the actual error
+            return {"status": "error", "detail": f"Both attempts failed. Error: {str(e2)}"}
