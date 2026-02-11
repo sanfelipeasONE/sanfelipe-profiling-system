@@ -309,8 +309,24 @@ def export_residents_excel(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user) 
 ):
-    excel_file = report_service.generate_household_excel(db, barangay_name=barangay)
-    filename = f"SanFelipe_Households_{barangay if barangay else 'All'}.xlsx"
+    # 1. Initialize the target
+    target_barangay = barangay
+
+    # 2. SECURITY OVERRIDE
+    if current_user.role != "admin":
+        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+        
+        if official_name:
+            target_barangay = official_name
+        else:
+            target_barangay = current_user.username.replace("_", " ").title()
+
+    # 3. Generate the file
+    excel_file = report_service.generate_household_excel(db, barangay_name=target_barangay)
+    
+    # 4. Create filename
+    clean_name = target_barangay.replace(" ", "_") if target_barangay else "All"
+    filename = f"SanFelipe_Households_{clean_name}.xlsx"
     
     return StreamingResponse(
         excel_file,
