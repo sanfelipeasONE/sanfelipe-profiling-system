@@ -149,6 +149,43 @@ def reset_password(
     
     return {"message": f"Password for {user_to_edit.username} has been reset."}
 
+@app.delete("/users/{user_id}")
+def delete_user(
+    user_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    # 1. Security Check: Only admins can delete accounts
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete users")
+
+    # 2. Find the user in the database
+    user_to_delete = db.query(models.User).filter(models.User.id == user_id).first()
+    
+    if not user_to_delete:
+        raise HTTPException(status_code=404, detail="User account not found")
+
+    # 3. Safety Check: Prevent the admin from deleting their own account
+    if user_to_delete.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account while logged in")
+
+    # 4. Global Safety: Ensure at least one admin remains
+    if user_to_delete.role == "admin":
+        admin_count = db.query(models.User).filter(models.User.role == "admin").count()
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="Cannot delete the last administrator")
+
+    try:
+        db.delete(user_to_delete)
+        db.commit()
+        return {"message": f"User {user_to_delete.username} has been removed from the system"}
+    except Exception as e:
+        db.rollback()
+        # This triggers if the user has data linked to them (Foreign Key Constraint)
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete user: This account has registered residents linked to it."
+        )
 
 # ==========================================
 #      RESIDENT ENDPOINTS
