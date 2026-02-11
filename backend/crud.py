@@ -29,7 +29,6 @@ def get_resident_count(db: Session, search: str = None, barangay: str = None):
 def get_residents(db: Session, skip: int = 0, limit: int = 20, search: str = None, barangay: str = None):
     query = db.query(models.ResidentProfile)
     
-    # 1. Apply Search Filter
     if search:
         search_fmt = f"%{search}%"
         query = query.filter(
@@ -39,12 +38,11 @@ def get_residents(db: Session, skip: int = 0, limit: int = 20, search: str = Non
             )
         )
     
-    # 2. Apply Barangay Filter
+    # FIX: Ensure this filter is applied
     if barangay:
-        # Ensures exact match (Case Sensitive by default in Postgres, which is good for "Rosete" vs "rosete")
         query = query.filter(models.ResidentProfile.barangay == barangay)
     
-    # 3. Apply Pagination & Sort by Newest First
+    # Order by ID descending so the newest (just added) resident appears at the top
     return query.order_by(models.ResidentProfile.id.desc()).offset(skip).limit(limit).all()
 
 def create_resident(db: Session, resident: schemas.ResidentCreate):

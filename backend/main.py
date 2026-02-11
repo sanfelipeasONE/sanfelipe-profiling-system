@@ -197,6 +197,13 @@ def create_resident(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # --- FIX: FORCE BARANGAY NAME FOR STAFF ---
+    # If the user is NOT admin, we overwrite the 'barangay' field
+    # to match their account. This ensures they can always see what they create.
+    if current_user.role != "admin":
+        # e.g., converts "rosete" -> "Rosete"
+        resident.barangay = current_user.username.capitalize() 
+
     return crud.create_resident(db=db, resident=resident)
 
 # main.py
