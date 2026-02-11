@@ -65,6 +65,7 @@ class ResidentProfile(Base):
     birthdate = Column(Date)
     sex = Column(String)
     civil_status = Column(String, nullable=True)
+    religion = Column(String, nullable=True)
     precinct_no = Column(String, nullable=True)
     
     # 5. WORK & CONTACT

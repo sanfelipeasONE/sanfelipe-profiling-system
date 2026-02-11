@@ -50,6 +50,7 @@ def generate_household_excel(db: Session, barangay_name: str = None):
             'Sex': r.sex,
             'Age': calculate_age(r.birthdate),
             'Civil Status': r.civil_status,
+            'Religion': r.religion,
             'Occupation': r.occupation,
             'Total': total_members,
             'Sectors': r.sector_summary,

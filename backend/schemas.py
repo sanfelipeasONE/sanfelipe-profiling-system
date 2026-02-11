@@ -67,6 +67,7 @@ class ResidentBase(BaseModel):
     sex: str
     birthdate: Optional[date] = None
     civil_status: Optional[str] = None
+    religion: Optional[str] = None
     occupation: Optional[str] = None
     
     # Spouse/Partner Info

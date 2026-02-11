@@ -31,11 +31,12 @@ const InputGroup = ({ label, name, value, onChange, type = "text", required = fa
   </div>
 );
 
-// Initial empty form state
+// --- UPDATED INITIAL STATE ---
 const getInitialFormState = () => ({
   last_name: '', first_name: '', middle_name: '', ext_name: '',
   house_no: '', purok: '', barangay: '',
   birthdate: '', sex: '', civil_status: '',
+  religion: '', // <--- ADDED RELIGION
   occupation: '', precinct_no: '', contact_no: '',
   spouse_last_name: '', spouse_first_name: '', spouse_middle_name: '', spouse_ext_name: '',
   sector_ids: [], family_members: [], other_sector_details: '' 
@@ -43,13 +44,11 @@ const getInitialFormState = () => ({
 
 export default function AddResidentForm({ onSuccess, onCancel, residentToEdit }) {
   const [formData, setFormData] = useState(getInitialFormState());
-
   const [barangayOptions, setBarangayOptions] = useState([]);
   const [purokOptions, setPurokOptions] = useState([]);
   const [sectorOptions, setSectorOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   
-  // Get User Role to determine if we lock the barangay field
   const userRole = localStorage.getItem('role') || 'staff'; 
 
   useEffect(() => {
@@ -128,13 +127,10 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       } else {
         await api.post('/residents/', formData);
         toast.success("Resident Registered!");
-        // Reset form after successful creation (not for edits)
         setTimeout(() => {
           resetForm();
-          // Scroll to top for better UX
           window.scrollTo({ top: 0, behavior: 'smooth' });
           setLoading(false);
-          // Call onSuccess to refresh the data
           onSuccess();
         }, 1500);
       }
@@ -173,10 +169,12 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
             <InputGroup label="Ext." name="ext_name" value={formData.ext_name} onChange={handleChange} placeholder="Jr/Sr/III" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <InputGroup label="Birthdate *" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
             <SelectGroup label="Sex *" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required placeholder="Choose gender" />
-            <SelectGroup label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed']} required placeholder="Choose status" />
+            <SelectGroup label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed', 'Live-in Partner']} required placeholder="Choose status" />
+            {/* --- NEW RELIGION FIELD --- */}
+            <InputGroup label="Religion" name="religion" value={formData.religion} onChange={handleChange} placeholder="e.g. Catholic" />
           </div>
 
           {(formData.civil_status === 'Married' || formData.civil_status === 'Live-in Partner') && (
@@ -209,9 +207,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <InputGroup label="House No." name="house_no" value={formData.house_no} onChange={handleChange} placeholder="e.g. Block 1 Lot 23" />
             <SelectGroup label="Purok *" name="purok" value={formData.purok} onChange={handleChange} options={purokOptions} required placeholder="Select purok" />
-            
-            {/* --- FIX: DISABLE BARANGAY SELECTION FOR STAFF --- */}
-            {/* If user is Admin, they can select. If Staff, it's disabled. */}
             <SelectGroup 
               label={userRole === 'admin' ? "Barangay *" : "Barangay (Auto-Assigned)"}
               name="barangay" 
@@ -265,14 +260,12 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           )}
         </section>
 
-        {/* ACTIONS - Fixed positioning to respect sidebar */}
         <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-stone-200 flex flex-col sm:flex-row justify-end gap-3 z-50 shadow-lg">
           <button type="button" onClick={onCancel} className="w-full sm:w-auto px-8 py-3 font-bold text-stone-500 hover:bg-stone-50 rounded-xl transition-colors">Cancel</button>
           <button type="submit" disabled={loading} className="w-full sm:w-auto px-12 py-3 bg-red-600 text-white rounded-xl font-bold shadow-xl shadow-red-200 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             {loading ? "Saving..." : "Save Record"}
           </button>
         </div>
-
       </form>
     </div>
   );

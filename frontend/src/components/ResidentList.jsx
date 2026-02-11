@@ -16,23 +16,19 @@ export default function ResidentList({ userRole, onEdit }) {
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
   
-  // Modal State
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, residentId: null, name: '' });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage, setItemsPerPage] = useState(20); // Added dynamic page size
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  // --- MODERN PAGINATION LOGIC ---
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   const paginationRange = useMemo(() => {
-    const siblingCount = 1; // How many numbers to show next to current page
+    const siblingCount = 1;
     const totalPageNumbers = siblingCount + 5;
 
-    // Case 1: If the number of pages is less than the page numbers we want to show
     if (totalPages <= totalPageNumbers) {
       return Array.from({ length: totalPages }, (_, idx) => idx + 1);
     }
@@ -46,21 +42,18 @@ export default function ResidentList({ userRole, onEdit }) {
     const firstPageIndex = 1;
     const lastPageIndex = totalPages;
 
-    // Case 2: No left dots, but right dots
     if (!shouldShowLeftDots && shouldShowRightDots) {
       const leftItemCount = 3 + 2 * siblingCount;
       const leftRange = Array.from({ length: leftItemCount }, (_, idx) => idx + 1);
       return [...leftRange, '...', totalPages];
     }
 
-    // Case 3: No right dots, but left dots
     if (shouldShowLeftDots && !shouldShowRightDots) {
       const rightItemCount = 3 + 2 * siblingCount;
       const rightRange = Array.from({ length: rightItemCount }, (_, idx) => totalPages - rightItemCount + idx + 1);
       return [firstPageIndex, '...', ...rightRange];
     }
 
-    // Case 4: Both left and right dots
     if (shouldShowLeftDots && shouldShowRightDots) {
       const middleRange = Array.from({ length: rightSiblingIndex - leftSiblingIndex + 1 }, (_, idx) => leftSiblingIndex + idx);
       return [firstPageIndex, '...', ...middleRange, '...', lastPageIndex];
@@ -73,16 +66,11 @@ export default function ResidentList({ userRole, onEdit }) {
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
-      
-      if (userRole === 'admin' && barangay) {
-        params.append('barangay', barangay);
-      }
-      
+      if (userRole === 'admin' && barangay) params.append('barangay', barangay);
       params.append('skip', skip);
       params.append('limit', limit);
 
       const response = await api.get(`/residents/?${params.toString()}`);
-      
       if (response.data.items) {
         setResidents(response.data.items);
         setTotalItems(response.data.total);
@@ -105,9 +93,8 @@ export default function ResidentList({ userRole, onEdit }) {
       } catch (err) { console.error(err); }
     };
     fetchBarangays();
-
     fetchResidents(searchTerm, selectedBarangay, currentPage, itemsPerPage);
-  }, [userRole, currentPage, itemsPerPage]); // Added itemsPerPage dependency
+  }, [userRole, currentPage, itemsPerPage]);
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
@@ -123,12 +110,9 @@ export default function ResidentList({ userRole, onEdit }) {
     fetchResidents(searchTerm, val, 1, itemsPerPage);
   };
 
-  // Handle changing rows per page
   const handleLimitChange = (e) => {
-    const newLimit = parseInt(e.target.value);
-    setItemsPerPage(newLimit);
-    setCurrentPage(1); // Reset to page 1 to avoid out of bounds
-    // fetchResidents is handled by useEffect
+    setItemsPerPage(parseInt(e.target.value));
+    setCurrentPage(1);
   };
 
   const toggleRow = (id) => {
@@ -146,35 +130,58 @@ export default function ResidentList({ userRole, onEdit }) {
     finally { setIsDeleting(false); }
   };
 
-  // Subcomponent for Details
+  // --- UPDATED ResidentDetails WITH RELIGION AND SPOUSE ---
   const ResidentDetails = ({ r }) => (
     <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone-50/50 border-t border-stone-100 animate-in slide-in-from-top-2 duration-300">
-      <div className="space-y-4">
-        <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
-          <User size={14} /> Personal Details
-        </h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-[10px] text-stone-400 uppercase font-bold">Civil Status</p>
-            <p className="text-sm font-semibold text-stone-700">{r.civil_status || 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-stone-400 uppercase font-bold">Contact No.</p>
-            <p className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
-              <Phone size={12} /> {r.contact_no || 'N/A'}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-stone-400 uppercase font-bold">Precinct No.</p>
-            <p className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
-              <Fingerprint size={12} /> {r.precinct_no || 'N/A'}
-            </p>
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
+            <User size={14} /> Personal Details
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[10px] text-stone-400 uppercase font-bold">Civil Status</p>
+              <p className="text-sm font-semibold text-stone-700">{r.civil_status || 'N/A'}</p>
+            </div>
+            {/* --- ADDED RELIGION HERE --- */}
+            <div>
+              <p className="text-[10px] text-stone-400 uppercase font-bold">Religion</p>
+              <p className="text-sm font-semibold text-stone-700">{r.religion || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-stone-400 uppercase font-bold">Contact No.</p>
+              <p className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
+                <Phone size={12} /> {r.contact_no || 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-stone-400 uppercase font-bold">Precinct No.</p>
+              <p className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
+                <Fingerprint size={12} /> {r.precinct_no || 'N/A'}
+              </p>
+            </div>
           </div>
         </div>
+
+        {/* Spouse Section remains active */}
+        {(r.spouse_first_name || r.spouse_last_name) && (
+          <div className="space-y-3 pt-4 border-t border-stone-100">
+            <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
+              <Heart size={14} className="text-rose-400 fill-rose-400" /> Spouse / Partner
+            </h4>
+            <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
+              <p className="text-sm font-bold text-stone-800">
+                {r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name || ''} {r.spouse_ext_name || ''}
+              </p>
+              <p className="text-[10px] text-stone-400 font-medium uppercase mt-0.5">Legal Spouse / Partner</p>
+            </div>
+          </div>
+        )}
       </div>
+
       <div className="space-y-4">
         <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
-          <Heart size={14} /> Family Background
+          <User size={14} /> Family Members
         </h4>
         {r.family_members?.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -186,7 +193,7 @@ export default function ResidentList({ userRole, onEdit }) {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-stone-400 italic">No family members recorded.</p>
+          <p className="text-xs text-stone-400 italic">No additional family members recorded.</p>
         )}
       </div>
     </div>
@@ -196,7 +203,6 @@ export default function ResidentList({ userRole, onEdit }) {
     <div className="space-y-4 animate-in fade-in duration-500">
       <Toaster position="top-center" />
 
-      {/* SEARCH & FILTERS */}
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 md:p-6 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -235,7 +241,6 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
       </div>
 
-      {/* TABLE SECTION */}
       <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden relative min-h-[400px]">
         {loading && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-50 flex flex-col items-center justify-center">
@@ -302,10 +307,7 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
       </div>
 
-      {/* MODERN PAGINATION */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white border border-stone-100 rounded-2xl shadow-sm">
-        
-        {/* Left: Rows Per Page */}
         <div className="flex items-center gap-3 text-xs text-stone-500 order-2 md:order-1">
           <span>Rows per page:</span>
           <div className="relative">
@@ -326,47 +328,34 @@ export default function ResidentList({ userRole, onEdit }) {
           </span>
         </div>
 
-        {/* Right: Pagination Controls */}
         <div className="flex items-center gap-1 order-1 md:order-2">
-          {/* First Page */}
           <button 
             disabled={currentPage === 1 || loading}
             onClick={() => setCurrentPage(1)}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
             title="First Page"
           >
             <ChevronsLeft size={16} />
           </button>
           
-          {/* Prev Page */}
           <button 
             disabled={currentPage === 1 || loading}
             onClick={() => setCurrentPage(prev => prev - 1)}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
           >
             <ChevronLeft size={16} />
           </button>
 
-          {/* Numbered Buttons */}
           <div className="flex items-center gap-1 px-2">
             {paginationRange?.map((pageNumber, idx) => {
-              // Render Ellipsis
               if (pageNumber === '...') {
                 return <span key={idx} className="text-stone-400 px-2 text-xs">...</span>;
               }
-              
-              // Render Page Number
               return (
                 <button
                   key={idx}
                   onClick={() => setCurrentPage(pageNumber)}
-                  className={`
-                    min-w-[32px] h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all
-                    ${pageNumber === currentPage 
-                      ? 'bg-rose-500 text-white shadow-md shadow-rose-200' 
-                      : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
-                    }
-                  `}
+                  className={`min-w-[32px] h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${pageNumber === currentPage ? 'bg-rose-500 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}
                 >
                   {pageNumber}
                 </button>
@@ -374,47 +363,24 @@ export default function ResidentList({ userRole, onEdit }) {
             })}
           </div>
 
-          {/* Next Page */}
           <button 
             disabled={currentPage === totalPages || loading}
             onClick={() => setCurrentPage(prev => prev + 1)}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
           >
             <ChevronRight size={16} />
           </button>
 
-          {/* Last Page */}
           <button 
             disabled={currentPage === totalPages || loading}
             onClick={() => setCurrentPage(totalPages)}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
             title="Last Page"
           >
             <ChevronsRight size={16} />
           </button>
         </div>
       </div>
-
-      {/* DELETE MODAL (Unchanged) */}
-      {deleteModal.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })}></div>
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 duration-200 shadow-2xl">
-            {/* ... modal content ... */}
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3"><Trash2 size={32}/></div>
-              <h3 className="text-xl font-bold text-stone-900">Delete Record?</h3>
-              <p className="text-sm text-stone-500 mt-2 mb-8">Permanently remove <span className="font-bold text-stone-800">{deleteModal.name}</span>?</p>
-              <div className="space-y-3">
-                <button onClick={confirmDelete} className="w-full py-3.5 bg-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-200">
-                  {isDeleting ? "Deleting..." : "Confirm Delete"}
-                </button>
-                <button onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })} className="w-full py-3.5 text-stone-400 font-bold">Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
