@@ -26,6 +26,7 @@ app = FastAPI(title="San Felipe Residential Profile Form")
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
+    "https://sanfelipe-profiling-system-production.up.railway.app",
 ]
 
 app.add_middleware(
