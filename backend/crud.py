@@ -30,8 +30,10 @@ def get_resident_count(db: Session, search: str = None, barangay: str = None):
     
     # Apply Barangay Filter
     if barangay:
-        query = query.filter(models.ResidentProfile.barangay == barangay)
-        
+        query = query.filter(
+            func.lower(models.ResidentProfile.barangay) == barangay.lower()
+        )
+
     return query.count()
 
 # --- FIX: Updated Fetcher with Pagination & Strict Filtering ---

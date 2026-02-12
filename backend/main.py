@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import text, func
 from services.import_service import process_excel_import
 import io
 
@@ -282,8 +282,11 @@ def update_resident(
     if current_user.role != "admin":
         # Additional safety: Check if resident belongs to this staff
         existing = crud.get_resident(db, resident_id)
-        if existing and existing.barangay != current_user.username.capitalize():
-            raise HTTPException(status_code=403, detail="You can only edit residents in your barangay")
+        official_name = BARANGAY_MAPPING.get(current_user.username.lower(), current_user.username.replace("_", " ").title())
+
+        if existing:
+            if existing.barangay.lower() != official_name.lower():
+                raise HTTPException(...)
 
     db_resident = crud.update_resident(db, resident_id=resident_id, resident_data=resident)
     if db_resident is None:
@@ -444,4 +447,18 @@ def debug_diagnose(
             "total_records": db.query(models.ResidentProfile).count(),
             "sample_records": sample_data
         }
+    }
+
+@app.get("/debug/barangay-test")
+def debug_barangay(
+    barangay: str,
+    db: Session = Depends(get_db)
+):
+    residents = db.query(models.ResidentProfile).filter(
+        func.lower(models.ResidentProfile.barangay) == barangay.lower()
+    ).all()
+
+    return {
+        "filter_used": barangay,
+        "count_found": len(residents)
     }
