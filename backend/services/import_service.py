@@ -29,15 +29,18 @@ def parse_date(date_val):
 
 def get_sectors(row):
     active_sectors = []
-    # Using the exact columns from your file structure
+    # Columns to check for checkmarks/text
     possible_sectors = [
         'FARMER', 'FISHERFOLK', 'FISHERMAN/BANCA OWNER', 'TODA', 
         'BRGY BNS/BHW', 'BRGY TANOD', 'BRGY OFFICIAL', 'LGU EMPLOYEE', 
         'INDIGENOUS PEOPLE', 'PWD', 'OFW', 'STUDENT', 
         'SENIOR CITIZEN', 'LIFEGUARD', 'SOLO PARENT'
     ]
+    
+    # Check normalized uppercase columns
     for sector in possible_sectors:
-        val = row.get(sector)
+        # We try to get the column; if missing, we skip
+        val = row.get(sector) 
         if clean_str(val) != "":
             active_sectors.append(sector)
 
@@ -52,116 +55,128 @@ def get_sectors(row):
     return summary, other_details
 
 def process_excel_import(file_content, db: Session):
-    # --- STEP 1: FIND THE HEADER ROW ---
-    # We read the file without a header first to scan for "LAST NAME"
     header_index = 0
+    df = None
+    
+    # --- PHASE 1: READ THE FILE ---
+    try:
+        # Try as Excel
+        df = pd.read_excel(file_content, header=None, dtype=str, engine='openpyxl')
+    except Exception as e_xlsx:
+        file_content.seek(0)
+        try:
+            # Try as CSV
+            df = pd.read_csv(file_content, header=None, dtype=str, encoding='cp1252')
+        except Exception as e_csv:
+            return {"added": 0, "errors": [f"CRITICAL: Could not read file. {str(e_xlsx)}"]}
+
+    # --- PHASE 2: FIND HEADER ROW ---
     found_header = False
     
-    try:
-        # Load raw data to scan
-        df_scan = pd.read_excel(file_content, header=None, dtype=str, engine='openpyxl')
+    # Scan first 20 rows for "LAST NAME"
+    for i in range(min(20, len(df))):
+        # Create a clean list of values for this row
+        row_values = [str(x).strip().upper() for x in df.iloc[i].values]
         
-        # Scan first 20 rows
-        for i in range(min(20, len(df_scan))):
-            # Convert row to string and check for keywords
-            row_str = " ".join([str(x).upper() for x in df_scan.iloc[i].values])
-            if "LAST NAME" in row_str and "FIRST NAME" in row_str:
-                header_index = i
-                found_header = True
-                break
-                
-        if not found_header:
-            return {"added": 0, "errors": ["Could not find 'LAST NAME' column. Please ensure headers are within the first 20 rows."]}
+        if "LAST NAME" in row_values:
+            header_index = i
+            found_header = True
+            
+            # Reset DataFrame with this row as header
+            # We explicitly set the column names from this row
+            df.columns = row_values
+            
+            # Drop the header row and previous rows from data
+            df = df.iloc[i+1:].reset_index(drop=True)
+            
+            # Rename duplicates (Handling the two "LAST NAME" columns)
+            # Pandas does this automatically on read, but since we manually set columns,
+            # we need to ensure unique names for the Spouse columns.
+            new_cols = []
+            seen = {}
+            for c in df.columns:
+                if c in seen:
+                    seen[c] += 1
+                    new_cols.append(f"{c}.{seen[c]}")
+                else:
+                    seen[c] = 0
+                    new_cols.append(c)
+            df.columns = new_cols
+            
+            break
+            
+    if not found_header:
+        # DEBUG: Return the first few rows to see what the server sees
+        preview = df.head(3).to_string()
+        return {"added": 0, "errors": [f"Could not find 'LAST NAME' in first 20 rows. Preview of file content:\n{preview}"]}
 
-        # --- STEP 2: RELOAD WITH CORRECT HEADER ---
-        file_content.seek(0) # Reset file pointer
-        df = pd.read_excel(file_content, header=header_index, dtype=str, engine='openpyxl')
-        
-    except Exception as e:
-        # Fallback for CSV
-        try:
-            file_content.seek(0)
-            df = pd.read_csv(file_content, header=0, dtype=str, encoding='cp1252')
-        except:
-            return {"added": 0, "errors": [f"File Read Error: {str(e)}"]}
-
-    # Clean and Normalize Data
+    # --- PHASE 3: PROCESS DATA ---
     df = df.where(pd.notnull(df), None)
-    df.columns = df.columns.str.strip().str.upper()
-    
-    # DEBUG: Print columns to logs (optional, helps debugging)
-    # print(f"Detected Columns: {df.columns.tolist()}")
-
     success_count = 0
     errors = []
 
-    # --- STEP 3: ITERATE ---
     for index, row in df.iterrows():
         try:
-            # Required Field Check
+            # Strict Check
             lname = clean_str(row.get('LAST NAME'))
             if not lname:
-                # Log skipped rows to help you debug
-                # errors.append(f"Row {index + 2}: Skipped (No Last Name)") 
+                # Silent skip for empty rows
                 continue
 
-            # --- PARSE PERSONAL ---
-            fname = clean_str(row.get('FIRST NAME'))
-            mname = clean_str(row.get('MIDDLE NAME'))
-            ext   = clean_str(row.get('EXT NAME'))
-            
-            # --- PARSE SPOUSE ---
-            # Pandas handles duplicates as 'LAST NAME.1'
-            spouse_lname  = clean_str(row.get('LAST NAME.1'))
-            spouse_fname  = clean_str(row.get('FIRST NAME.1'))
-            spouse_mname  = clean_str(row.get('MIDDLE NAME.1'))
-            spouse_ext    = clean_str(row.get('EXT NAME.1'))
-
-            # --- PARSE DATE ---
-            birthdate = parse_date(row.get('BIRTHDATE'))
-
-            # --- SECTORS ---
-            sector_summary_str, other_details_str = get_sectors(row)
-
-            # --- CREATE OBJECT ---
+            # --- MAP COLUMNS ---
             resident = ResidentProfile(
                 last_name=lname,
-                first_name=fname,
-                middle_name=mname,
-                ext_name=ext,
+                first_name=clean_str(row.get('FIRST NAME')),
+                middle_name=clean_str(row.get('MIDDLE NAME')),
+                ext_name=clean_str(row.get('EXT NAME')),
                 
+                # Address
                 house_no=clean_str(row.get('HOUSE NO. / STREET')),
                 purok=clean_str(row.get('PUROK/SITIO')),
                 barangay=clean_str(row.get('BARANGAY')),
                 
+                # Personal
                 sex=clean_str(row.get('SEX')),
-                birthdate=birthdate,
+                birthdate=parse_date(row.get('BIRTHDATE')),
                 civil_status=clean_str(row.get('CIVIL STATUS')),
                 religion=clean_str(row.get('RELIGION')),
                 occupation=clean_str(row.get('OCCUPATION')),
                 contact_no=clean_str(row.get('CONTACT')),
                 precinct_no=clean_str(row.get('PRECINT NO')),
                 
-                sector_summary=sector_summary_str,
-                other_sector_details=other_details_str,
+                # Sectors
+                # Pass the whole row so helper can find columns
+                sector_summary=get_sectors(row)[0],
+                other_sector_details=get_sectors(row)[1],
                 
-                spouse_last_name=spouse_lname,
-                spouse_first_name=spouse_fname,
-                spouse_middle_name=spouse_mname,
-                spouse_ext_name=spouse_ext,
+                # Spouse (Using .1 suffix for duplicates)
+                spouse_last_name=clean_str(row.get('LAST NAME.1')),
+                spouse_first_name=clean_str(row.get('FIRST NAME.1')),
+                spouse_middle_name=clean_str(row.get('MIDDLE NAME.1')),
+                spouse_ext_name=clean_str(row.get('EXT NAME.1')),
             )
             
             db.add(resident)
             success_count += 1
             
         except Exception as e:
-            errors.append(f"Row {index + 2 + header_index}: {str(e)}")
+            errors.append(f"Row {index + 2}: {str(e)}")
 
-    # 4. COMMIT
+    # --- PHASE 4: FINAL CHECK ---
+    if success_count == 0:
+        return {
+            "added": 0, 
+            "errors": [
+                "Header found, but no rows added.",
+                f"Detected Columns: {list(df.columns)}",
+                "Possible Issue: 'LAST NAME' column might be empty or misnamed."
+            ]
+        }
+
     try:
         db.commit()
     except Exception as e:
         db.rollback()
-        return {"added": 0, "errors": [f"Database Error: {str(e)}"]}
+        return {"added": 0, "errors": [f"Database Commit Error: {str(e)}"]}
     
     return {"added": success_count, "errors": errors}
