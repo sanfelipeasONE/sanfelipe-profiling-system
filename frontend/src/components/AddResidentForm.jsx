@@ -66,15 +66,69 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   }, []);
 
   useEffect(() => {
-    if (residentToEdit) {
+    if (residentToEdit && barangayOptions.length && purokOptions.length) {
+
+      const normalizeSelect = (value, options) => {
+        if (!value) return '';
+
+        const cleaned = value.toLowerCase().trim();
+
+        const match = options.find(opt => {
+          const optionValue = (opt.name || opt).toLowerCase().trim();
+
+          return (
+            optionValue === cleaned ||                     // exact match
+            optionValue.replace("purok", "").trim() === cleaned.replace("purok", "").trim()
+          );
+        });
+
+        return match ? (match.name || match) : '';
+      };
+
+      const normalizeSex = (value) => {
+        if (!value) return '';
+        const v = value.toLowerCase().trim();
+        if (v === 'm' || v === 'male') return 'Male';
+        if (v === 'f' || v === 'female') return 'Female';
+        return '';
+      };
+
+      const normalizeCivilStatus = (value) => {
+        if (!value) return '';
+        const v = value.toLowerCase().trim();
+        if (v === 'single') return 'Single';
+        if (v === 'married') return 'Married';
+        if (v === 'widowed') return 'Widowed';
+        if (v.includes('live')) return 'Live-in Partner';
+        return '';
+      };
+
       setFormData({
+        ...getInitialFormState(),
         ...residentToEdit,
-        birthdate: residentToEdit.birthdate ? residentToEdit.birthdate.split('T')[0] : '',
-        sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map(s => s.id) : [],
+
+        birthdate: residentToEdit.birthdate
+          ? residentToEdit.birthdate.split('T')[0]
+          : '',
+
+        sex: normalizeSex(residentToEdit.sex),
+        civil_status: normalizeCivilStatus(residentToEdit.civil_status),
+
+        barangay: normalizeSelect(residentToEdit.barangay, barangayOptions),
+        purok: normalizeSelect(residentToEdit.purok, purokOptions),
+
+        sector_ids: residentToEdit.sectors
+          ? residentToEdit.sectors.map(s => s.id)
+          : [],
+
         family_members: residentToEdit.family_members || []
       });
     }
-  }, [residentToEdit]);
+  }, [residentToEdit, barangayOptions, purokOptions]);
+
+
+
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;

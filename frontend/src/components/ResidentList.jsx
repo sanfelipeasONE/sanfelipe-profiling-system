@@ -16,6 +16,7 @@ export default function ResidentList({ userRole, onEdit }) {
   const [barangayList, setBarangayList] = useState([]);
   const [selectedBarangay, setSelectedBarangay] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSector, setSelectedSector] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
 
@@ -90,13 +91,22 @@ export default function ResidentList({ userRole, onEdit }) {
   }, [totalItems, itemsPerPage, currentPage, totalPages]);
 
   // --- DATA FETCHING ---
-  const fetchResidents = async (search = searchTerm, barangay = selectedBarangay, page = currentPage, limit = itemsPerPage) => {
+  const fetchResidents = async (
+  search = searchTerm,
+  barangay = selectedBarangay,
+  sector = selectedSector,
+  page = currentPage,
+  limit = itemsPerPage
+) => {
+
     setLoading(true);
     const skip = (page - 1) * limit;
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (userRole === 'admin' && barangay) params.append('barangay', barangay);
+      if (sector) params.append('sector', sector);
+
       params.append('skip', skip);
       params.append('limit', limit);
 
@@ -127,11 +137,13 @@ export default function ResidentList({ userRole, onEdit }) {
 
   useEffect(() => {
     fetchResidents();
-  }, [userRole, currentPage, itemsPerPage, selectedBarangay, searchTerm]);
+  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, searchTerm]);
+
 
   // --- HANDLERS ---
   const handleSearchChange = (e) => { setSearchTerm(e.target.value); setCurrentPage(1); };
   const handleBarangayFilter = (e) => { setSelectedBarangay(e.target.value); setCurrentPage(1); };
+  const handleSectorFilter = (e) => { setSelectedSector(e.target.value); setCurrentPage(1); };
   const handleLimitChange = (e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); };
   const toggleRow = (id) => { setExpandedRow(expandedRow === id ? null : id); };
 
@@ -278,10 +290,37 @@ export default function ResidentList({ userRole, onEdit }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative group">
             <input type="text" placeholder="Search by name..." value={searchTerm} onChange={handleSearchChange} className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-100 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none text-sm" />
             <Search className="absolute left-3 top-3.5 text-stone-400 group-focus-within:text-rose-500" size={18} />
+          </div>
+          <div className="relative">
+            <select
+              value={selectedSector}
+              onChange={handleSectorFilter}
+              className="w-full appearance-none pl-10 pr-10 py-3 bg-stone-50 border border-stone-100 rounded-xl outline-none text-sm focus:ring-2 focus:ring-rose-500/20"
+            >
+              <option value="">All Sectors</option>
+              <option value="Fisherman/Banca Owner">Fisherman/Banca Owner</option>
+              <option value="Senior Citizen">Senior Citizen</option>
+              <option value="PWD">PWD</option>
+              <option value="OFW">OFW</option>
+              <option value="Student">Student</option>
+              <option value="SOLO PARENT">Solo Parent</option>
+              <option value="Indigenous People">Indigenous People</option>
+              <option value="LGU Employee">LGU Employee</option>
+              <option value="BRGY OFFICIAL">BRGY. Official/Employee</option>
+              <option value="BRGY BNS/BHW">BRGY. BNS/BHW</option>
+              <option value="BRGY TANOD">BRGY Tanod</option>
+              <option value="Lifeguard">Lifeguard</option>
+              <option value="TODA">TODA</option>
+              <option value="OTHERS">Others</option>
+              <option value="NONE">None</option>
+            </select>
+
+            <Briefcase className="absolute left-3 top-3.5 text-stone-400" size={16} />
+            <ChevronDown className="absolute right-3 top-3.5 text-stone-400" size={14} />
           </div>
 
           {userRole === 'admin' && (
@@ -313,7 +352,7 @@ export default function ResidentList({ userRole, onEdit }) {
                 <th className="py-4 px-6 w-12"></th>
                 <th className="py-4 px-6">Resident Info</th>
                 <th className="py-4 px-6">Birthdate</th>
-                <th className="py-4 px-6">Address</th>
+                <th className="py-4 px-6">Purok/Address</th>
                 <th className="py-4 px-6">Sectors</th>
                 <th className="py-4 px-6 text-center">Actions</th>
               </tr>
@@ -335,7 +374,7 @@ export default function ResidentList({ userRole, onEdit }) {
                       {/* 1. RESIDENT INFO */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm font-bold text-stone-800">{r.last_name}, {r.first_name} {r.ext_name}</p>
+                          <p className="text-sm font-bold text-stone-800">{r.last_name}, {r.first_name} {r.middle_name ? r.middle_name + ' ' : ''}{r.ext_name || ''}</p>
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.sex === 'M' ? 'bg-blue-50 text-blue-600' : r.sex === 'F' ? 'bg-pink-50 text-pink-600' : 'bg-stone-100 text-stone-500'}`}>
                             {r.sex || '?'}
                           </span>
@@ -355,8 +394,13 @@ export default function ResidentList({ userRole, onEdit }) {
 
                       {/* 3. ADDRESS */}
                       <td className="py-4 px-6">
-                        <p className="text-sm text-stone-600">{r.purok}, {r.barangay}</p>
-                      </td>
+                    <p className="text-sm text-stone-600">
+                      {r.house_no && (
+                        <span className="font-semibold">{r.house_no}, </span>
+                      )}
+                      {r.purok}, {r.barangay}
+                    </p>
+                  </td>
 
                       {/* 4. SECTORS */}
                       <td className="py-4 px-6">
