@@ -5,6 +5,8 @@ import {
   ShieldCheck, UserCircle, AlertCircle, Eye, EyeOff, Lock
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { createPortal } from 'react-dom';
+
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -39,7 +41,7 @@ export default function UserManagement() {
       await api.post('/users/', newUser);
       toast.success("Account Deployed!");
       setShowForm(false);
-      setNewUser({ username: '', password: '', role: 'barangay' }); // Reset form
+      setNewUser({ username: '', password: '', role: 'barangay' });
       fetchUsers();
     } catch (err) { 
       if (err.response?.status === 401) {
@@ -84,8 +86,8 @@ export default function UserManagement() {
   };
 
   return (
-    /* Change 1: Added "relative mt-0" to keep modals and layout inside the dashboard content */
-    <div className="relative mt-0 max-w-5xl mx-auto space-y-6 pb-10 animate-in fade-in duration-500">
+    // Kept 'relative' here just in case, but modals are now 'fixed'
+    <div className="mt-0 max-w-5xl mx-auto space-y-6 pb-10 animate-in fade-in duration-500 relative">
       <Toaster position="top-right" />
 
       {/* HEADER */}
@@ -175,65 +177,136 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* MODERN RESET PASSWORD MODAL */}
-      {resetModal.isOpen && (
-        /* Change 2: Changed "fixed" to "absolute" and ensured inset-0 matches relative parent */
-        <div className="absolute inset-0 z-[100] flex items-start justify-center p-4 pt-20">
-          <div className="absolute inset-0 bg-stone-900/20 backdrop-blur-sm animate-in fade-in" onClick={() => setResetModal({ ...resetModal, isOpen: false })}></div>
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 shadow-2xl border border-stone-100 h-fit">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><Lock size={32}/></div>
-              <h3 className="text-xl font-bold text-stone-900">Reset Password</h3>
-              <p className="text-sm text-stone-500 mt-1 mb-6">Updating credentials for <span className="font-bold text-stone-800">{resetModal.username}</span></p>
-              
-              <div className="relative mb-6">
-                <input 
-                  type={showResetPass ? "text" : "password"}
-                  placeholder="Enter new password"
-                  value={resetModal.newPassword}
-                  onChange={(e) => setResetModal({ ...resetModal, newPassword: e.target.value })}
-                  className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl outline-none focus:border-rose-500 font-medium text-sm pr-12"
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowResetPass(!showResetPass)}
-                  className="absolute right-4 top-4 text-stone-400 hover:text-stone-600"
-                >
-                  {showResetPass ? <EyeOff size={18}/> : <Eye size={18}/>}
-                </button>
-              </div>
+      {/* --- RESET PASSWORD MODAL --- */}
+      {resetModal.isOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            
+            {/* FULL SCREEN BLUR OVERLAY */}
+            <div 
+              className="fixed inset-0 bg-black/50 backdrop-blur-md"
+              onClick={() => setResetModal({ ...resetModal, isOpen: false })}
+            />
 
-              <div className="space-y-3">
-                <button onClick={handleConfirmReset} disabled={isSubmitting} className="w-full py-4 bg-stone-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-stone-200 active:scale-95 transition-all">
-                  {isSubmitting ? "Updating..." : "Update Password"}
-                </button>
-                <button onClick={() => setResetModal({ ...resetModal, isOpen: false })} className="w-full py-2 text-stone-400 font-bold text-sm">Cancel</button>
+            {/* MODAL CARD */}
+            <div className="relative z-10 bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-stone-100 animate-in zoom-in-95">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Lock size={32}/>
+                </div>
+
+                <h3 className="text-xl font-bold text-stone-900">
+                  Reset Password
+                </h3>
+
+                <p className="text-sm text-stone-500 mt-1 mb-6">
+                  Updating credentials for 
+                  <span className="font-bold text-stone-800">
+                    {" "}{resetModal.username}
+                  </span>
+                </p>
+
+                <div className="relative mb-6">
+                  <input 
+                    type={showResetPass ? "text" : "password"}
+                    placeholder="Enter new password"
+                    value={resetModal.newPassword}
+                    onChange={(e) => 
+                      setResetModal({ ...resetModal, newPassword: e.target.value })
+                    }
+                    className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl outline-none focus:border-rose-500 font-medium text-sm pr-12"
+                  />
+
+                  <button 
+                    type="button"
+                    onClick={() => setShowResetPass(!showResetPass)}
+                    className="absolute right-4 top-4 text-stone-400 hover:text-stone-600"
+                  >
+                    {showResetPass ? <EyeOff size={18}/> : <Eye size={18}/>}
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleConfirmReset}
+                    disabled={isSubmitting}
+                    className="w-full py-4 bg-stone-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl"
+                  >
+                    {isSubmitting ? "Updating..." : "Update Password"}
+                  </button>
+
+                  <button
+                    onClick={() => setResetModal({ ...resetModal, isOpen: false })}
+                    className="w-full py-2 text-stone-400 font-bold text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )
+      }
 
-      {/* MODERN DELETE MODAL */}
-      {deleteModal.isOpen && (
-        /* Change 3: Changed "fixed" to "absolute" to prevent sidebar overlap */
-        <div className="absolute inset-0 z-[100] flex items-start justify-center p-4 pt-20">
-          <div className="absolute inset-0 bg-stone-900/20 backdrop-blur-sm animate-in fade-in" onClick={() => setDeleteModal({ isOpen: false, userId: null, username: '' })}></div>
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative animate-in zoom-in-95 shadow-2xl border border-stone-100 h-fit">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3"><AlertCircle size={32}/></div>
-              <h3 className="text-xl font-bold text-stone-900">Delete Account?</h3>
-              <p className="text-sm text-stone-500 mt-2 mb-8 italic">Removing <span className="font-bold text-stone-800 not-italic">"{deleteModal.username}"</span> will revoke all system access.</p>
-              <div className="space-y-3">
-                <button onClick={handleDeleteAccount} disabled={isSubmitting} className="w-full py-3.5 bg-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-200">
-                  {isSubmitting ? "Processing..." : "Confirm Removal"}
-                </button>
-                <button onClick={() => setDeleteModal({ isOpen: false, userId: null, username: '' })} className="w-full py-3.5 text-stone-400 font-bold">Cancel</button>
+      {/* --- DELETE MODAL --- */}
+      {deleteModal.isOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            
+            {/* FULL SCREEN OVERLAY */}
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-md"
+              onClick={() =>
+                setDeleteModal({ isOpen: false, userId: null, username: "" })
+              }
+            />
+
+            {/* MODAL CARD */}
+            <div className="relative z-10 bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-stone-100 animate-in zoom-in-95">
+              <div className="text-center">
+                
+                <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3">
+                  <AlertCircle size={32} />
+                </div>
+
+                <h3 className="text-xl font-bold text-stone-900">
+                  Delete Account?
+                </h3>
+
+                <p className="text-sm text-stone-500 mt-2 mb-8 italic">
+                  Removing{" "}
+                  <span className="font-bold text-stone-800 not-italic">
+                    "{deleteModal.username}"
+                  </span>{" "}
+                  will revoke all system access.
+                </p>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 bg-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-200 active:scale-95 transition-all"
+                  >
+                    {isSubmitting ? "Processing..." : "Confirm Removal"}
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setDeleteModal({ isOpen: false, userId: null, username: "" })
+                    }
+                    className="w-full py-3.5 text-stone-400 font-bold"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )
+      }
+
     </div>
   );
 }

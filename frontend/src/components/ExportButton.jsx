@@ -88,7 +88,7 @@ export default function ExportButton({ barangay }) {
       <button 
         onClick={handleExport} 
         disabled={loading}
-        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 shadow-sm shadow-emerald-200"
+        className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors disabled:opacity-50 shadow-sm shadow-rose-200"
       >
         {loading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
         {loading ? "Generating..." : "Export to Excel"}

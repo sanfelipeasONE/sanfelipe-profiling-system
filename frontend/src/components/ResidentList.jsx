@@ -1,13 +1,15 @@
 import { useEffect, useState, Fragment, useMemo } from 'react';
 import api from '../api';
-import { 
-  Trash2, Edit, Search, ChevronDown, ChevronUp, 
-  Loader2, Filter, Phone, Fingerprint, Heart, User, 
+import {
+  Trash2, Edit, Search, ChevronDown, ChevronUp,
+  Loader2, Filter, Phone, Fingerprint, Heart, User,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  Briefcase 
+  Briefcase
 } from 'lucide-react';
 import ExportButton from './ExportButton';
 import toast, { Toaster } from 'react-hot-toast';
+import { createPortal } from "react-dom";
+
 
 export default function ResidentList({ userRole, onEdit }) {
   const [residents, setResidents] = useState([]);
@@ -16,7 +18,7 @@ export default function ResidentList({ userRole, onEdit }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
-  
+
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, residentId: null, name: '' });
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -34,8 +36,8 @@ export default function ResidentList({ userRole, onEdit }) {
     }
     // Check capitalization mismatch just in case (e.g. "OTHERS")
     if (summary.toUpperCase().includes("OTHERS") && details) {
-         // Regex to replace "Others" case-insensitively
-         return summary.replace(/Others/i, details);
+      // Regex to replace "Others" case-insensitively
+      return summary.replace(/Others/i, details);
     }
     return summary;
   };
@@ -118,7 +120,7 @@ export default function ResidentList({ userRole, onEdit }) {
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); 
+    setCurrentPage(1);
   };
 
   const handleBarangayFilter = (e) => {
@@ -142,17 +144,17 @@ export default function ResidentList({ userRole, onEdit }) {
       toast.success('Resident removed');
       setDeleteModal({ isOpen: false, residentId: null, name: '' });
       fetchResidents();
-    } catch (err) { 
-        toast.error('Error deleting record.'); 
-    } finally { 
-        setIsDeleting(false); 
+    } catch (err) {
+      toast.error('Error deleting record.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   // --- DETAILS COMPONENT ---
   const ResidentDetails = ({ r }) => (
     <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone-50/50 border-t border-stone-100 animate-in slide-in-from-top-2 duration-300">
-      
+
       {/* LEFT COLUMN: Personal & Spouse */}
       <div className="space-y-6">
         <div className="space-y-3">
@@ -201,15 +203,15 @@ export default function ResidentList({ userRole, onEdit }) {
       {/* RIGHT COLUMN: Sectors & Family */}
       <div className="space-y-6">
         <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
-              <Briefcase size={14} /> Sector Affiliation
-            </h4>
-            <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm space-y-2">
-              <p className="text-sm font-bold text-stone-800">
-                {/* USE HELPER HERE */}
-                {formatSectors(r.sector_summary, r.other_sector_details)}
-              </p>
-            </div>
+          <h4 className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
+            <Briefcase size={14} /> Sector Affiliation
+          </h4>
+          <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm space-y-2">
+            <p className="text-sm font-bold text-stone-800">
+              {/* USE HELPER HERE */}
+              {formatSectors(r.sector_summary, r.other_sector_details)}
+            </p>
+          </div>
         </div>
 
         <div className="space-y-3 pt-4 border-t border-stone-200">
@@ -237,52 +239,81 @@ export default function ResidentList({ userRole, onEdit }) {
     <div className="relative mt-0 space-y-4 animate-in fade-in duration-500">
       <Toaster position="top-center" />
 
-      {deleteModal.isOpen && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 mb-4">
-              <Trash2 size={24} />
+      {deleteModal.isOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+
+            {/* FULL SCREEN BLUR */}
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-md"
+              onClick={() =>
+                setDeleteModal({ isOpen: false, residentId: null, name: '' })
+              }
+            />
+
+            {/* MODAL CARD */}
+            <div className="relative z-10 bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 mb-4">
+                <Trash2 size={24} />
+              </div>
+
+              <h3 className="text-lg font-bold text-stone-900">
+                Delete Record?
+              </h3>
+
+              <p className="text-sm text-stone-500 mt-2">
+                Are you sure you want to delete{" "}
+                <span className="font-bold text-stone-800">
+                  {deleteModal.name}
+                </span>
+                ? This action cannot be undone.
+              </p>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() =>
+                    setDeleteModal({ isOpen: false, residentId: null, name: '' })
+                  }
+                  className="flex-1 py-2.5 rounded-xl border border-stone-200 text-stone-600 text-sm font-semibold hover:bg-stone-50 transition-colors"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    "Delete"
+                  )}
+                </button>
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-stone-900">Delete Record?</h3>
-            <p className="text-sm text-stone-500 mt-2">
-              Are you sure you want to delete <span className="font-bold text-stone-800">{deleteModal.name}</span>? 
-              This action cannot be undone.
-            </p>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })}
-                className="flex-1 py-2.5 rounded-xl border border-stone-200 text-stone-600 text-sm font-semibold hover:bg-stone-50 transition-colors"
-                disabled={isDeleting}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                disabled={isDeleting}
-              >
-                {isDeleting ? <Loader2 size={16} className="animate-spin" /> : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )
+      }
+
 
       {/* Database Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 md:p-6 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-stone-900">Resident Database</h2>
-            <p className="text-xs text-stone-500">Manage community records.</p>
+            <h2 className="text-xl font-bold text-stone-900">San Felipe Resident Database</h2>
           </div>
           <ExportButton barangay={selectedBarangay} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="relative group">
-            <input 
-              type="text" 
-              placeholder="Search by name..." 
+            <input
+              type="text"
+              placeholder="Search by name..."
               value={searchTerm}
               onChange={handleSearchChange}
               className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-100 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none text-sm"
@@ -332,7 +363,7 @@ export default function ResidentList({ userRole, onEdit }) {
               ) : (
                 residents.map((r) => (
                   <Fragment key={r.id}>
-                    <tr 
+                    <tr
                       className={`hover:bg-stone-50/40 transition-colors cursor-pointer ${expandedRow === r.id ? 'bg-rose-50/20' : ''}`}
                       onClick={() => toggleRow(r.id)}
                     >
@@ -354,8 +385,8 @@ export default function ResidentList({ userRole, onEdit }) {
                       </td>
                       <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-center gap-2">
-                          <button onClick={() => onEdit(r)} className="p-2 text-stone-400 hover:text-rose-600 transition-colors"><Edit size={16}/></button>
-                          <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: `${r.first_name} ${r.last_name}` })} className="p-2 text-stone-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                          <button onClick={() => onEdit(r)} className="p-2 text-stone-400 hover:text-rose-600 transition-colors"><Edit size={16} /></button>
+                          <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: `${r.first_name} ${r.last_name}` })} className="p-2 text-stone-400 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -374,78 +405,94 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
       </div>
 
-      {/* Pagination Footer */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white border border-stone-100 rounded-2xl shadow-sm">
-        {/* ... pagination controls ... */}
-        <div className="flex items-center gap-3 text-xs text-stone-500 order-2 md:order-1">
-          <span>Rows per page:</span>
-          <div className="relative">
-            <select 
-              value={itemsPerPage}
-              onChange={handleLimitChange}
-              className="appearance-none bg-stone-50 border border-stone-200 rounded-lg py-1.5 pl-3 pr-8 font-semibold text-stone-700 outline-none focus:ring-2 focus:ring-rose-500/20"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-            <ChevronDown size={12} className="absolute right-2 top-2.5 text-stone-400 pointer-events-none"/>
+      {/* Modern Pagination Footer */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-3 bg-white/80 backdrop-blur-md border border-stone-200/60 rounded-3xl shadow-sm">
+        
+        {/* LEFT SIDE — Metadata & Page Size */}
+        <div className="flex items-center gap-4 order-2 md:order-1">
+          <div className="flex items-center gap-2 bg-stone-100/50 px-3 py-1.5 rounded-2xl border border-stone-200/40">
+            <span className="text-[11px] uppercase tracking-wider font-bold text-stone-400">Rows</span>
+            <div className="relative flex items-center">
+              <select
+                value={itemsPerPage}
+                onChange={handleLimitChange}
+                className="appearance-none bg-transparent pr-5 text-sm font-bold text-stone-700 outline-none cursor-pointer focus:text-rose-600 transition-colors"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <ChevronDown
+                size={12}
+                className="absolute right-0 top-1 text-stone-400 pointer-events-none"
+              />
+            </div>
           </div>
-          <span className="hidden md:inline border-l border-stone-200 pl-3 ml-1">
-            Total {totalItems}
+          
+          <div className="h-4 w-[1px] bg-stone-200 hidden md:block" />
+          
+          <span className="text-xs font-medium text-stone-500">
+            <span className="text-stone-900 font-bold">{totalItems}</span> total results
           </span>
         </div>
 
-        <div className="flex items-center gap-1 order-1 md:order-2">
-          <button 
-            disabled={currentPage === 1 || loading}
-            onClick={() => setCurrentPage(1)}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
-          >
-            <ChevronsLeft size={16} />
-          </button>
+        {/* RIGHT SIDE — Controls */}
+        <div className="flex items-center gap-3 order-1 md:order-2">
           
-          <button 
-            disabled={currentPage === 1 || loading}
-            onClick={() => setCurrentPage(prev => prev - 1)}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
-          >
-            <ChevronLeft size={16} />
-          </button>
+          {/* Page Counter for Mobile/Tablet */}
+          <span className="text-xs font-bold text-stone-400 md:mr-2">
+            {currentPage} <span className="mx-1 text-stone-300">/</span> {totalPages || 1}
+          </span>
 
-          <div className="flex items-center gap-1 px-2">
-            {paginationRange?.map((pageNumber, idx) => {
-              if (pageNumber === '...') {
-                return <span key={idx} className="text-stone-400 px-2 text-xs">...</span>;
-              }
-              return (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentPage(pageNumber)}
-                  className={`min-w-[32px] h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${pageNumber === currentPage ? 'bg-rose-500 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}
-                >
-                  {pageNumber}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-1.5">
+            {/* Previous Button */}
+            <button
+              disabled={currentPage === 1 || loading}
+              onClick={() => setCurrentPage(prev => prev - 1)}
+              className="w-10 h-10 flex items-center justify-center rounded-2xl border border-stone-200 text-stone-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:border-stone-200 transition-all duration-200 active:scale-95"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            {/* Page Numbers - Hidden on small mobile to keep it clean */}
+            <div className="hidden sm:flex items-center gap-1.5">
+              {paginationRange?.map((pageNumber, idx) => {
+                if (pageNumber === "...") {
+                  return (
+                    <span key={idx} className="w-8 text-center text-stone-300 font-black">
+                      ···
+                    </span>
+                  );
+                }
+
+                const isActive = pageNumber === currentPage;
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentPage(pageNumber)}
+                    className={`w-10 h-10 flex items-center justify-center rounded-2xl text-sm font-bold transition-all duration-200 active:scale-95 ${
+                      isActive
+                        ? "bg-stone-900 text-white shadow-lg shadow-stone-200 scale-105"
+                        : "text-stone-500 hover:bg-stone-100 border border-transparent hover:border-stone-200"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Next Button */}
+            <button
+              disabled={currentPage === totalPages || loading}
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              className="w-10 h-10 flex items-center justify-center rounded-2xl border border-stone-200 text-stone-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-20 transition-all duration-200 active:scale-95"
+            >
+              <ChevronRight size={20} />
+            </button>
           </div>
-
-          <button 
-            disabled={currentPage === totalPages || loading}
-            onClick={() => setCurrentPage(prev => prev + 1)}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
-          >
-            <ChevronRight size={16} />
-          </button>
-
-          <button 
-            disabled={currentPage === totalPages || loading}
-            onClick={() => setCurrentPage(totalPages)}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
-          >
-            <ChevronsRight size={16} />
-          </button>
         </div>
       </div>
     </div>

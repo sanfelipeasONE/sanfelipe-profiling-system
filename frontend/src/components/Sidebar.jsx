@@ -87,7 +87,7 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
             </div>
             <div>
               <h1 className="text-sm font-bold text-gray-900 leading-none">LGU San Felipe</h1>
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-1">Zambales</p>
+              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-1">Province of Zambales</p>
             </div>
           </div>
           <button onClick={() => setIsOpen(false)} className="ml-auto lg:hidden text-gray-400 hover:text-gray-600"><X size={18} /></button>
