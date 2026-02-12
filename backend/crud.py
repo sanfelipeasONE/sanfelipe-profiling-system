@@ -226,11 +226,11 @@ def get_dashboard_stats(db: Session):
     ).distinct().count()
 
     total_male = db.query(models.ResidentProfile).filter(
-        func.upper(models.ResidentProfile.sex) == "MALE"
+        func.upper(models.ResidentProfile.sex).in_(["M", "MALE"])
     ).count()
 
     total_female = db.query(models.ResidentProfile).filter(
-        func.upper(models.ResidentProfile.sex) == "FEMALE"
+        func.upper(models.ResidentProfile.sex).in_(["F", "FEMALE"])
     ).count()
 
     barangay_counts = db.query(
