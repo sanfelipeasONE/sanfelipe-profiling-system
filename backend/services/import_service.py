@@ -122,6 +122,7 @@ def process_excel_import(file_content, db: Session):
             )
 
             # -------- FAMILY MEMBERS --------
+            # FAMILY MEMBERS (AUTO-CORRECTED VERSION)
             for i in range(1, 6):
 
                 lname = clean_str(row.get(f"{i}. LAST NAME"))
@@ -129,16 +130,24 @@ def process_excel_import(file_content, db: Session):
                 mname = clean_str(row.get(f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"))
                 rel   = clean_str(row.get(f"{i}. RELATIONSHIP"))
 
-                # Fix shifted case
-                if lname == "" and fname != "" and rel != "":
+                # --- FIX SHIFT CASE 1 ---
+                # Relationship accidentally in LAST NAME column
+                if lname.upper() in ["SON", "DAUGHTER", "FATHER", "MOTHER", "NIECE", "NEPHEW", "GRANDSON", "GRANDDAUGHTER", "GRANDFATHER", "GRANDMOTHER", "SISTER", "BROTHER", "UNCLE", "AUNT"]:
+                    rel = lname
                     lname = fname
                     fname = mname
+                    mname = ""
 
-                # If nothing meaningful, skip
-                if lname == "" and fname == "":
+                # --- FIX SHIFT CASE 2 ---
+                # If relationship exists but first name empty
+                if rel != "" and fname == "":
+                    fname = lname
+                    lname = ""
+
+                # Skip empty rows
+                if lname == "" and fname == "" and rel == "":
                     continue
 
-                # Only create member inside this block
                 new_member = FamilyMember(
                     last_name=lname,
                     first_name=fname,
@@ -147,6 +156,7 @@ def process_excel_import(file_content, db: Session):
                 )
 
                 resident.family_members.append(new_member)
+
 
 
             db.add(resident)
