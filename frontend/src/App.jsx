@@ -12,14 +12,15 @@ import UserManagement from './components/UserManagement';
 /**
  * DashboardLayout
  * Wraps protected routes with the Sidebar and a scrollable main content area.
+ * Updated to accept `onResetView` and pass it to Sidebar.
  */
-const DashboardLayout = ({ userRole, onLogout }) => {
+// 1. UPDATE THIS COMPONENT DEFINITION
+const DashboardLayout = ({ userRole, onLogout, onResetView }) => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Sidebar - Fixed width */}
-      <Sidebar userRole={userRole} onLogout={onLogout} />
+      {/* 2. PASS THE RESET FUNCTION TO SIDEBAR */}
+      <Sidebar userRole={userRole} onLogout={onLogout} onLinkClick={onResetView} />
       
-      {/* Main Content Area - Fill remaining space and scrollable */}
       <main className="flex-1 lg:ml-[260px] h-full overflow-y-auto transition-all duration-300">
         <div className="p-8 max-w-7xl mx-auto">
           <Outlet />
@@ -33,35 +34,27 @@ export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [role, setRole] = useState(localStorage.getItem('role') || 'staff');
 
-  // --- EDITING STATE LOGIC ---
-  // This tracks if we are currently editing a resident and who it is.
   const [isEditing, setIsEditing] = useState(false);
   const [currentResident, setCurrentResident] = useState(null);
 
-  /**
-   * handleEditInitiated
-   * Triggered when the Edit button is clicked in ResidentList.
-   */
   const handleEditInitiated = (resident) => {
     setCurrentResident(resident);
-    setIsEditing(true); // This switches the view in the Route
+    setIsEditing(true);
   };
 
-  /**
-   * handleFinishEditing
-   * Returns the view to the list after a successful save or cancel.
-   */
+  // This function clears the editing state.
+  // We will use this when a form is saved AND when a sidebar link is clicked.
   const handleFinishEditing = () => {
     setIsEditing(false);
     setCurrentResident(null);
   };
 
   const handleLogin = (newRole, username) => {
-  localStorage.setItem('role', newRole);
-  localStorage.setItem('username', username);
-  setRole(newRole);
-  setToken(localStorage.getItem('token'));
-};
+    localStorage.setItem('role', newRole);
+    localStorage.setItem('username', username);
+    setRole(newRole);
+    setToken(localStorage.getItem('token'));
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -71,52 +64,40 @@ export default function App() {
 
   return (
     <Routes>
-      {/* PUBLIC ROUTE: Login */}
       <Route 
         path="/login" 
         element={
-          !token ? (
-            <Login onLogin={handleLogin} />
-          ) : (
-            <Navigate to="/dashboard/overview" replace />
-          )
+          !token ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard/overview" replace />
         } 
       />
 
-      {/* PROTECTED ROUTES: Dashboard */}
       <Route 
         path="/dashboard" 
         element={
           token ? (
-            <DashboardLayout userRole={role} onLogout={handleLogout} />
+            // 3. PASS handleFinishEditing AS onResetView HERE
+            <DashboardLayout 
+              userRole={role} 
+              onLogout={handleLogout} 
+              onResetView={handleFinishEditing} 
+            />
           ) : (
             <Navigate to="/login" replace />
           )
         }
       >
-        {/* Sub-route: Overview (Admin Only) */}
         <Route 
           path="overview" 
           element={
-            role === 'admin' ? (
-              <DashboardStats userRole={role} />
-            ) : (
-              <Navigate to="/dashboard/residents" replace />
-            )
+            role === 'admin' ? <DashboardStats userRole={role} /> : <Navigate to="/dashboard/residents" replace />
           } 
         />
 
-        {/* Sub-route: Residents
-            Uses a conditional to show either the LIST or the EDIT FORM
-        */}
         <Route 
           path="residents" 
           element={
             !isEditing ? (
-              <ResidentList 
-                userRole={role} 
-                onEdit={handleEditInitiated} 
-              />
+              <ResidentList userRole={role} onEdit={handleEditInitiated} />
             ) : (
               <AddResidentForm 
                 residentToEdit={currentResident} 
@@ -127,10 +108,8 @@ export default function App() {
           } 
         />
 
-        {/* Sub-route: Register (Always a fresh form) */}
         <Route path="create" element={<AddResidentForm onSuccess={handleFinishEditing} />} />
         
-        {/* Sub-route: User Management */}
         <Route path="users" element={<UserManagement />} />
         
         <Route index element={<Navigate to="/dashboard/overview" replace />} />

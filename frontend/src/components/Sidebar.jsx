@@ -11,30 +11,22 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-/**
- * Sidebar Component
- * @param {string} userRole - The role of the logged-in user ('admin' or 'barangay')
- * @param {function} onLogout - Function to handle session clearing and redirection
- */
-export default function Sidebar({ userRole = 'staff', onLogout }) {
+// 1. ACCEPT THE NEW PROP: onLinkClick
+export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
   const logoUrl = '/san_felipe_seal.png';
 
-  // 1. Define all possible menu items with role-based access
   const allMenuItems = [
-    // Changed role to 'admin' so Barangay users don't see the global dashboard
     { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin' }, 
     { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
     { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
   ];
 
-  // 2. Filter items based on the current user's role
   const menuItems = allMenuItems.filter(item => {
     if (item.role === 'all') return true;
-    // Ensure lowercase comparison to avoid string mismatch bugs
     if (item.role === 'admin' && userRole?.toLowerCase() === 'admin') return true;
     return false;
   });
@@ -42,11 +34,15 @@ export default function Sidebar({ userRole = 'staff', onLogout }) {
   const isActive = (path) => location.pathname === path;
 
   const handleNavigate = (path) => {
+    // 2. CRITICAL FIX: RESET THE PARENT VIEW
+    if (onLinkClick) {
+      onLinkClick();
+    }
+
     navigate(path);
     setIsOpen(false);
   };
 
-  // NavItem sub-component for consistent styling
   const NavItem = ({ label, path, Icon }) => {
     const active = isActive(path);
 
@@ -72,125 +68,57 @@ export default function Sidebar({ userRole = 'staff', onLogout }) {
       {/* MOBILE HEADER */}
       <div className="lg:hidden fixed top-0 left-0 w-full h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 z-40">
         <div className="flex items-center gap-2">
-          <img
-            src={logoUrl}
-            alt="San Felipe Seal"
-            className="w-7 h-7 object-contain"
-            onError={(e) => (e.target.style.display = 'none')}
-          />
-          <span className="text-sm font-bold text-gray-800 tracking-tight">
-            San Felipe
-          </span>
+          <img src={logoUrl} alt="San Felipe Seal" className="w-7 h-7 object-contain" onError={(e) => (e.target.style.display = 'none')} />
+          <span className="text-sm font-bold text-gray-800 tracking-tight">San Felipe</span>
         </div>
-
-        <button
-          onClick={() => setIsOpen(true)}
-          className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-        >
+        <button onClick={() => setIsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
           <Menu size={20} />
         </button>
       </div>
 
-      {/* MOBILE OVERLAY */}
-      {isOpen && (
-        <div
-          onClick={() => setIsOpen(false)}
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
-        />
-      )}
+      {isOpen && <div onClick={() => setIsOpen(false)} className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden" />}
 
       {/* SIDEBAR CONTAINER */}
-      <aside
-        className={`fixed top-0 left-0 h-full w-[260px] bg-white border-r border-gray-100 z-50 transform transition-transform duration-300 ease-in-out
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 flex flex-col shadow-xl lg:shadow-none`}
-      >
-        {/* BRANDING SECTION */}
+      <aside className={`fixed top-0 left-0 h-full w-[260px] bg-white border-r border-gray-100 z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col shadow-xl lg:shadow-none`}>
         <div className="h-20 flex items-center px-6 border-b border-gray-50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center border border-red-100">
-                <img
-                src={logoUrl}
-                alt="San Felipe Seal"
-                className="w-7 h-7 object-contain"
-                onError={(e) => (e.target.style.display = 'none')}
-                />
+                <img src={logoUrl} alt="San Felipe Seal" className="w-7 h-7 object-contain" onError={(e) => (e.target.style.display = 'none')} />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-gray-900 leading-none">
-                LGU San Felipe
-              </h1>
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-1">
-                Zambales
-              </p>
+              <h1 className="text-sm font-bold text-gray-900 leading-none">LGU San Felipe</h1>
+              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-1">Zambales</p>
             </div>
           </div>
-
-          <button
-            onClick={() => setIsOpen(false)}
-            className="ml-auto lg:hidden text-gray-400 hover:text-gray-600"
-          >
-            <X size={18} />
-          </button>
+          <button onClick={() => setIsOpen(false)} className="ml-auto lg:hidden text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
 
-        {/* MAIN NAVIGATION */}
         <nav className="flex-1 overflow-y-auto py-6">
-          <div className="px-6 mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">
-            Main Menu
-          </div>
-
+          <div className="px-6 mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Main Menu</div>
           <div className="space-y-1">
-            {menuItems.map((item) => (
-                <NavItem
-                key={item.path}
-                label={item.label}
-                path={item.path}
-                Icon={item.Icon}
-                />
-            ))}
+            {menuItems.map((item) => <NavItem key={item.path} label={item.label} path={item.path} Icon={item.Icon} />)}
           </div>
-
-          {/* ADMINISTRATION SECTION (Admin Only) */}
           {userRole?.toLowerCase() === 'admin' && (
             <div className="mt-8">
-              <div className="px-6 mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">
-                Administration
-              </div>
-              <NavItem
-                label="User Management"
-                path="/dashboard/users"
-                Icon={Settings}
-              />
+              <div className="px-6 mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Administration</div>
+              <NavItem label="User Management" path="/dashboard/users" Icon={Settings} />
             </div>
           )}
         </nav>
 
-        {/* ACCOUNT FOOTER */}
         <div className="p-4 bg-gray-50/50 border-t border-gray-100">
           <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-800 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-200 uppercase">
-              {userRole?.charAt(0)}
-            </div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-800 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-200 uppercase">{userRole?.charAt(0)}</div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-gray-800 capitalize truncate">
-                {userRole} Account
-              </p>
+              <p className="text-sm font-bold text-gray-800 capitalize truncate">{userRole} Account</p>
               <div className="flex items-center gap-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
-                    Online
-                </p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Online</p>
               </div>
             </div>
           </div>
-
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-red-600 bg-white border border-red-100 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all duration-200 shadow-sm"
-          >
-            <LogOut size={15} />
-            Sign Out
+          <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-red-600 bg-white border border-red-100 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all duration-200 shadow-sm">
+            <LogOut size={15} /> Sign Out
           </button>
         </div>
       </aside>
