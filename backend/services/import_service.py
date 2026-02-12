@@ -123,28 +123,30 @@ def process_excel_import(file_content, db: Session):
 
             # -------- FAMILY MEMBERS --------
             for i in range(1, 6):
+
                 lname = clean_str(row.get(f"{i}. LAST NAME"))
                 fname = clean_str(row.get(f"{i}. FIRST NAME"))
                 mname = clean_str(row.get(f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"))
                 rel   = clean_str(row.get(f"{i}. RELATIONSHIP"))
 
+                # Fix shifted case
                 if lname == "" and fname != "" and rel != "":
-                    # Probably shifted left
                     lname = fname
                     fname = mname
-                    rel   = rel
-                    resident.family_members.append(member)
+
+                # If nothing meaningful, skip
                 if lname == "" and fname == "":
                     continue
-                
-                member = FamilyMember(
-                last_name=lname,
-                first_name=fname,
-                middle_name=mname,
-                relationship=rel
-                    )
-                
-                resident.family_members.append(member)
+
+                # Only create member inside this block
+                new_member = FamilyMember(
+                    last_name=lname,
+                    first_name=fname,
+                    middle_name=mname,
+                    relationship=rel
+                )
+
+                resident.family_members.append(new_member)
 
 
             db.add(resident)
