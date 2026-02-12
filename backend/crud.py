@@ -21,13 +21,13 @@ def apply_barangay_filter(query, barangay: str):
 # =====================================================
 
 def apply_sector_filter(query, sector: str):
-    if sector:
-        query = query.filter(
-            func.lower(
-                func.trim(models.ResidentProfile.sector_summary)
-            ).like(f"%{sector.strip().lower()}%")
-        )
-    return query
+    if not sector:
+        return query
+
+    return query.join(models.ResidentProfile.sectors).filter(
+        func.lower(models.Sector.name) == sector.strip().lower()
+    )
+
 
 
 
