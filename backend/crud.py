@@ -107,3 +107,53 @@ def get_residents(
         .limit(limit)
         .all()
     )
+
+# =====================================================
+# DASHBOARD STATS (POSTGRES SAFE)
+# =====================================================
+
+def get_dashboard_stats(db: Session):
+
+    total_residents = db.query(
+        func.count(models.ResidentProfile.id)
+    ).scalar() or 0
+
+    total_households = db.query(
+        func.count(
+            func.distinct(
+                func.trim(models.ResidentProfile.barangay) +
+                "-" +
+                func.coalesce(func.trim(models.ResidentProfile.house_no), "")
+            )
+        )
+    ).scalar() or 0
+
+    total_male = db.query(
+        func.count(models.ResidentProfile.id)
+    ).filter(
+        func.lower(models.ResidentProfile.sex).in_(["male", "m"])
+    ).scalar() or 0
+
+    total_female = db.query(
+        func.count(models.ResidentProfile.id)
+    ).filter(
+        func.lower(models.ResidentProfile.sex).in_(["female", "f"])
+    ).scalar() or 0
+
+    barangay_counts = db.query(
+        func.trim(models.ResidentProfile.barangay),
+        func.count(models.ResidentProfile.id)
+    ).group_by(
+        func.trim(models.ResidentProfile.barangay)
+    ).all()
+
+    stats_barangay = {b: count for b, count in barangay_counts if b}
+
+    return {
+        "total_residents": total_residents,
+        "total_households": total_households,
+        "total_male": total_male,
+        "total_female": total_female,
+        "population_by_barangay": stats_barangay,
+        "population_by_sector": {}
+    }
