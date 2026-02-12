@@ -62,6 +62,8 @@ BARANGAY_MAPPING = {
     "balincaguing": "Balincaguing",
     "maloma": "Maloma",
     "sindol": "Sindol",
+    "sanrafael": "San Rafael",
+    "san rafael": "San Rafael",  # Handles space variation
 }
 # --- AUTH HELPER FUNCTIONS ---
 def verify_password(plain_password, hashed_password):
