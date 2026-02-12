@@ -71,16 +71,23 @@ def family_member_exists(db: Session, profile_id, lname, fname, rel):
 
 
 # ===============================
-# SAFE COLUMN GETTER (IMPORTANT)
+# FLEXIBLE SECTOR CHECK
 # ===============================
-def get_value(row, possible_names):
+def is_checked(value):
     """
-    Tries multiple possible column names safely.
+    Detects if a sector cell is checked.
+    Accepts \, /, ✓, 1, YES, any non-empty value.
     """
-    for name in possible_names:
-        if name in row:
-            return row.get(name)
-    return None
+    val = clean_str(value).lower()
+
+    if val in ["\\", "/", "✓", "1", "yes", "y", "true"]:
+        return True
+
+    # If not empty → assume checked
+    if val != "":
+        return True
+
+    return False
 
 
 # ===============================
@@ -91,38 +98,29 @@ def process_excel_import(file_content, db: Session):
     df = pd.read_excel(file_content, dtype=object, engine="openpyxl")
     df = df.replace({pd.NaT: None})
     df = df.where(pd.notnull(df), None)
-
-    # Normalize column names (remove trailing spaces)
     df.columns = df.columns.str.strip()
 
     success_count = 0
     skipped_duplicates = 0
     errors = []
 
+    # ✅ FIXED SECTOR LIST (comma added + correct names)
     sector_columns = [
+        "INDIGENOUS PEOPLE",
+        "SENIOR CITIZEN",
+        "PWD",
+        "BRGY. OFFICIAL/EMPLOYEE",
+        "OFW",
+        "SOLO PARENT",
+        "FARMERS",
         "FISHERFOLK",
         "FISHERMAN/BANCA OWNER",
-        "TODA",
-        "BRGY BNS/BHW",
-        "BRGY TANOD",
-        "BRGY OFFICIAL",
         "LGU EMPLOYEE",
-        "INDIGENOUS PEOPLE",
-        "PWD",
-        "OFW",
+        "TODA",
         "STUDENT",
-        "SENIOR CITIZEN",
         "LIFEGUARD",
-        "SOLO PARENT"
         "OTHERS"
     ]
-
-    relationship_keywords = {
-        "SON", "DAUGHTER", "FATHER", "MOTHER",
-        "NIECE", "NEPHEW", "BROTHER", "SISTER",
-        "GRANDSON", "GRANDDAUGHTER", "GRANDFATHER", "GRANDMOTHER",
-        "UNCLE", "AUNT", "COUSIN", "HUSBAND", "WIFE", "PARTNER"
-    }
 
     for index, row in df.iterrows():
         try:
@@ -134,13 +132,9 @@ def process_excel_import(file_content, db: Session):
             if last_name == "" and first_name == "":
                 continue
 
-            # 🔒 DUPLICATE CHECK
+            # DUPLICATE CHECK
             existing_resident = resident_exists(
-                db,
-                last_name,
-                first_name,
-                middle_name,
-                barangay
+                db, last_name, first_name, middle_name, barangay
             )
 
             if existing_resident:
@@ -149,48 +143,27 @@ def process_excel_import(file_content, db: Session):
 
             birthdate = parse_date(row.get("BIRTHDATE"))
 
-            # -------- SECTORS --------
+            # ===============================
+            # SECTOR PROCESSING (FIXED)
+            # ===============================
             active_sectors = []
+
             for col in sector_columns:
-                if clean_str(row.get(col)) == "\\":
-                    active_sectors.append(col)
+                if col in df.columns:
+                    if is_checked(row.get(col)):
+                        active_sectors.append(col)
 
             sector_summary = ", ".join(active_sectors) if active_sectors else "None"
 
-            # -------- SPOUSE --------
-            spouse_last = clean_str(row.get("LAST NAME.2"))
-            spouse_first = clean_str(row.get("FIRST NAME.1"))
-            spouse_middle = clean_str(row.get("MIDDLE NAME.1"))
-
-            if spouse_last == "" and spouse_first == "":
-                spouse_full = clean_str(row.get("SPOUSE/PARTNER"))
-                if spouse_full:
-                    parts = spouse_full.split()
-                    if len(parts) >= 2:
-                        spouse_first = parts[0]
-                        spouse_last = parts[-1]
-                        if len(parts) > 2:
-                            spouse_middle = " ".join(parts[1:-1])
-
-            # -------- ADDRESS (HOUSE NO / STREET SAFE) --------
-            house_no_value = clean_str(
-                get_value(row, [
-                    "HOUSE NO. / STREET",
-                    "HOUSE NO./STREET",
-                    "HOUSE NO / STREET",
-                    "HOUSE NO.",
-                    "HOUSE NO",
-                    "ADDRESS"
-                ])
-            )
-
-            # -------- CREATE RESIDENT --------
+            # ===============================
+            # CREATE RESIDENT
+            # ===============================
             resident = ResidentProfile(
                 last_name=last_name,
                 first_name=first_name,
                 middle_name=middle_name,
                 ext_name=clean_str(row.get("EXT NAME")),
-                house_no=house_no_value,
+                house_no=clean_str(row.get("HOUSE NO.")),
                 purok=clean_str(row.get("PUROK")),
                 barangay=barangay,
                 birthdate=birthdate,
@@ -199,28 +172,20 @@ def process_excel_import(file_content, db: Session):
                 religion=clean_str(row.get("RELIGION")),
                 occupation=clean_str(row.get("OCCUPATION")),
                 contact_no=clean_str(row.get("CONTACT NUMBER")),
-                spouse_last_name=spouse_last,
-                spouse_first_name=spouse_first,
-                spouse_middle_name=spouse_middle,
                 sector_summary=sector_summary
             )
 
             db.add(resident)
             db.flush()
 
-            # -------- FAMILY MEMBERS --------
+            # ===============================
+            # FAMILY MEMBERS
+            # ===============================
             for i in range(1, 6):
-
                 lname = clean_str(row.get(f"{i}. LAST NAME"))
                 fname = clean_str(row.get(f"{i}. FIRST NAME"))
                 mname = clean_str(row.get(f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"))
                 rel = clean_str(row.get(f"{i}. RELATIONSHIP"))
-
-                if lname.upper() in relationship_keywords and rel == "":
-                    rel = lname
-                    lname = fname
-                    fname = mname
-                    mname = ""
 
                 if lname == "" and fname == "" and rel == "":
                     continue
