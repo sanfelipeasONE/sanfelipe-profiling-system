@@ -67,13 +67,22 @@ def estimate_birthdate(age):
         return None
 
 def process_excel_import(file_content, db: Session):
-    # Read Excel (Load all as string first to avoid auto-conversion errors)
+    # Determine if we are dealing with a CSV or Excel based on content
+    # Note: file_content is a BytesIO object here
+    
     try:
-        df = pd.read_excel(file_content, dtype=str)
-    except:
-        # Fallback for CSV if excel fails
+        # Try reading as Excel (.xlsx) explicitly
+        # engine='openpyxl' ensures we use the correct library
+        df = pd.read_excel(file_content, dtype=str, engine='openpyxl')
+    except Exception as e_xlsx:
+        # If Excel fails, reset cursor and try CSV with robust encoding
         file_content.seek(0)
-        df = pd.read_csv(file_content, dtype=str)
+        try:
+            # use 'latin1' or 'cp1252' which tolerates more characters than utf-8
+            df = pd.read_csv(file_content, dtype=str, encoding='cp1252')
+        except Exception as e_csv:
+            # If both fail, return the REAL Excel error to help debug
+            return {"added": 0, "errors": [f"File read error: Is 'openpyxl' installed? Original Error: {str(e_xlsx)}"]}
 
     # Clean 'nan' strings
     df = df.where(pd.notnull(df), None)
@@ -84,9 +93,10 @@ def process_excel_import(file_content, db: Session):
     for index, row in df.iterrows():
         try:
             # --- 1. PARSE HOUSEHOLD HEAD ---
+            # Use specific column names from your file structure
             raw_head = row.get('Household Head')
             if not raw_head: 
-                continue # Skip empty rows
+                continue 
 
             l, f, m, e = parse_full_name(raw_head)
 
@@ -95,37 +105,31 @@ def process_excel_import(file_content, db: Session):
             sl, sf, sm, se = parse_full_name(raw_spouse)
 
             # --- 3. PARSE BIRTHDATE ---
-            # Using 'Age' column since 'Birthdate' is missing in your file
             bday = estimate_birthdate(row.get('Age'))
 
             # --- 4. CREATE RECORD ---
             resident = ResidentProfile(
-                # Personal Parsed
                 last_name=l,
                 first_name=f,
                 middle_name=m,
                 ext_name=e,
                 
-                # Spouse Parsed
                 spouse_last_name=sl,
                 spouse_first_name=sf,
                 spouse_middle_name=sm,
                 spouse_ext_name=se,
 
-                # Address Mapped
                 barangay=row.get('Barangay', ''),
                 purok=row.get('Purok', ''),
                 house_no=str(row.get('House #', '')),
 
-                # Other Fields
                 sex=row.get('Sex', ''),
-                civil_status=row.get('Status', ''), # Mapped from 'Status'
+                civil_status=row.get('Status', ''),
                 occupation=row.get('Occupation', ''),
-                religion=row.get('Religion', None), # Might be missing in excel
+                religion=row.get('Religion', None),
                 contact_no=str(row.get('Contact', '')),
                 sector_summary=row.get('Sectors', ''),
                 
-                # Estimated Birthdate
                 birthdate=bday 
             )
             
@@ -136,5 +140,4 @@ def process_excel_import(file_content, db: Session):
             errors.append(f"Row {index + 2}: {str(e)}")
 
     db.commit()
-    
     return {"added": success_count, "errors": errors}

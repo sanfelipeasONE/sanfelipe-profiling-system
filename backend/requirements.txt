@@ -10,3 +10,4 @@ python-multipart
 pandas
 xlsxwriter
 bcrypt==4.0.1
+openpyxl
