@@ -205,11 +205,15 @@ def get_residents(
     query = apply_sector_filter(query, sector)
 
     return (
-        query.order_by(models.ResidentProfile.id.desc())
+        query.order_by(
+            func.lower(models.ResidentProfile.last_name).asc(),
+            func.lower(models.ResidentProfile.first_name).asc()
+        )
         .offset(skip)
         .limit(limit)
         .all()
     )
+
 
 
 # =====================================================
