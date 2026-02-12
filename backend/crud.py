@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 import models, schemas
 from sqlalchemy import or_, func
-
+from models import ResidentProfile, Sector, resident_sectors
 
 # ==========================================
 # SINGLE RESIDENT (WITH RELATIONSHIPS)
@@ -46,37 +46,124 @@ def get_resident_count(db: Session, search: str = None, barangay: str = None):
 # ==========================================
 # GET RESIDENTS (PAGINATED)
 # ==========================================
-def get_residents(db: Session, skip: int = 0, limit: int = 20,
-                  search: str = None, barangay: str = None):
+def normalize_sector(name: str):
+    """
+    Normalizes sector names so small spelling differences
+    won't break your dashboard.
+    """
+    if not name:
+        return None
 
-    query = db.query(models.ResidentProfile).options(
-        joinedload(models.ResidentProfile.family_members),
-        joinedload(models.ResidentProfile.sectors)
-    )
+    name = name.strip().upper()
 
-    if search:
-        search_fmt = f"%{search}%"
-        query = query.filter(
-            or_(
-                models.ResidentProfile.last_name.ilike(search_fmt),
-                models.ResidentProfile.first_name.ilike(search_fmt)
+    mapping = {
+        "INDIGENOUS PEOPLE": "Indigenous People",
+        "SENIOR CITIZEN": "Senior Citizen",
+        "PWD": "PWD",
+        "BRGY OFFICIAL": "BRGY. Official/Employee",
+        "BRGY OFFICIAL/EMPLOYEE": "BRGY. Official/Employee",
+        "LGU EMPLOYEE": "LGU Employee",
+        "OFW": "OFW",
+        "SOLO PARENT": "Solo Parent",
+        "FARMER": "Farmers",
+        "FARMERS": "Farmers",
+        "FISHERFOLK": "Fisherfolk",
+        "FISHERMAN/BANCA OWNER": "Fisherman/Banca Owner",
+        "TODA": "TODA",
+        "STUDENT": "Student",
+        "LIFEGUARD": "Lifeguard",
+        "OTHERS": "Others"
+    }
+
+    return mapping.get(name, name.title())
+
+
+def get_dashboard_stats(db: Session):
+
+    # -------------------------
+    # 1️⃣ TOTAL RESIDENTS
+    # -------------------------
+    total_residents = db.query(func.count(ResidentProfile.id)).scalar() or 0
+
+    # -------------------------
+    # 2️⃣ HOUSEHOLDS (Unique House + Barangay)
+    # -------------------------
+    total_households = db.query(
+        func.count(func.distinct(
+            func.concat(
+                ResidentProfile.barangay,
+                "-",
+                ResidentProfile.house_no
             )
-        )
+        ))
+    ).scalar() or 0
 
-    # ✅ FIX: Case-insensitive barangay filtering
-    if barangay:
-        query = query.filter(
-            func.replace(func.upper(models.ResidentProfile.barangay), 'Ñ', 'N') ==
-            barangay.upper().replace('Ñ', 'N')
-        )
+    # -------------------------
+    # 3️⃣ GENDER COUNT (CASE INSENSITIVE)
+    # -------------------------
+    total_male = db.query(func.count(ResidentProfile.id)).filter(
+        func.lower(ResidentProfile.sex).in_(["male", "m"])
+    ).scalar() or 0
 
-    return (
-        query
-        .order_by(models.ResidentProfile.id.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    total_female = db.query(func.count(ResidentProfile.id)).filter(
+        func.lower(ResidentProfile.sex).in_(["female", "f"])
+    ).scalar() or 0
+
+    # -------------------------
+    # 4️⃣ POPULATION BY BARANGAY
+    # -------------------------
+    barangay_counts = db.query(
+        ResidentProfile.barangay,
+        func.count(ResidentProfile.id)
+    ).group_by(ResidentProfile.barangay).all()
+
+    stats_barangay = {
+        b: count for b, count in barangay_counts if b
+    }
+
+    # -------------------------
+    # 5️⃣ POPULATION BY SECTOR
+    # -------------------------
+    sector_counts = db.query(
+        Sector.name,
+        func.count(resident_sectors.c.resident_id)
+    ).join(resident_sectors).group_by(Sector.name).all()
+
+    # Required sector list
+    required_sectors = [
+        "Indigenous People",
+        "Senior Citizen",
+        "PWD",
+        "BRGY. Official/Employee",
+        "OFW",
+        "Solo Parent",
+        "Farmers",
+        "Fisherfolk",
+        "Fisherman/Banca Owner",
+        "LGU Employee",
+        "TODA",
+        "Student",
+        "Lifeguard",
+        "Others"
+    ]
+
+    stats_sector = {sector: 0 for sector in required_sectors}
+
+    for name, count in sector_counts:
+        normalized = normalize_sector(name)
+        if normalized in stats_sector:
+            stats_sector[normalized] += count
+        else:
+            stats_sector["Others"] += count
+
+    return {
+        "total_residents": total_residents,
+        "total_households": total_households,
+        "total_male": total_male,
+        "total_female": total_female,
+        "population_by_barangay": stats_barangay,
+        "population_by_sector": stats_sector
+    }
 
 
 # ==========================================
