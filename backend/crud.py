@@ -399,45 +399,6 @@ def get_resident_count(
 
     return query.count()
 
-
-
-# =====================================================
-# GET RESIDENT LIST
-# =====================================================
-
-def get_residents(
-    db: Session,
-    skip: int = 0,
-    limit: int = 20,
-    search: str = None,
-    barangay: str = None,
-    sector: str = None
-):
-    query = db.query(models.ResidentProfile).options(
-        joinedload(models.ResidentProfile.family_members),
-        joinedload(models.ResidentProfile.sectors)
-    )
-
-    if search:
-        search_fmt = f"%{search.strip()}%"
-        query = query.filter(
-            or_(
-                models.ResidentProfile.last_name.ilike(search_fmt),
-                models.ResidentProfile.first_name.ilike(search_fmt)
-            )
-        )
-
-    query = apply_barangay_filter(query, barangay)
-    query = apply_sector_filter(query, sector)
-
-    return (
-        query.order_by(models.ResidentProfile.id.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-
 # =====================================================
 # DASHBOARD STATS (POSTGRES SAFE)
 # =====================================================
