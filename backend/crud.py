@@ -23,10 +23,12 @@ def apply_barangay_filter(query, barangay: str):
 def apply_sector_filter(query, sector: str):
     if sector:
         query = query.filter(
-            func.lower(models.ResidentProfile.sector_summary)
-            .like(f"%{sector.lower()}%")
+            func.lower(
+                func.trim(models.ResidentProfile.sector_summary)
+            ).like(f"%{sector.strip().lower()}%")
         )
     return query
+
 
 
 # =====================================================
@@ -53,7 +55,7 @@ def get_resident_count(
     db: Session,
     search: str = None,
     barangay: str = None,
-    sector: str = None   # ✅ ADDED
+    sector: str = None
 ):
     query = db.query(models.ResidentProfile)
 
@@ -72,6 +74,7 @@ def get_resident_count(
     return query.count()
 
 
+
 # =====================================================
 # GET RESIDENT LIST
 # =====================================================
@@ -82,7 +85,7 @@ def get_residents(
     limit: int = 20,
     search: str = None,
     barangay: str = None,
-    sector: str = None   # ✅ ADDED
+    sector: str = None
 ):
     query = db.query(models.ResidentProfile).options(
         joinedload(models.ResidentProfile.family_members),
@@ -107,6 +110,7 @@ def get_residents(
         .limit(limit)
         .all()
     )
+
 
 # =====================================================
 # DASHBOARD STATS (POSTGRES SAFE)
