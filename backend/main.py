@@ -350,6 +350,37 @@ def get_archived_residents(
     return db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == True
     ).all()
+
+@app.put("/residents/{resident_id}/archive")
+def archive_resident(
+    resident_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can archive")
+
+    result = crud.archive_resident(db, resident_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    return {"message": "Resident archived successfully"}
+
+@app.get("/residents/archived")
+def get_archived_residents(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403)
+
+    residents = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.is_archived == True
+    ).all()
+
+    return residents
+
     
 @app.put("/residents/{resident_id}/restore")
 def restore_resident(
@@ -358,9 +389,15 @@ def restore_resident(
     current_user: models.User = Depends(get_current_user)
 ):
     if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail="Only admin can restore")
 
-    return crud.restore_resident(db, resident_id)
+    result = crud.restore_resident(db, resident_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    return {"message": "Resident restored successfully"}
+
 
 
 # --- EXCEL EXPORT ENDPOINT ---

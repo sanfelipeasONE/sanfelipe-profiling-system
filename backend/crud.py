@@ -143,6 +143,25 @@ def restore_resident(db: Session, resident_id: int):
     return resident
 
 # =====================================================
+# ARCHIVE RESIDENT
+# =====================================================
+
+def archive_resident(db: Session, resident_id: int):
+    db_resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not db_resident:
+        return None
+
+    db_resident.is_archived = True
+    db.commit()
+    db.refresh(db_resident)
+
+    return db_resident
+
+# =====================================================
 # FILTER HELPERS
 # =====================================================
 def apply_barangay_filter(query, barangay: str):
@@ -283,7 +302,9 @@ def get_dashboard_stats(db: Session):
 
     # 🔥 BASE FILTER (VERY IMPORTANT)
     base_query = db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.is_deleted == False
+        models.ResidentProfile.is_deleted == False,
+        models.ResidentProfile.is_archived == False
+
     )
 
     # ------------------------------

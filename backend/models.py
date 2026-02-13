@@ -57,6 +57,8 @@ class ResidentProfile(Base):
     is_deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime, nullable=True)
     
+    is_archived = Column(Boolean, default=False)
+    
     # 1. PERSONAL INFO
     last_name = Column(String, index=True)
     first_name = Column(String, index=True)
