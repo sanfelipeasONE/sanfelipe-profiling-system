@@ -162,19 +162,20 @@ def restore_resident(db: Session, resident_id: int):
 # =====================================================
 
 def archive_resident(db: Session, resident_id: int):
-    db_resident = db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.id == resident_id,
-        models.ResidentProfile.is_deleted == False
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id
     ).first()
 
-    if not db_resident:
+    if not resident:
         return None
 
-    db_resident.is_archived = True
-    db.commit()
-    db.refresh(db_resident)
+    resident.is_deleted = True
+    resident.is_archived = True  # if you are using archive column
 
-    return db_resident
+    db.commit()
+    db.refresh(resident)
+
+    return resident
 
 # =====================================================
 # FILTER HELPERS

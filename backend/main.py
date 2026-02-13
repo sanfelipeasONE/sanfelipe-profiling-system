@@ -310,6 +310,23 @@ def get_archived_residents(db: Session = Depends(get_db),
     return db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == True
     ).all()
+    
+@app.put("/residents/{resident_id}/archive")
+def archive_resident(
+    resident_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can archive")
+
+    result = crud.archive_resident(db, resident_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    return {"message": "Resident archived successfully"}
+
 
 # ------------------------------
 # LIST RESIDENTS
