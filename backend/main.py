@@ -301,24 +301,55 @@ def update_resident(
 def promote_family_head(
     resident_id: int,
     new_head_member_id: int = Query(...),
-    reason: str = Query(...),  # "Deceased" or "OFW"
+    reason: str = Query("Deceased"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     if current_user.role != "admin":
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=403, detail="Only admin can promote family head")
 
-    result = crud.promote_family_member_to_head(
-        db,
-        resident_id,
-        new_head_member_id,
-        reason
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    new_head = db.query(models.FamilyMember).filter(
+        models.FamilyMember.id == new_head_member_id,
+        models.FamilyMember.profile_id == resident_id
+    ).first()
+
+    if not new_head:
+        raise HTTPException(status_code=404, detail="Family member not found")
+
+    # 1️⃣ Save old head data
+    old_head = models.FamilyMember(
+        profile_id=resident.id,
+        first_name=resident.first_name,
+        last_name=resident.last_name,
+        middle_name=resident.middle_name,
+        ext_name=resident.ext_name,
+        relationship="Former Head",
+        is_family_head=False
     )
 
-    if not result:
-        raise HTTPException(status_code=404, detail="Promotion failed")
+    db.add(old_head)
+
+    # 2️⃣ Update resident profile to new head
+    resident.first_name = new_head.first_name
+    resident.last_name = new_head.last_name
+    resident.middle_name = new_head.middle_name
+    resident.ext_name = new_head.ext_name
+    resident.status = reason
+
+    # 3️⃣ Delete promoted member from family_members
+    db.delete(new_head)
+
+    db.commit()
 
     return {"message": "Family head updated successfully"}
+
 
 # ------------------------------
 # ARCHIVED ROUTE (MUST BE FIRST)
