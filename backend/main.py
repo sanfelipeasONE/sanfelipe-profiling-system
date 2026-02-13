@@ -227,6 +227,35 @@ def delete_user(
 
     return {"message": f"User '{user_to_delete.username}' deleted successfully"}
 
+class UserPasswordReset(BaseModel):
+    new_password: str
+    
+@app.put("/users/{user_id}/reset-password", status_code=200)
+def reset_password(
+    user_id: int,
+    password_data: UserPasswordReset,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Only admin can reset
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can reset passwords")
+
+    user_to_edit = db.query(models.User).filter(
+        models.User.id == user_id
+    ).first()
+
+    if not user_to_edit:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Hash new password
+    hashed_pw = pwd_context.hash(password_data.new_password)
+    user_to_edit.hashed_password = hashed_pw
+
+    db.commit()
+
+    return {"message": f"Password reset for {user_to_edit.username}"}
+
 
 # ---------------------------------------------------
 # RESIDENTS
