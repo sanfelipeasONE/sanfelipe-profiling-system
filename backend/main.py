@@ -331,16 +331,13 @@ def archive_resident(
 @app.put("/residents/{resident_id}/promote")
 def promote_family_head(
     resident_id: int,
-    new_head_member_id: int = Query(...),
-    reason: str = Query("Deceased"),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    new_head_member_id: int,
+    reason: str,
+    db: Session = Depends(get_db)
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can promote")
-
     resident = db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.id == resident_id
+        models.ResidentProfile.id == resident_id,
+        models.ResidentProfile.is_deleted == False
     ).first()
 
     if not resident:
@@ -354,25 +351,62 @@ def promote_family_head(
     if not new_head:
         raise HTTPException(status_code=404, detail="Family member not found")
 
-    # 🔹 Archive old head if needed
-    if reason == "Deceased":
-        resident.is_archived = True
-        resident.status = "Deceased"
-    else:
-        resident.status = reason
+    # ===============================
+    # 1️⃣ SAVE OLD HEAD DATA FIRST
+    # ===============================
 
-    # 🔹 Replace resident name with new head
+    old_head_member = models.FamilyMember(
+        profile_id=resident.id,
+        first_name=resident.first_name,
+        last_name=resident.last_name,
+        middle_name=resident.middle_name,
+        ext_name=resident.ext_name,
+        relationship="Former Head",
+        birthdate=resident.birthdate,
+        occupation=resident.occupation,
+        is_active=False   # MARK AS DECEASED
+    )
+
+    db.add(old_head_member)
+
+    # ===============================
+    # 2️⃣ OVERWRITE PROFILE WITH NEW HEAD
+    # ===============================
+
     resident.first_name = new_head.first_name
     resident.last_name = new_head.last_name
     resident.middle_name = new_head.middle_name
     resident.ext_name = new_head.ext_name
+    resident.birthdate = new_head.birthdate
+    resident.occupation = new_head.occupation
 
-    # 🔹 Remove promoted member from family list
+    # CLEAR ALL OLD PERSONAL DETAILS
+    resident.civil_status = None
+    resident.religion = None
+    resident.precinct_no = None
+    resident.contact_no = None
+    resident.other_sector_details = None
+    resident.sector_summary = None
+
+    # CLEAR SPOUSE
+    resident.spouse_first_name = None
+    resident.spouse_last_name = None
+    resident.spouse_middle_name = None
+    resident.spouse_ext_name = None
+
+    resident.status = "Active"
+    resident.is_archived = False
+
+    # ===============================
+    # 3️⃣ REMOVE PROMOTED MEMBER FROM FAMILY TABLE
+    # ===============================
+
     db.delete(new_head)
 
     db.commit()
 
-    return {"message": "Family head updated successfully"}
+    return {"message": "Family head successfully replaced"}
+
 
 
 # ------------------------------
