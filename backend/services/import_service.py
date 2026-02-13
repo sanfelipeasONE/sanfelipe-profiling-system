@@ -214,35 +214,36 @@ def process_excel_import(file_content, db: Session):
             # ===============================
             for i in range(1, 6):
 
-                lname = clean_str(row.get(f"{i}. LAST NAME"))
-                fname = clean_str(row.get(f"{i}. FIRST NAME"))
-                mname = clean_str(row.get(f"{i}. MIDDLE NAME"))
+                # Flexible column matching
+                lname = clean_str(row.get(f"{i}. LAST NAME") or row.get(f"{i}. LAST NAME.1"))
+
+                fname = clean_str(row.get(f"{i}. FIRST NAME") or row.get(f"{i}. FIRST NAME.1"))
+
+                # 👇 FIXED MIDDLE NAME HANDLING
+                mname = None
+                for col in df.columns:
+                    if col.startswith(f"{i}. MIDDLE NAME"):
+                        mname = clean_str(row.get(col))
+                        break
+
                 rel = clean_str(row.get(f"{i}. RELATIONSHIP"))
 
-                # Skip fake entries like SON / DAUGHTER in last name column
-                if lname.upper() in ["SON", "DAUGHTER", "ANAK"]:
-                    lname = ""
-
-                if fname.upper() in ["SON", "DAUGHTER", "ANAK"]:
-                    fname = ""
-
-                # Skip empty rows
-                if lname == "" and fname == "":
+                if lname == "" and fname == "" and rel == "":
                     continue
 
-                # Avoid duplicates
                 if family_member_exists(db, resident.id, lname, fname, rel):
                     continue
 
                 new_member = FamilyMember(
                     profile_id=resident.id,
-                    last_name=lname if lname != "" else None,
-                    first_name=fname if fname != "" else None,
-                    middle_name=mname if mname != "" else None,
-                    relationship=rel if rel != "" else None
+                    last_name=lname or None,
+                    first_name=fname or None,
+                    middle_name=mname or None,
+                    relationship=rel or None
                 )
 
                 db.add(new_member)
+
 
             success_count += 1
 
