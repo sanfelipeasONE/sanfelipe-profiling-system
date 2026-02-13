@@ -209,23 +209,33 @@ def process_excel_import(file_content, db: Session):
             # FAMILY MEMBERS
             # ===============================
             for i in range(1, 6):
+
                 lname = clean_str(row.get(f"{i}. LAST NAME"))
                 fname = clean_str(row.get(f"{i}. FIRST NAME"))
-                mname = clean_str(row.get(f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"))
+                mname = clean_str(row.get(f"{i}. MIDDLE NAME"))
                 rel = clean_str(row.get(f"{i}. RELATIONSHIP"))
 
-                if lname == "" and fname == "" and rel == "":
+                # Skip fake entries like SON / DAUGHTER in last name column
+                if lname.upper() in ["SON", "DAUGHTER", "ANAK"]:
+                    lname = ""
+
+                if fname.upper() in ["SON", "DAUGHTER", "ANAK"]:
+                    fname = ""
+
+                # Skip empty rows
+                if lname == "" and fname == "":
                     continue
 
+                # Avoid duplicates
                 if family_member_exists(db, resident.id, lname, fname, rel):
                     continue
 
                 new_member = FamilyMember(
                     profile_id=resident.id,
-                    last_name=lname,
-                    first_name=fname,
-                    middle_name=mname,
-                    relationship=rel
+                    last_name=lname if lname != "" else None,
+                    first_name=fname if fname != "" else None,
+                    middle_name=mname if mname != "" else None,
+                    relationship=rel if rel != "" else None
                 )
 
                 db.add(new_member)
