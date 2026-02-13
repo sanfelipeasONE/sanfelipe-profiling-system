@@ -300,12 +300,34 @@ def get_residents(
 # =====================================================
 def get_dashboard_stats(db: Session):
 
-    # 🔥 BASE FILTER (VERY IMPORTANT)
     base_query = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == False,
         models.ResidentProfile.is_archived == False
-
     )
+
+    total_residents = base_query.count() or 0
+
+    total_households = db.query(
+        func.count(
+            func.distinct(
+                func.trim(models.ResidentProfile.barangay) +
+                "-" +
+                func.coalesce(func.trim(models.ResidentProfile.house_no), "")
+            )
+        )
+    ).filter(
+        models.ResidentProfile.is_deleted == False,
+        models.ResidentProfile.is_archived == False
+    ).scalar() or 0
+
+    total_male = base_query.filter(
+        func.lower(models.ResidentProfile.sex).in_(["male", "m"])
+    ).count() or 0
+
+    total_female = base_query.filter(
+        func.lower(models.ResidentProfile.sex).in_(["female", "f"])
+    ).count() or 0
+
 
     # ------------------------------
     # TOTAL RESIDENTS
