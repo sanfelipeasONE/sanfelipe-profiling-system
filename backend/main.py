@@ -189,6 +189,45 @@ def get_users(db: Session = Depends(get_db),
 
     return db.query(models.User).all()
 
+@app.delete("/users/{user_id}", status_code=200)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Only admin can delete
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete users")
+
+    user_to_delete = db.query(models.User).filter(
+        models.User.id == user_id
+    ).first()
+
+    if not user_to_delete:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Prevent admin from deleting themselves
+    if user_to_delete.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
+    # Prevent deleting last admin
+    if user_to_delete.role == "admin":
+        admin_count = db.query(models.User).filter(
+            models.User.role == "admin"
+        ).count()
+
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete the last administrator"
+            )
+
+    db.delete(user_to_delete)
+    db.commit()
+
+    return {"message": f"User '{user_to_delete.username}' deleted successfully"}
+
+
 # ---------------------------------------------------
 # RESIDENTS
 # ---------------------------------------------------
