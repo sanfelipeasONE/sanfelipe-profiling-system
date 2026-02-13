@@ -123,6 +123,21 @@ def delete_resident(db: Session, resident_id: int):
 
     return db_resident
 
+def soft_delete_resident(db: Session, resident_id: int):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id
+    ).first()
+
+    if not resident:
+        return None
+
+    resident.is_deleted = True
+    db.commit()
+    db.refresh(resident)
+
+    return resident
+
+
 # =====================================================
 # RESTORE RESIDENT
 # =====================================================

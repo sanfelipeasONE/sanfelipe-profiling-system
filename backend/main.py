@@ -209,6 +209,25 @@ def create_resident(resident: schemas.ResidentCreate,
 
     return crud.create_resident(db=db, resident=resident)
 
+@app.put("/residents/{resident_id}", response_model=schemas.Resident)
+def update_resident(
+    resident_id: int,
+    resident: schemas.ResidentUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+
+    db_resident = crud.update_resident(
+        db,
+        resident_id=resident_id,
+        resident_data=resident
+    )
+
+    if not db_resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    return db_resident
+
 # ------------------------------
 # ARCHIVED ROUTE (MUST BE FIRST)
 # ------------------------------
