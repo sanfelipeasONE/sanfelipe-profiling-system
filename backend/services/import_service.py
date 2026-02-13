@@ -99,6 +99,10 @@ def process_excel_import(file_content, db: Session):
     df = df.replace({pd.NaT: None})
     df = df.where(pd.notnull(df), None)
     df.columns = df.columns.str.strip()
+    
+    print("=== EXCEL COLUMNS ===")
+    print(df.columns.tolist())
+    print("=====================")
 
     success_count = 0
     skipped_duplicates = 0
@@ -123,7 +127,7 @@ def process_excel_import(file_content, db: Session):
     "STUDENT",
     "LIFEGUARD",
     "OTHERS"
-]
+    ]
 
     # Normalize Excel headers
     excel_columns = [col.strip().upper() for col in df.columns]
