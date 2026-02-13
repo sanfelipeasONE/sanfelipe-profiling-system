@@ -120,4 +120,5 @@ class FamilyMember(Base):
     occupation = Column(String, nullable=True)
     
     is_active = Column(Boolean, default=True)
+    is_family_head = Column(Boolean, default=False)
     head = orm_relationship("ResidentProfile", back_populates="family_members")
