@@ -20,13 +20,17 @@ import models, schemas, crud
 from database import engine, get_db
 from services import report_service
 
-# ----------------------------------------------------
-# INITIAL SETUP
-# ----------------------------------------------------
+# ---------------------------------------------------
+# INITIALIZE APP
+# ---------------------------------------------------
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="San Felipe Residential Profiling System")
+app = FastAPI(title="San Felipe Residential Profile Form")
+
+# ---------------------------------------------------
+# CORS
+# ---------------------------------------------------
 
 origins = [
     "http://localhost:5173",
@@ -45,16 +49,43 @@ app.add_middleware(
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
+# ---------------------------------------------------
+# SECURITY
+# ---------------------------------------------------
+
+SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-for-dev-only")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# ----------------------------------------------------
+# ---------------------------------------------------
+# BARANGAY MAPPING
+# ---------------------------------------------------
+
+BARANGAY_MAPPING = {
+    "faranal": "FARAÑAL",
+    "santo_nino": "STO NIÑO",
+    "santonino": "STO NIÑO",
+    "sto_nino": "STO NIÑO",
+    "sto nino": "STO NIÑO",
+    "sto niño": "STO NIÑO",
+    "santo nino": "STO NIÑO",
+    "santo niño": "STO NIÑO",
+    "rosete": "ROSETE",
+    "amagna": "AMAGNA",
+    "apostol": "APOSTOL",
+    "balincaguing": "BALINCAGUING",
+    "maloma": "MALOMA",
+    "sindol": "SINDOL",
+    "sanrafael": "SAN RAFAEL",
+    "san rafael": "SAN RAFAEL",
+}
+
+# ---------------------------------------------------
 # AUTH HELPERS
-# ----------------------------------------------------
+# ---------------------------------------------------
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -65,10 +96,9 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-):
+async def get_current_user(token: str = Depends(oauth2_scheme),
+                           db: Session = Depends(get_db)):
+
     credentials_exception = HTTPException(
         status_code=401,
         detail="Could not validate credentials",
@@ -77,7 +107,7 @@ async def get_current_user(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
+        username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
     except JWTError:
@@ -89,15 +119,14 @@ async def get_current_user(
 
     return user
 
-# ----------------------------------------------------
+# ---------------------------------------------------
 # LOGIN
-# ----------------------------------------------------
+# ---------------------------------------------------
 
 @app.post("/token")
-def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
+def login(form_data: OAuth2PasswordRequestForm = Depends(),
+          db: Session = Depends(get_db)):
+
     user = db.query(models.User).filter(
         models.User.username == form_data.username
     ).first()
@@ -106,7 +135,7 @@ def login(
         raise HTTPException(status_code=401, detail="Incorrect username or password")
 
     access_token = create_access_token(
-        {"sub": user.username, "role": user.role}
+        data={"sub": user.username, "role": user.role}
     )
 
     return {
@@ -115,41 +144,117 @@ def login(
         "role": user.role
     }
 
-# =====================================================
-# RESIDENT ENDPOINTS
-# =====================================================
+# ---------------------------------------------------
+# USER MANAGEMENT
+# ---------------------------------------------------
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "barangay"
+
+@app.post("/users/")
+def create_user(user: UserCreate,
+                db: Session = Depends(get_db),
+                current_user: models.User = Depends(get_current_user)):
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403)
+
+    existing = db.query(models.User).filter(
+        models.User.username == user.username
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    hashed_pw = pwd_context.hash(user.password)
+    new_user = models.User(
+        username=user.username,
+        hashed_password=hashed_pw,
+        role=user.role
+    )
+
+    db.add(new_user)
+    db.commit()
+
+    return {"message": "User created successfully"}
+
+@app.get("/users/")
+def get_users(db: Session = Depends(get_db),
+              current_user: models.User = Depends(get_current_user)):
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403)
+
+    return db.query(models.User).all()
+
+# ---------------------------------------------------
+# RESIDENTS
+# ---------------------------------------------------
 
 @app.post("/residents/", response_model=schemas.Resident)
-def create_resident(
-    resident: schemas.ResidentCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    return crud.create_resident(db, resident)
+def create_resident(resident: schemas.ResidentCreate,
+                    db: Session = Depends(get_db),
+                    current_user: models.User = Depends(get_current_user)):
+
+    if current_user.role != "admin":
+        username_lower = current_user.username.lower()
+        official_name = None
+        for key in BARANGAY_MAPPING:
+            if key in username_lower:
+                official_name = BARANGAY_MAPPING[key]
+                break
+        resident.barangay = official_name or current_user.username.replace("_", " ").title()
+
+    return crud.create_resident(db=db, resident=resident)
+
+# ------------------------------
+# ARCHIVED ROUTE (MUST BE FIRST)
+# ------------------------------
+
+@app.get("/residents/archived")
+def get_archived_residents(db: Session = Depends(get_db),
+                           current_user: models.User = Depends(get_current_user)):
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403)
+
+    return db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.is_deleted == True
+    ).all()
+
+# ------------------------------
+# LIST RESIDENTS
+# ------------------------------
 
 @app.get("/residents/", response_model=schemas.ResidentPagination)
-def read_residents(
-    skip: int = 0,
-    limit: int = 20,
-    search: str = None,
-    barangay: str = None,
-    sector: str = None,
-    sort_by: str = "last_name",
-    sort_order: str = "asc",
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    total = crud.get_resident_count(db, search, barangay, sector)
+def read_residents(skip: int = 0,
+                   limit: int = 20,
+                   search: str = None,
+                   barangay: str = Query(None),
+                   sector: str = Query(None),
+                   sort_by: str = Query("last_name"),
+                   sort_order: str = Query("asc"),
+                   db: Session = Depends(get_db),
+                   current_user: models.User = Depends(get_current_user)):
+
+    filter_barangay = barangay
+
+    if current_user.role != "admin":
+        username_lower = current_user.username.lower()
+        official_name = None
+        for key in BARANGAY_MAPPING:
+            if key in username_lower:
+                official_name = BARANGAY_MAPPING[key]
+                break
+        filter_barangay = official_name or current_user.username.replace("_", " ").title()
+
+    total = crud.get_resident_count(db, search, filter_barangay, sector)
 
     residents = crud.get_residents(
-        db,
-        skip=skip,
-        limit=limit,
-        search=search,
-        barangay=barangay,
-        sector=sector,
-        sort_by=sort_by,
-        sort_order=sort_order
+        db, skip, limit, search, filter_barangay, sector,
+        sort_by=sort_by, sort_order=sort_order
     )
 
     return {
@@ -159,132 +264,79 @@ def read_residents(
         "size": limit
     }
 
-# ----------------------------------------------------
-# 🔥 STATIC ROUTES FIRST (PREVENT 422 ERROR)
-# ----------------------------------------------------
+@app.get("/residents/{resident_id}", response_model=schemas.Resident)
+def read_resident(resident_id: int,
+                  db: Session = Depends(get_db),
+                  current_user: models.User = Depends(get_current_user)):
 
-@app.get("/residents/archived", response_model=List[schemas.Resident])
-def get_archived_residents(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
+    resident = crud.get_resident(db, resident_id)
+    if not resident:
+        raise HTTPException(status_code=404)
 
-    return db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.is_archived == True
-    ).all()
+    return resident
 
-@app.put("/residents/{resident_id}/archive")
-def archive_resident(
-    resident_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403)
+@app.delete("/residents/{resident_id}")
+def soft_delete_resident(resident_id: int,
+                         db: Session = Depends(get_db),
+                         current_user: models.User = Depends(get_current_user)):
 
-    result = crud.archive_resident(db, resident_id)
+    result = crud.soft_delete_resident(db, resident_id)
     if not result:
-        raise HTTPException(status_code=404, detail="Resident not found")
+        raise HTTPException(status_code=404)
 
-    return {"message": "Resident archived successfully"}
+    return {"message": "Resident archived"}
+
+# ---------------------------------------------------
+# RESTORE
+# ---------------------------------------------------
 
 @app.put("/residents/{resident_id}/restore")
-def restore_resident(
-    resident_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
+def restore_resident(resident_id: int,
+                     db: Session = Depends(get_db),
+                     current_user: models.User = Depends(get_current_user)):
+
     if current_user.role != "admin":
         raise HTTPException(status_code=403)
 
     result = crud.restore_resident(db, resident_id)
     if not result:
-        raise HTTPException(status_code=404, detail="Resident not found")
-
-    return {"message": "Resident restored successfully"}
-
-# ----------------------------------------------------
-# 🔥 DYNAMIC ROUTE LAST
-# ----------------------------------------------------
-
-@app.get("/residents/{resident_id}", response_model=schemas.Resident)
-def read_resident(
-    resident_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    resident = crud.get_resident(db, resident_id)
-    if not resident:
-        raise HTTPException(status_code=404, detail="Resident not found")
-    return resident
-
-@app.put("/residents/{resident_id}", response_model=schemas.Resident)
-def update_resident(
-    resident_id: int,
-    resident: schemas.ResidentUpdate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    updated = crud.update_resident(db, resident_id, resident)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Resident not found")
-    return updated
-
-@app.delete("/residents/{resident_id}")
-def delete_resident(
-    resident_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    deleted = crud.delete_resident(db, resident_id)
-    if not deleted:
         raise HTTPException(status_code=404)
-    return {"message": "Resident deleted"}
 
-# =====================================================
+    return {"message": "Resident restored"}
+
+# ---------------------------------------------------
 # DASHBOARD
-# =====================================================
+# ---------------------------------------------------
 
 @app.get("/dashboard/stats", response_model=schemas.DashboardStats)
-def get_dashboard_stats(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
+def get_stats(db: Session = Depends(get_db),
+              current_user: models.User = Depends(get_current_user)):
+
     if current_user.role != "admin":
         raise HTTPException(status_code=403)
 
     return crud.get_dashboard_stats(db)
 
-# =====================================================
-# EXCEL EXPORT
-# =====================================================
+# ---------------------------------------------------
+# REFERENCE DATA
+# ---------------------------------------------------
 
-@app.get("/export/excel")
-def export_residents_excel(
-    barangay: str = Query(None),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    file = report_service.generate_household_excel(db, barangay)
-    filename = "SanFelipe_Households.xlsx"
+@app.get("/barangays/")
+def get_barangays(db: Session = Depends(get_db),
+                  current_user: models.User = Depends(get_current_user)):
+    return db.query(models.Barangay).all()
 
-    return StreamingResponse(
-        file,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+@app.get("/puroks/")
+def get_puroks(db: Session = Depends(get_db),
+               current_user: models.User = Depends(get_current_user)):
+    return db.query(models.Purok).all()
 
-# =====================================================
-# EXCEL IMPORT
-# =====================================================
+@app.get("/sectors/")
+def get_sectors(db: Session = Depends(get_db),
+                current_user: models.User = Depends(get_current_user)):
+    return db.query(models.Sector).all()
 
-@app.post("/import/excel")
-async def import_residents_excel(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    contents = await file.read()
-    result = process_excel_import(io.BytesIO(contents), db)
-    return result
+@app.get("/relationships/")
+def get_relationships(db: Session = Depends(get_db),
+                      current_user: models.User = Depends(get_current_user)):
+    return db.query(models.Relationship).all()
