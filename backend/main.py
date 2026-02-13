@@ -328,6 +328,10 @@ def archive_resident(
 
     return {"message": "Resident archived successfully"}
 
+# ------------------------------
+# PROMOTE FAMILY HEAD
+# ------------------------------
+
 @app.put("/residents/{resident_id}/promote")
 def promote_family_head(
     resident_id: int,
@@ -407,6 +411,70 @@ def promote_family_head(
 
     return {"message": "Family head successfully replaced"}
 
+@app.put("/residents/{resident_id}/promote-spouse")
+def promote_spouse_to_head(
+    resident_id: int,
+    reason: str,
+    db: Session = Depends(get_db)
+):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    if not resident.spouse_first_name:
+        raise HTTPException(status_code=400, detail="No spouse to promote")
+
+    # ==========================
+    # 1️⃣ Save old head to family members
+    # ==========================
+
+    old_head_member = models.FamilyMember(
+        profile_id=resident.id,
+        first_name=resident.first_name,
+        last_name=resident.last_name,
+        middle_name=resident.middle_name,
+        ext_name=resident.ext_name,
+        relationship="Former Head",
+        birthdate=resident.birthdate,
+        occupation=resident.occupation,
+        is_active=False
+    )
+
+    db.add(old_head_member)
+
+    # ==========================
+    # 2️⃣ Promote spouse into resident profile
+    # ==========================
+
+    resident.first_name = resident.spouse_first_name
+    resident.last_name = resident.spouse_last_name
+    resident.middle_name = resident.spouse_middle_name
+    resident.ext_name = resident.spouse_ext_name
+
+    # CLEAR spouse fields
+    resident.spouse_first_name = None
+    resident.spouse_last_name = None
+    resident.spouse_middle_name = None
+    resident.spouse_ext_name = None
+
+    # CLEAR personal details
+    resident.civil_status = None
+    resident.religion = None
+    resident.contact_no = None
+    resident.precinct_no = None
+    resident.other_sector_details = None
+    resident.sector_summary = None
+
+    resident.status = "Active"
+    resident.is_archived = False
+
+    db.commit()
+
+    return {"message": "Spouse promoted to head successfully"}
 
 
 # ------------------------------
