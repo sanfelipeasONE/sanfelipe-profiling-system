@@ -179,6 +179,36 @@ export default function ResidentList({ userRole, onEdit }) {
     }
   };
 
+  const [promotionModal, setPromotionModal] = useState({
+  isOpen: false,
+  memberId: null,
+  reason: "Deceased"
+  });
+
+
+  const handlePromote = async (memberId, reason) => {
+  try {
+    await api.put(`/residents/${expandedRow}/promote`, null, {
+      params: {
+        new_head_member_id: memberId,
+        reason: reason
+      }
+    });
+
+    toast.success("New family head assigned.");
+    setPromotionModal({
+      isOpen: false,
+      memberId: null,
+      reason: "Deceased"
+    });
+    fetchResidents();
+  } catch {
+    toast.error("Promotion failed.");
+  }
+};
+
+
+
   // --- DETAILS SUB-COMPONENT ---
   const ResidentDetails = ({ r }) => (
     <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone-50/50 border-t border-stone-100 animate-in slide-in-from-top-2 duration-300">
@@ -217,10 +247,23 @@ export default function ResidentList({ userRole, onEdit }) {
             <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
               <Heart size={14} className="text-rose-400 fill-rose-400" /> Spouse / Partner
             </h4>
-            <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
+            <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm space-y-2">
               <p className="text-sm font-bold text-stone-800">
                 {r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name || ''} {r.spouse_ext_name || ''}
               </p>
+              <button
+                onClick={() =>
+                  setPromotionModal({
+                    isOpen: true,
+                    memberId: "spouse",
+                    reason: "Deceased"
+                  })
+                }
+                className="text-green-600 hover:text-green-800 text-xs"
+              >
+                Make Family Head
+              </button>
+
               <p className="text-[10px] text-stone-400 font-medium uppercase mt-0.5">Legal Spouse / Partner</p>
             </div>
           </div>
@@ -246,13 +289,39 @@ export default function ResidentList({ userRole, onEdit }) {
           </h4>
           {r.family_members?.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {r.family_members.map((fm, i) => (
-                <div key={i} className="px-3 py-1.5 bg-white border border-stone-200 rounded-lg shadow-sm text-xs">
-                  <span className="font-bold text-stone-800">{fm.first_name} {fm.last_name}</span>
-                  <span className="ml-2 text-stone-400 italic">({fm.relationship})</span>
+              {r.family_members
+                ?.filter(fm => fm.first_name || fm.last_name)
+                .map((fm, i) => (
+
+                <div key={i} className="px-3 py-1.5 bg-white border border-stone-200 rounded-lg shadow-sm text-xs space-y-1">
+                  <div>
+                    <span className="font-bold text-stone-800">
+                      {fm.first_name} {fm.middle_name || ''} {fm.last_name}
+                    </span>
+                    <span className="ml-2 text-stone-400 italic">
+                      ({fm.relationship})
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPromotionModal({
+                        isOpen: true,
+                        memberId: fm.id,
+                        reason: "Deceased"
+                      });
+                    }}
+                    className="text-green-600 hover:text-green-800 text-[10px]"
+                  >
+                    Make Family Head
+                  </button>
                 </div>
               ))}
+
+
             </div>
+          
           ) : (
             <p className="text-xs text-stone-400 italic">No additional family members recorded.</p>
           )}
@@ -289,6 +358,78 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>,
         document.body
       )}
+      {/* ✅ ADD PROMOTION MODAL HERE */}
+      {promotionModal.isOpen && createPortal(
+        <div className="fixed inset-0 z-[99999]">
+          
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() =>
+              setPromotionModal({
+                isOpen: false,
+                memberId: null,
+                reason: "Deceased"
+              })
+            }
+          />
+
+          {/* Modal */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-2xl w-80 shadow-2xl">
+              <h3 className="font-bold mb-4 text-sm">
+                Reason for Replacement
+              </h3>
+
+              <select
+                className="w-full border p-2 rounded mb-4 text-sm outline-none focus:ring-1 focus:ring-green-600"
+                value={promotionModal.reason}
+                onChange={(e) =>
+                  setPromotionModal({
+                    ...promotionModal,
+                    reason: e.target.value
+                  })
+                }
+              >
+                <option value="Deceased">Deceased</option>
+                <option value="OFW">OFW</option>
+                <option value="Transferred">Transferred</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    handlePromote(
+                      promotionModal.memberId,
+                      promotionModal.reason
+                    )
+                  }
+                  className="bg-red-600 hover:bg-red-900 text-white w-full py-2 rounded text-sm transition-colors"
+                >
+                  Confirm
+                </button>
+
+                <button
+                  onClick={() =>
+                    setPromotionModal({
+                      isOpen: false,
+                      memberId: null,
+                      reason: "Deceased"
+                    })
+                  }
+                  className="bg-stone-200 hover:bg-stone-300 w-full py-2 rounded text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+
 
       {/* HEADER */}
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 md:p-6 space-y-4">
