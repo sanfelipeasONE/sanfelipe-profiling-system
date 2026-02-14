@@ -2,7 +2,7 @@ import io
 import pandas as pd
 from datetime import date
 from sqlalchemy.orm import Session
-import models
+from app import models
 
 def calculate_age(birthdate):
     if not birthdate:

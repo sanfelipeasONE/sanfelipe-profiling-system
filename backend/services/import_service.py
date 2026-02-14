@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from models import ResidentProfile, FamilyMember
+from app.models import ResidentProfile, FamilyMember
 
 
 # ===============================
