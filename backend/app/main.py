@@ -16,9 +16,9 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 
-import models
-import schemas
-import crud
+from app import models
+from app import schemas
+from app import crud
 from app.core.database import engine, get_db
 from services import report_service
 
