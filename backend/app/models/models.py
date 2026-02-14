@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Table, UniqueConstraint
 from sqlalchemy.orm import relationship as orm_relationship
 from sqlalchemy.sql import func
-from database import Base
+from app.core.database import Base
 
 # --- ASSOCIATION TABLE (Many-to-Many) ---
 resident_sectors = Table(

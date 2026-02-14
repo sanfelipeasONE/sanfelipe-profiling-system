@@ -1,4 +1,4 @@
-from database import engine, Base
+from app.core.database import engine, Base
 import models
 
 print("Creating database tables...")

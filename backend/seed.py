@@ -1,4 +1,4 @@
-from database import SessionLocal, engine
+from app.core.database import SessionLocal, engine
 import models
 from passlib.context import CryptContext
 import os

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
-import models, schemas
+from app import models, schemas
 from datetime import datetime
 
 
