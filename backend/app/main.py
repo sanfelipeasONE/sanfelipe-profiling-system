@@ -321,7 +321,7 @@ def archive_resident(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can archive")
 
-    result = crud.archive_resident(db, resident_id)
+    result = crud.archive_resident(db, resident_id, current_user.id)
 
     if not result:
         raise HTTPException(status_code=404, detail="Resident not found")
