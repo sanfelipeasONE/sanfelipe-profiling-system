@@ -628,45 +628,6 @@ def export_residents_excel(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Restrict barangay automatically for non-admin
-    target_barangay = barangay
-
-    if current_user.role != "admin":
-        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
-
-        if official_name:
-            target_barangay = official_name
-        else:
-            target_barangay = current_user.username.replace("_", " ").title()
-
-    try:
-        excel_file = report_service.generate_household_excel(
-            db,
-            barangay_name=target_barangay
-        )
-
-        clean_name = (
-            target_barangay.replace(" ", "_")
-            if target_barangay else "All"
-        )
-
-        filename = f"SanFelipe_Households_{clean_name}.xlsx"
-
-        return StreamingResponse(
-            iter([excel_file.getvalue()]),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/export/excel")
-def export_residents_excel(
-    barangay: str = Query(None),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    # Restrict barangay automatically for non-admin
     target_barangay = barangay
 
     if current_user.role != "admin":
@@ -700,6 +661,7 @@ def export_residents_excel(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # ---------------------------------------------------
 # REFERENCE DATA
