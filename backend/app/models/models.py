@@ -16,6 +16,9 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     role = Column(String, default="admin")
+    
+    is_archived = Column(Boolean, default=False)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
 
 # --- REFERENCE TABLES ---
 class Barangay(Base):

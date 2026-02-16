@@ -91,7 +91,7 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     # Update family members
     db.query(models.FamilyMember).filter(
         models.FamilyMember.profile_id == resident_id
-    ).delete()
+    ).delete(synchronize_session=False)
 
     if resident_data.family_members:
         for fm_data in resident_data.family_members:
