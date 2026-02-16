@@ -23,7 +23,7 @@ def calculate_age(birthdate):
 def excel_col_letter(col_idx):
     """
     Convert column index (0-based) to Excel column letter.
-    Supports beyond Z (AA, AB, etc.)
+    Supports AA, AB, etc.
     """
     letter = ""
     while col_idx >= 0:
@@ -74,11 +74,9 @@ def generate_household_excel(db: Session, barangay_name: str = None):
 
     for r in residents:
 
-        # Household head formatting
         mi = f"{r.middle_name[0]}." if r.middle_name else ""
         full_name = f"{r.last_name}, {r.first_name} {mi} {r.ext_name or ''}".strip()
 
-        # Spouse formatting
         spouse_name = ""
         if r.spouse_first_name:
             s_mi = f"{r.spouse_middle_name[0]}." if r.spouse_middle_name else ""
@@ -103,7 +101,7 @@ def generate_household_excel(db: Session, barangay_name: str = None):
             'Contact': r.contact_no,
         }
 
-        # Add family member columns dynamically
+        # Dynamic family member columns
         for i in range(max_family_count):
             if i < len(r.family_members):
                 fm = r.family_members[i]
@@ -194,11 +192,9 @@ def generate_household_excel(db: Session, barangay_name: str = None):
 
         headers = base_headers + family_headers
 
-        # Write column headers
         for col, h in enumerate(headers):
             worksheet.write(4, col, h, fmt_header)
 
-        # Dynamic merge range
         last_col = excel_col_letter(len(headers) - 1)
 
         worksheet.merge_range(f'A1:{last_col}1', 'REPUBLIC OF THE PHILIPPINES', fmt_sub)
@@ -208,13 +204,41 @@ def generate_household_excel(db: Session, barangay_name: str = None):
         title_text = f"MASTER LIST - {barangay_name.upper()}" if barangay_name else "MASTER LIST - ALL BARANGAYS"
         worksheet.merge_range(f'A4:{last_col}4', title_text, fmt_title)
 
-        # Auto column width
-        for col in range(len(headers)):
-            worksheet.set_column(col, col, 15)
+        # --------------------------------------------------
+        # COLUMN WIDTH SETTINGS (FIXED)
+        # --------------------------------------------------
 
-        # Apply border formatting
+        worksheet.set_column('A:A', 6)
+        worksheet.set_column('B:B', 15)
+        worksheet.set_column('C:C', 10)
+        worksheet.set_column('D:D', 12)
+        worksheet.set_column('E:E', 35)   # Wider Head
+        worksheet.set_column('F:F', 30)   # Wider Spouse
+        worksheet.set_column('G:H', 6)
+        worksheet.set_column('I:I', 12)
+        worksheet.set_column('J:J', 15)
+        worksheet.set_column('K:K', 18)
+        worksheet.set_column('L:L', 8)
+        worksheet.set_column('M:M', 20)
+        worksheet.set_column('N:N', 15)
+
+        # Family columns width
+        start_family_col = len(base_headers)
+        for i in range(max_family_count * 4):
+            col_idx = start_family_col + i
+            worksheet.set_column(col_idx, col_idx, 18)
+
+        # --------------------------------------------------
+        # APPLY FORMAT TO DATA ROWS
+        # --------------------------------------------------
+
         for row_idx in range(len(df)):
             worksheet.set_row(5 + row_idx, None, fmt_center)
+
+            worksheet.write(5 + row_idx, 4, df.iloc[row_idx]['Household Head'], fmt_text)
+            worksheet.write(5 + row_idx, 5, df.iloc[row_idx]['Spouse'], fmt_text)
+            worksheet.write(5 + row_idx, 10, df.iloc[row_idx]['Occupation'], fmt_text)
+            worksheet.write(5 + row_idx, 12, df.iloc[row_idx]['Sectors'], fmt_text)
 
     output.seek(0)
     return output
