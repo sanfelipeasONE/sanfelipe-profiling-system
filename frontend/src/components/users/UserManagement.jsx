@@ -2,19 +2,25 @@ import { useEffect, useState } from 'react';
 import api from '../../api/api';
 import { 
   UserPlus, Shield, User, Loader2, Key, Trash2, 
-  ShieldCheck, UserCircle, AlertCircle, Eye, EyeOff, Lock
+  ShieldCheck, AlertCircle, Eye, EyeOff, Lock,
+  ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from 'react-dom';
-
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'barangay' });
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(false);
+  
+  // --- LOADING STATE ---
+  const [loading, setLoading] = useState(true); // Default to true on mount
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+
   // Modal States
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, userId: null, username: '' });
   const [resetModal, setResetModal] = useState({ isOpen: false, userId: null, username: '', newPassword: '' });
@@ -33,6 +39,15 @@ export default function UserManagement() {
   };
 
   useEffect(() => { fetchUsers(); }, []);
+
+  // Pagination Logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsers = users.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(users.length / itemsPerPage);
+
+  const goToNextPage = () => { if (currentPage < totalPages) setCurrentPage(prev => prev + 1); };
+  const goToPrevPage = () => { if (currentPage > 1) setCurrentPage(prev => prev - 1); };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -77,16 +92,15 @@ export default function UserManagement() {
       toast.success("Account permanently removed");
       setDeleteModal({ isOpen: false, userId: null, username: '' });
       fetchUsers();
+      if (currentUsers.length === 1 && currentPage > 1) setCurrentPage(prev => prev - 1);
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || "Error deleting account.";
-      toast.error(errorMessage);
+      toast.error(err.response?.data?.detail || "Error deleting account.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    // Kept 'relative' here just in case, but modals are now 'fixed'
     <div className="mt-0 max-w-5xl mx-auto space-y-6 pb-10 animate-in fade-in duration-500 relative">
       <Toaster position="top-right" />
 
@@ -137,8 +151,8 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* USER LIST */}
-      <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
+      {/* USER LIST TABLE */}
+      <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden flex flex-col h-full">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-stone-50 border-b border-stone-100">
@@ -149,98 +163,117 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-50">
-              {users.map(u => (
-                <tr key={u.id} className="hover:bg-rose-50/20 transition-colors group">
-                  <td className="p-5">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${u.role === 'admin' ? 'bg-rose-50 text-rose-600' : 'bg-stone-100 text-stone-400'}`}>
-                        {u.role === 'admin' ? <Shield size={18} /> : <User size={18} />}
-                      </div>
-                      <span className="text-sm font-bold text-stone-800">{u.username}</span>
-                    </div>
-                  </td>
-                  <td className="p-5">
-                    <span className={`text-[9px] px-2.5 py-1 rounded-full font-black uppercase border ${u.role === 'admin' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-stone-50 text-stone-600 border-stone-100'}`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="p-5 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button onClick={() => setResetModal({ isOpen: true, userId: u.id, username: u.username, newPassword: '' })} className="p-2 text-stone-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"><Key size={16} /></button>
-                      <button onClick={() => setDeleteModal({ isOpen: true, userId: u.id, username: u.username })} className="p-2 text-stone-400 hover:text-red-600 hover:bg-white rounded-lg transition-all"><Trash2 size={16} /></button>
+              
+              {/* --- LOADING STATE --- */}
+              {loading ? (
+                <tr>
+                  <td colSpan="3" className="p-12 text-center bg-white">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+                      <p className="text-xs font-bold text-stone-400 uppercase tracking-widest animate-pulse">
+                        Fetching Credentials...
+                      </p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : currentUsers.length > 0 ? (
+                // --- DATA LOADED ---
+                currentUsers.map(u => (
+                  <tr key={u.id} className="hover:bg-rose-50/20 transition-colors group">
+                    <td className="p-5">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${u.role === 'admin' ? 'bg-rose-50 text-rose-600' : 'bg-stone-100 text-stone-400'}`}>
+                          {u.role === 'admin' ? <Shield size={18} /> : <User size={18} />}
+                        </div>
+                        <span className="text-sm font-bold text-stone-800">{u.username}</span>
+                      </div>
+                    </td>
+                    <td className="p-5">
+                      <span className={`text-[9px] px-2.5 py-1 rounded-full font-black uppercase border ${u.role === 'admin' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-stone-50 text-stone-600 border-stone-100'}`}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="p-5 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => setResetModal({ isOpen: true, userId: u.id, username: u.username, newPassword: '' })} className="p-2 text-stone-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"><Key size={16} /></button>
+                        <button onClick={() => setDeleteModal({ isOpen: true, userId: u.id, username: u.username })} className="p-2 text-stone-400 hover:text-red-600 hover:bg-white rounded-lg transition-all"><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                // --- NO DATA STATE ---
+                <tr>
+                  <td colSpan="3" className="p-8 text-center text-stone-400 text-sm font-medium italic">
+                    No users found in the system.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION (Only show if not loading and has data) */}
+        {!loading && users.length > 0 && (
+          <div className="p-4 border-t border-stone-100 bg-stone-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span className="text-xs font-bold text-stone-400 uppercase tracking-wide">
+              Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, users.length)} of {users.length}
+            </span>
+            
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={goToPrevPage} 
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl border border-stone-200 bg-white text-stone-500 hover:bg-stone-50 hover:text-stone-800 disabled:opacity-30 disabled:hover:bg-white transition-all"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i + 1}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                      currentPage === i + 1 
+                        ? 'bg-rose-600 text-white shadow-md shadow-rose-200' 
+                        : 'bg-white text-stone-500 hover:bg-stone-100 border border-stone-200'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+
+              <button 
+                onClick={goToNextPage} 
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-xl border border-stone-200 bg-white text-stone-500 hover:bg-stone-50 hover:text-stone-800 disabled:opacity-30 disabled:hover:bg-white transition-all"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* --- RESET PASSWORD MODAL --- */}
       {resetModal.isOpen &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            
-            {/* FULL SCREEN BLUR OVERLAY */}
-            <div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-md"
-              onClick={() => setResetModal({ ...resetModal, isOpen: false })}
-            />
-
-            {/* MODAL CARD */}
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-md" onClick={() => setResetModal({ ...resetModal, isOpen: false })}/>
             <div className="relative z-10 bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-stone-100 animate-in zoom-in-95">
               <div className="text-center">
-                <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Lock size={32}/>
-                </div>
-
-                <h3 className="text-xl font-bold text-stone-900">
-                  Reset Password
-                </h3>
-
-                <p className="text-sm text-stone-500 mt-1 mb-6">
-                  Updating credentials for 
-                  <span className="font-bold text-stone-800">
-                    {" "}{resetModal.username}
-                  </span>
-                </p>
-
+                <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><Lock size={32}/></div>
+                <h3 className="text-xl font-bold text-stone-900">Reset Password</h3>
+                <p className="text-sm text-stone-500 mt-1 mb-6">Updating credentials for <span className="font-bold text-stone-800"> {resetModal.username}</span></p>
                 <div className="relative mb-6">
-                  <input 
-                    type={showResetPass ? "text" : "password"}
-                    placeholder="Enter new password"
-                    value={resetModal.newPassword}
-                    onChange={(e) => 
-                      setResetModal({ ...resetModal, newPassword: e.target.value })
-                    }
-                    className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl outline-none focus:border-rose-500 font-medium text-sm pr-12"
-                  />
-
-                  <button 
-                    type="button"
-                    onClick={() => setShowResetPass(!showResetPass)}
-                    className="absolute right-4 top-4 text-stone-400 hover:text-stone-600"
-                  >
-                    {showResetPass ? <EyeOff size={18}/> : <Eye size={18}/>}
-                  </button>
+                  <input type={showResetPass ? "text" : "password"} placeholder="Enter new password" value={resetModal.newPassword} onChange={(e) => setResetModal({ ...resetModal, newPassword: e.target.value })} className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl outline-none focus:border-rose-500 font-medium text-sm pr-12"/>
+                  <button type="button" onClick={() => setShowResetPass(!showResetPass)} className="absolute right-4 top-4 text-stone-400 hover:text-stone-600">{showResetPass ? <EyeOff size={18}/> : <Eye size={18}/>}</button>
                 </div>
-
                 <div className="space-y-3">
-                  <button
-                    onClick={handleConfirmReset}
-                    disabled={isSubmitting}
-                    className="w-full py-4 bg-stone-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl"
-                  >
-                    {isSubmitting ? "Updating..." : "Update Password"}
-                  </button>
-
-                  <button
-                    onClick={() => setResetModal({ ...resetModal, isOpen: false })}
-                    className="w-full py-2 text-stone-400 font-bold text-sm"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={handleConfirmReset} disabled={isSubmitting} className="w-full py-4 bg-stone-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl">{isSubmitting ? "Updating..." : "Update Password"}</button>
+                  <button onClick={() => setResetModal({ ...resetModal, isOpen: false })} className="w-full py-2 text-stone-400 font-bold text-sm">Cancel</button>
                 </div>
               </div>
             </div>
@@ -253,52 +286,15 @@ export default function UserManagement() {
       {deleteModal.isOpen &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            
-            {/* FULL SCREEN OVERLAY */}
-            <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-md"
-              onClick={() =>
-                setDeleteModal({ isOpen: false, userId: null, username: "" })
-              }
-            />
-
-            {/* MODAL CARD */}
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md" onClick={() => setDeleteModal({ isOpen: false, userId: null, username: "" })}/>
             <div className="relative z-10 bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-stone-100 animate-in zoom-in-95">
               <div className="text-center">
-                
-                <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3">
-                  <AlertCircle size={32} />
-                </div>
-
-                <h3 className="text-xl font-bold text-stone-900">
-                  Delete Account?
-                </h3>
-
-                <p className="text-sm text-stone-500 mt-2 mb-8 italic">
-                  Removing{" "}
-                  <span className="font-bold text-stone-800 not-italic">
-                    "{deleteModal.username}"
-                  </span>{" "}
-                  will revoke all system access.
-                </p>
-
+                <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3"><AlertCircle size={32} /></div>
+                <h3 className="text-xl font-bold text-stone-900">Delete Account?</h3>
+                <p className="text-sm text-stone-500 mt-2 mb-8 italic">Removing <span className="font-bold text-stone-800 not-italic">"{deleteModal.username}"</span> will revoke all system access.</p>
                 <div className="space-y-3">
-                  <button
-                    onClick={handleDeleteAccount}
-                    disabled={isSubmitting}
-                    className="w-full py-3.5 bg-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-200 active:scale-95 transition-all"
-                  >
-                    {isSubmitting ? "Processing..." : "Confirm Removal"}
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      setDeleteModal({ isOpen: false, userId: null, username: "" })
-                    }
-                    className="w-full py-3.5 text-stone-400 font-bold"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={handleDeleteAccount} disabled={isSubmitting} className="w-full py-3.5 bg-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-200 active:scale-95 transition-all">{isSubmitting ? "Processing..." : "Confirm Removal"}</button>
+                  <button onClick={() => setDeleteModal({ isOpen: false, userId: null, username: "" })} className="w-full py-3.5 text-stone-400 font-bold">Cancel</button>
                 </div>
               </div>
             </div>
@@ -306,7 +302,6 @@ export default function UserManagement() {
           document.body
         )
       }
-
     </div>
   );
 }

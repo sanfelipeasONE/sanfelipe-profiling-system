@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/api';
 import toast, { Toaster } from 'react-hot-toast';
-import { RotateCcw, Archive, Loader2, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RotateCcw, Archive, Loader2, FileX, ChevronLeft, ChevronRight, Search, ShieldAlert } from 'lucide-react';
 
 export default function ArchivedResidents() {
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [restoringId, setRestoringId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 8; 
 
   const fetchArchived = async () => {
     try {
       const res = await api.get('/residents/archived');
       setResidents(res.data); 
     } catch (err) {
-      toast.error("Failed to load archived residents.");
+      toast.error("System Error: Could not retrieve archival records.");
     } finally {
       setLoading(false);
     }
@@ -29,7 +29,7 @@ export default function ArchivedResidents() {
     setRestoringId(id);
     try {
       await api.put(`/residents/${id}/restore`);
-      toast.success("Resident restored successfully!");
+      toast.success("Record restored to active registry.");
       
       setResidents(prev => prev.filter(r => r.id !== id));
       
@@ -37,7 +37,7 @@ export default function ArchivedResidents() {
         setCurrentPage(prev => prev - 1);
       }
     } catch (err) {
-      toast.error("Restore failed.");
+      toast.error("Action Failed: Database update error.");
     } finally {
       setRestoringId(null);
     }
@@ -54,126 +54,168 @@ export default function ArchivedResidents() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 space-y-3 text-red-600 animate-pulse">
-        <Loader2 size={32} className="animate-spin" />
-        <span className="text-xs font-bold uppercase tracking-widest">Loading Archives...</span>
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <Loader2 size={40} className="animate-spin text-rose-600" />
+        <span className="text-xs font-bold uppercase tracking-widest text-rose-800">Retrieving Archival Data...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="font-sans text-stone-800 animate-in fade-in duration-300">
       <Toaster 
-        position="top-center" 
+        position="top-right" 
         toastOptions={{
-          style: { border: '1px solid #fee2e2', color: '#991b1b' }
+          style: { 
+            background: '#881337', // Rose-900
+            color: '#fff',
+            borderRadius: '4px',
+            fontSize: '13px'
+          }
         }} 
       />
 
-      {/* HEADER */}
-      <div className="flex items-center gap-3 pb-4 border-b border-red-200">
-        <div className="p-2.5 bg-red-600 rounded-xl text-white shadow-md shadow-red-200">
-          <Archive size={20} />
+      {/* --- ADMINISTRATIVE HEADER --- */}
+      <div className="mb-6 border-b-2 border-stone-200 pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-sm">
+            <Archive size={24} className="text-rose-700" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-stone-900 uppercase tracking-tight">
+              Archived Resident Registry
+            </h1>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-red-700">
-            Archived Residents
-          </h1>
-          <p className="text-xs font-medium text-stone-500">
-            View and restore previously removed records
-          </p>
+        
+        {/* Stat Counter */}
+        <div className="bg-white border border-stone-200 border-l-4 border-l-rose-600 px-5 py-2 rounded-sm shadow-sm">
+          <span className="text-xs font-bold text-stone-400 uppercase mr-3">Total Inactive</span>
+          <span className="text-xl font-bold text-rose-700">{residents.length}</span>
         </div>
       </div>
 
-      {/* CONTENT */}
-      {residents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 bg-red-50/30 border-2 border-dashed border-red-200 rounded-2xl text-center">
-          <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-red-400 mb-4 shadow-sm border border-red-100">
-            <UserX size={28} />
-          </div>
-          <p className="text-stone-600 font-bold">No archived residents found.</p>
-          <p className="text-xs text-stone-400 mt-1">When items are removed, they will appear here.</p>
+      {/* --- DATA TABLE CONTAINER --- */}
+      <div className="bg-white border border-stone-200 shadow-sm rounded-sm overflow-hidden">
+        
+        {/* Table Toolbar */}
+        <div className="bg-rose-50/50 border-b border-rose-100 px-4 py-3 flex items-center justify-between">
+           <div className="flex items-center gap-2 text-rose-800">
+             <ShieldAlert size={14} />
+             <span className="text-xs font-bold uppercase tracking-wider">Restricted Access • Archival View</span>
+           </div>
+           
+           <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-stone-200 rounded-sm">
+             <Search size={14} className="text-stone-400"/>
+             <span className="text-xs text-stone-400">Filter records...</span>
+           </div>
         </div>
-      ) : (
-        <>
-          {/* LIST */}
-          <div className="grid grid-cols-1 gap-3">
-            {currentData.map((r) => (
-              <div 
-                key={r.id} 
-                className="group bg-white border border-red-100 rounded-xl p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 shadow-sm hover:shadow-lg hover:shadow-red-50 hover:border-red-300 transition-all duration-300"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600 font-bold text-sm border border-red-100 group-hover:bg-red-600 group-hover:text-white transition-all">
-                     {r.first_name[0]}{r.last_name[0]}
-                  </div>
-                  <div>
-                    <p className="font-bold text-stone-800 group-hover:text-red-700 transition-colors">
-                      {r.last_name}, {r.first_name}
-                    </p>
-                    <p className="text-[10px] font-bold text-red-600 uppercase tracking-wide bg-red-50 border border-red-100 inline-block px-2 py-0.5 rounded-md mt-1">
-                      {r.barangay}
-                    </p>
-                  </div>
-                </div>
 
-                <button
-                  onClick={() => handleRestore(r.id)}
-                  disabled={restoringId === r.id}
-                  className="
-                    flex items-center justify-center gap-2 px-6 py-2.5 
-                    text-sm font-bold text-white 
-                    bg-red-600 hover:bg-red-700
-                    rounded-xl shadow-md shadow-red-100 
-                    transform active:scale-95 transition-all duration-200
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  "
-                >
-                  {restoringId === r.id ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <RotateCcw size={14} />
-                  )}
-                  {restoringId === r.id ? "Restoring..." : "Restore Member"}
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* PAGINATION CONTROLS */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-6 border-t border-red-100">
-              <p className="text-xs font-bold text-stone-400">
-                Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, residents.length)} of {residents.length}
-              </p>
-              
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={handlePrevPage} 
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-red-600 transition-all"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                
-                <div className="bg-red-50 px-4 py-1.5 rounded-lg border border-red-100">
-                   <span className="text-xs font-bold text-red-700">
-                    {currentPage} / {totalPages}
-                  </span>
-                </div>
-
-                <button 
-                  onClick={handleNextPage} 
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-red-600 transition-all"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
+        {residents.length === 0 ? (
+          // Empty State
+          <div className="flex flex-col items-center justify-center py-24 text-center bg-stone-50/50">
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-stone-300 mb-4 border border-stone-200">
+              <FileX size={32} />
             </div>
-          )}
-        </>
-      )}
+            <h3 className="text-stone-900 font-bold">No Records Found</h3>
+            <p className="text-xs text-stone-500 mt-1 max-w-xs">The archival database is currently empty.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-stone-50 border-b border-stone-200 text-xs uppercase tracking-wider text-stone-600 font-bold">
+                  <th className="px-6 py-4 w-24">Reference ID</th>
+                  <th className="px-6 py-4">Resident Name</th>
+                  <th className="px-6 py-4">Barangay</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 text-sm">
+                {currentData.map((r) => (
+                  <tr key={r.id} className="hover:bg-rose-50/30 transition-colors group">
+                    <td className="px-6 py-4 font-mono text-rose-400 text-xs font-medium">
+                      RES-{String(r.id).padStart(4, '0')}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-stone-800 group-hover:text-rose-900 transition-colors">
+                          {r.last_name}, {r.first_name}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-bold bg-stone-100 text-stone-600 border border-stone-200 uppercase tracking-wide">
+                        {r.barangay}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex gap-1.5 items-center px-2.5 py-1 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 uppercase tracking-wider">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+                        Archived
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => handleRestore(r.id)}
+                        disabled={restoringId === r.id}
+                        className="
+                          relative overflow-hidden inline-flex items-center gap-2 px-4 py-1.5 
+                          text-xs font-bold text-rose-700 
+                          bg-white border border-rose-200 
+                          hover:bg-rose-600 hover:text-white hover:border-rose-600
+                          rounded-sm transition-all duration-200
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          shadow-sm
+                        "
+                      >
+                        {restoringId === r.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <RotateCcw size={12} />
+                        )}
+                        {restoringId === r.id ? "PROCESSING" : "RESTORE"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* --- FOOTER PAGINATION --- */}
+        {totalPages > 1 && (
+          <div className="bg-stone-50 border-t border-stone-200 px-6 py-3 flex items-center justify-between">
+            <p className="text-xs font-medium text-stone-500">
+              Displaying <span className="font-bold text-stone-700">{indexOfFirstItem + 1}</span> to <span className="font-bold text-stone-700">{Math.min(indexOfLastItem, residents.length)}</span> of {residents.length} records
+            </p>
+            
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={handlePrevPage} 
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-sm border border-stone-300 text-stone-600 hover:bg-white hover:border-rose-300 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              
+              <div className="px-3 py-1 bg-white border border-stone-300 text-xs font-bold text-rose-900 rounded-sm">
+                 Page {currentPage} of {totalPages}
+              </div>
+
+              <button 
+                onClick={handleNextPage} 
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-sm border border-stone-300 text-stone-600 hover:bg-white hover:border-rose-300 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
