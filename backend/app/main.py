@@ -573,6 +573,22 @@ def soft_delete_resident(resident_id: int,
 
     return {"message": "Resident archived"}
 
+@app.delete("/residents/{resident_id}/permanent")
+def permanently_delete_resident(
+    resident_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    result = crud.permanently_delete_resident(db, resident_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    return {"message": "Resident permanently deleted"}
+
 # ---------------------------------------------------
 # RESTORE
 # ---------------------------------------------------

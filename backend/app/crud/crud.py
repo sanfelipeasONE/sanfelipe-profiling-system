@@ -288,6 +288,21 @@ def get_resident(db: Session, resident_id: int):
         .first()
     )
 
+# =====================================================
+# PERMANENT DELETE RESIDENTS
+# =====================================================
+def permanently_delete_resident(db: Session, resident_id: int):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id
+    ).first()
+
+    if not resident:
+        return None
+
+    db.delete(resident)
+    db.commit()
+
+    return True
 
 # =====================================================
 # COUNT RESIDENTS
