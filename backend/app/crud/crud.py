@@ -333,7 +333,8 @@ def get_residents(
 ):
     query = db.query(models.ResidentProfile).options(
         joinedload(models.ResidentProfile.family_members),
-        joinedload(models.ResidentProfile.sectors)
+        joinedload(models.ResidentProfile.sectors),
+        joinedload(models.ResidentProfile.assistances)
     )
     
     query = query.filter(models.ResidentProfile.is_deleted == False)
