@@ -278,7 +278,8 @@ def get_resident(db: Session, resident_id: int):
         db.query(models.ResidentProfile)
         .options(
             joinedload(models.ResidentProfile.family_members),
-            joinedload(models.ResidentProfile.sectors)
+            joinedload(models.ResidentProfile.sectors),
+            joinedload(models.ResidentProfile.assistances)
         )
         .filter(
         models.ResidentProfile.id == resident_id,
@@ -455,6 +456,7 @@ def add_assistance(db: Session, resident_id: int, assistance: schemas.Assistance
     db.commit()
     db.refresh(new_assistance)
     return new_assistance
+
 
     # ------------------------------
     # TOTAL RESIDENTS

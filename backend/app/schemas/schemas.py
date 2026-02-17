@@ -57,6 +57,17 @@ class AssistanceCreate(BaseModel):
     date_claimed: date | None = None
     amount: float | None = None
     implementing_office: str | None = None
+    
+class AssistanceOut(BaseModel):
+    id: int
+    type_of_assistance: str
+    date_processed: date | None
+    date_claimed: date | None
+    amount: float | None
+    implementing_office: str | None
+
+    class Config:
+        from_attributes = True
 
 
 
@@ -107,7 +118,8 @@ class Resident(ResidentBase):
     id: int
     created_at: Optional[datetime] = None
     family_members: List[FamilyMember] = []
-    sectors: List[Sector] = [] # Note: Assuming Sector schema exists above
+    sectors: List[Sector] = []
+    assistances: List[AssistanceOut] = []
 
     class Config:
         from_attributes = True

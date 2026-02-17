@@ -111,7 +111,7 @@ class ResidentProfile(Base):
     assistances = relationship(
     "ResidentAssistance",
     back_populates="resident",
-    cascade="all, delete"
+    cascade="all, delete-orphan"
 )
 
 class FamilyMember(Base):
