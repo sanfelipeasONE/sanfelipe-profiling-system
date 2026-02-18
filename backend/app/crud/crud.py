@@ -221,12 +221,11 @@ def archive_resident(db: Session, resident_id: int, user_id: int):
     resident.is_deleted = True
     resident.is_archived = True
 
-    # 🔥 ADD AUDIT LOG HERE
     log_action(
         db,
         user_id,
-        "Archived resident",
-        "resident",
+        "Deleted assistance",
+        "assistance",
         resident_id
     )
 
