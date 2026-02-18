@@ -203,7 +203,7 @@ export default function ResidentList({ userRole, onEdit }) {
     <div className="bg-stone-50 border-y border-stone-200 p-6 shadow-inner">
       <div className="flex items-center gap-2 mb-6 border-b border-stone-200 pb-2">
          <FileText size={16} className="text-rose-700"/>
-         <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wide">Detailed Resident Abstract</h3>
+         <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wide">Information Background</h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -689,7 +689,7 @@ export default function ResidentList({ userRole, onEdit }) {
             <tr className="bg-stone-200 border-b-2 border-stone-300 text-[11px] uppercase font-black text-stone-600 tracking-wider">
               <th className="py-3 px-4 w-10 text-center border-r border-stone-300">#</th>
               <th className="py-3 px-4 border-r border-stone-300 w-1/4">Resident Identity</th>
-              <th className="py-3 px-4 border-r border-stone-300">Birth Info</th>
+              <th className="py-3 px-4 border-r border-stone-300">Birthdate</th>
               <th className="py-3 px-4 border-r border-stone-300">Residency</th>
               <th className="py-3 px-4 border-r border-stone-300">Class/Sector</th>
               <th className="py-3 px-4 text-center">Admin</th>

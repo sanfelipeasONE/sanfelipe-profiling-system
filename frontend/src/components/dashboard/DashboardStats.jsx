@@ -4,7 +4,13 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { UsersRound, Building2, UserRound, ShieldAlert, Loader2 } from 'lucide-react';
+import { UsersRound, Building2, UserRound, ShieldAlert, Loader2, Activity } from 'lucide-react';
+
+// --- STYLE INJECTION FOR PUBLIC SANS (USWDS Standard) ---
+const govFontStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&display=swap');
+  .font-gov { font-family: 'Public Sans', system-ui, -apple-system, sans-serif; }
+`;
 
 export default function DashboardStats({ userRole }) {
   const [stats, setStats] = useState(null);
@@ -37,12 +43,13 @@ export default function DashboardStats({ userRole }) {
 
   if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] bg-white border border-stone-200 rounded-3xl p-12 text-center shadow-lg shadow-stone-200/50">
-        <div className="bg-red-50 p-4 rounded-full mb-6">
-          <ShieldAlert size={40} className="text-red-700" />
+      <div className="font-gov flex flex-col items-center justify-center min-h-[60vh] bg-stone-50 border border-stone-200 rounded-lg p-12 text-center">
+        <style>{govFontStyles}</style>
+        <div className="bg-red-50 p-4 rounded-full mb-6 border border-red-100">
+          <ShieldAlert size={40} className="text-red-900" />
         </div>
         <h2 className="text-2xl font-bold text-stone-900 tracking-tight">Access Restricted</h2>
-        <p className="text-stone-500 mt-3 max-w-sm mx-auto text-base leading-relaxed">
+        <p className="text-stone-600 mt-3 max-w-sm mx-auto text-base leading-relaxed">
           Global statistics are strictly limited to Administrator accounts.
         </p>
       </div>
@@ -51,7 +58,12 @@ export default function DashboardStats({ userRole }) {
 
   // --- LOADING STATE ---
   if (loading) {
-    return <BufferingLoader />;
+    return (
+        <>
+            <style>{govFontStyles}</style>
+            <BufferingLoader />
+        </>
+    );
   }
 
   // --- DATA PROCESSING ---
@@ -67,9 +79,8 @@ export default function DashboardStats({ userRole }) {
     { name: 'Female', value: stats?.total_female || 0 },
   ];
 
-  const GENDER_COLORS = ['#991b1b', '#ef4444']; // Dark Red (Male), Red (Female)
+  const GENDER_COLORS = ['#57534e', '#7f1d1d']; 
 
-  // Custom label render function for inside the donut
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -83,7 +94,7 @@ export default function DashboardStats({ userRole }) {
         fill="white" 
         textAnchor="middle" 
         dominantBaseline="central" 
-        className="text-xs font-bold"
+        className="text-xs font-bold font-gov"
       >
         {`${(percent * 100).toFixed(0)}%`}
       </text>
@@ -91,71 +102,63 @@ export default function DashboardStats({ userRole }) {
   };
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in duration-700">
+    <div className="font-gov space-y-8 pb-12 animate-in fade-in duration-700 bg-stone-50/50 p-6 rounded-xl">
+      <style>{govFontStyles}</style>
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-stone-200 pb-6">
         <div>
-          <h1 className="text-4xl font-extrabold text-stone-900 tracking-tight">
-            Overview
+          <h6 className="text-xs font-bold text-red-900/80 uppercase tracking-widest mb-1">
+            Municipality of San Felipe, Zambales
+          </h6>
+          <h1 className="text-3xl font-extrabold text-stone-900 tracking-tight">
+            Demographic Overview
           </h1>
-          <p className="text-stone-500 mt-2 text-base font-medium">
-            Municipality-wide demographic intelligence.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 px-4 py-1.5 bg-stone-100 rounded-full border border-stone-200">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-            <span className="text-xs font-semibold text-stone-500 uppercase tracking-widest">
-                Live Data
-            </span>
         </div>
       </div>
 
       {/* STAT CARDS ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
           title="Total Residents" 
           value={stats?.total_residents} 
-          icon={<UsersRound size={22} />} 
+          icon={<UsersRound size={20} />} 
         />
         <StatCard 
           title="Total Households" 
           value={stats?.total_households} 
-          icon={<Building2 size={22} />} 
+          icon={<Building2 size={20} />} 
         />
         <StatCard 
           title="Male Population" 
           value={stats?.total_male} 
-          icon={<UserRound size={22} />} 
+          icon={<UserRound size={20} />} 
         />
         <StatCard 
           title="Female Population" 
           value={stats?.total_female} 
-          icon={<UserRound size={22} />} 
+          icon={<UserRound size={20} />} 
         />
       </div>
 
       {/* CHARTS GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* BARANGAY CHART */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-stone-100 shadow-xl shadow-stone-200/40">
-          <div className="mb-8">
-            <h3 className="text-lg font-bold text-stone-900">Population Distribution</h3>
-            <p className="text-sm text-stone-400 font-medium">Residents per Barangay</p>
+        <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-stone-200 shadow-sm">
+          <div className="mb-6 border-b border-stone-100 pb-4">
+            <h3 className="text-base font-bold text-stone-900 uppercase tracking-wide">Population by Location</h3>
+            <p className="text-xs text-stone-500 mt-1">Recorded residents per Barangay unit</p>
           </div>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barangayData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f4" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
                 <XAxis 
                     dataKey="name" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: '#78716c', fontSize: 11 }}
+                    tick={{ fill: '#78716c', fontSize: 11, fontFamily: 'Public Sans', fontWeight: 600 }}
                     dy={10}
                     interval={0}
                     angle={-45}
@@ -165,25 +168,25 @@ export default function DashboardStats({ userRole }) {
                 <YAxis 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: '#78716c', fontSize: 12 }}
+                    tick={{ fill: '#78716c', fontSize: 11, fontFamily: 'Public Sans' }}
                 />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f5f5f4' }} />
                 <Bar 
                     dataKey="value" 
-                    fill="#991b1b" 
-                    radius={[6, 6, 0, 0]} 
-                    barSize={32}
+                    fill="#7f1d1d" // Maroon
+                    radius={[2, 2, 0, 0]} 
+                    barSize={24}
                 />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* --- UPDATED GENDER DONUT CHART --- */}
-        <div className="lg:col-span-1 bg-white rounded-3xl p-8 border border-stone-100 shadow-xl shadow-stone-200/40 flex flex-col">
-          <div className="mb-4">
-            <h3 className="text-lg font-bold text-stone-900">Gender Split</h3>
-            <p className="text-sm text-stone-400 font-medium">Demographic Ratio</p>
+        {/* GENDER DONUT CHART */}
+        <div className="lg:col-span-1 bg-white rounded-lg p-6 border border-stone-200 shadow-sm flex flex-col">
+          <div className="mb-4 border-b border-stone-100 pb-4">
+            <h3 className="text-base font-bold text-stone-900 uppercase tracking-wide">Gender Ratio</h3>
+            <p className="text-xs text-stone-500 mt-1">Demographic distribution split</p>
           </div>
           
           <div className="flex-1 relative min-h-[250px]">
@@ -193,14 +196,13 @@ export default function DashboardStats({ userRole }) {
                   data={genderData}
                   cx="50%"
                   cy="50%"
-                  // Increased thickness (inner 60 vs 70)
-                  innerRadius={60}
+                  innerRadius={65}
                   outerRadius={100}
-                  paddingAngle={4}
+                  paddingAngle={2}
                   dataKey="value"
                   stroke="none"
                   labelLine={false}
-                  label={renderCustomizedLabel} // Adds the % inside
+                  label={renderCustomizedLabel}
                 >
                   {genderData.map((_, i) => (
                     <Cell key={`cell-${i}`} fill={GENDER_COLORS[i % GENDER_COLORS.length]} />
@@ -210,10 +212,10 @@ export default function DashboardStats({ userRole }) {
               </PieChart>
             </ResponsiveContainer>
 
-            {/* Center Text: Total Count */}
+            {/* Center Text */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center">
-                    <span className="block text-3xl font-extrabold text-stone-900 tracking-tight">
+                    <span className="block text-2xl font-extrabold text-stone-900 tabular-nums tracking-tight">
                         {(stats?.total_residents || 0).toLocaleString()}
                     </span>
                     <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
@@ -223,16 +225,16 @@ export default function DashboardStats({ userRole }) {
             </div>
           </div>
 
-          {/* Custom Clean Legend Below Chart */}
-          <div className="mt-4 flex flex-col gap-3 border-t border-stone-100 pt-6">
+          {/* Legend */}
+          <div className="mt-4 flex flex-col gap-2 pt-4 border-t border-stone-100">
             {genderData.map((entry, index) => (
-              <div key={entry.name} className="flex items-center justify-between group">
-                <div className="flex items-center gap-3">
+              <div key={entry.name} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <div 
-                    className="w-3 h-3 rounded-full ring-2 ring-white shadow-sm"
+                    className="w-3 h-3 rounded-sm"
                     style={{ backgroundColor: GENDER_COLORS[index] }}
                   />
-                  <span className="text-sm font-semibold text-stone-600 group-hover:text-stone-900 transition-colors">
+                  <span className="text-xs font-bold text-stone-600 uppercase tracking-wide">
                     {entry.name}
                   </span>
                 </div>
@@ -243,44 +245,43 @@ export default function DashboardStats({ userRole }) {
             ))}
           </div>
         </div>
-        {/* --- END UPDATED CHART --- */}
 
       </div>
 
       {/* SECTOR LIST CHART */}
-      <div className="bg-white rounded-3xl p-8 border border-stone-100 shadow-xl shadow-stone-200/40">
-        <div className="flex items-center justify-between mb-8">
+      <div className="bg-white rounded-lg p-6 border border-stone-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6 border-b border-stone-100 pb-4">
             <div>
-                <h3 className="text-lg font-bold text-stone-900">Sector Breakdown</h3>
-                <p className="text-sm text-stone-400 font-medium">Population by Sector Classification</p>
+                <h3 className="text-base font-bold text-stone-900 uppercase tracking-wide">Sector Classification</h3>
+                <p className="text-xs text-stone-500 mt-1">Census breakdown by occupation/sector</p>
             </div>
         </div>
 
         <div className="w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height={Math.max(400, sectorData.length * 60)}>
+            <ResponsiveContainer width="100%" height={Math.max(400, sectorData.length * 50)}>
               <BarChart
                 layout="vertical"
                 data={sectorData}
                 margin={{ top: 0, right: 30, left: 30, bottom: 0 }}
                 barGap={4}
               >
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f5f5f4" />
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e7e5e4" />
                 <XAxis type="number" hide />
                 <YAxis 
                     type="category" 
                     dataKey="name" 
-                    width={150}
-                    tick={{ fill: '#44403c', fontSize: 13, fontWeight: 500 }}
+                    width={180}
+                    tick={{ fill: '#44403c', fontSize: 12, fontWeight: 600, fontFamily: 'Public Sans' }}
                     axisLine={false}
                     tickLine={false}
                 />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: '#fafaf9' }} />
                 <Bar 
                     dataKey="value" 
-                    fill="#991b1b" 
-                    radius={[0, 6, 6, 0]} 
-                    barSize={24}
-                    background={{ fill: '#f5f5f4', radius: [0, 6, 6, 0] }}
+                    fill="#7f1d1d" // Maroon
+                    radius={[0, 4, 4, 0]} 
+                    barSize={20}
+                    background={{ fill: '#f5f5f4', radius: [0, 4, 4, 0] }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -295,24 +296,19 @@ export default function DashboardStats({ userRole }) {
 
 function StatCard({ title, value, icon }) {
   return (
-    <div className="group relative overflow-hidden bg-white p-6 rounded-3xl border border-stone-100 shadow-lg shadow-stone-200/50 hover:shadow-stone-300/50 hover:-translate-y-1 transition-all duration-300">
+    <div className="bg-white p-5 rounded-lg border border-stone-200 shadow-sm hover:shadow-md hover:border-red-200 transition-all duration-200">
       <div className="flex justify-between items-start">
-        <div className="space-y-4 relative z-10">
-            <div className="w-12 h-12 flex items-center justify-center bg-stone-50 border border-stone-100 text-stone-600 rounded-2xl shadow-sm group-hover:bg-red-600 group-hover:text-white group-hover:shadow-red-200 transition-all duration-300">
-                {icon}
-            </div>
-            <div>
-                <p className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">
-                    {title}
-                </p>
-                <h4 className="text-3xl font-extrabold text-stone-900 tabular-nums tracking-tight">
-                    {(value || 0).toLocaleString()}
-                </h4>
-            </div>
+        <div className="space-y-1">
+            <p className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">
+                {title}
+            </p>
+            <h4 className="text-2xl font-extrabold text-stone-900 tabular-nums tracking-tight">
+                {(value || 0).toLocaleString()}
+            </h4>
         </div>
-        
-        {/* Decorative Background Element */}
-        <div className="absolute -top-6 -right-6 w-32 h-32 bg-stone-50 rounded-full group-hover:bg-red-50 transition-colors duration-500 z-0" />
+        <div className="w-10 h-10 flex items-center justify-center bg-stone-50 text-red-900 rounded-md border border-stone-100">
+             {icon}
+        </div>
       </div>
     </div>
   );
@@ -321,8 +317,8 @@ function StatCard({ title, value, icon }) {
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-stone-900/95 backdrop-blur text-white p-4 rounded-xl shadow-2xl border border-stone-800">
-          <p className="text-sm font-medium text-stone-300 mb-1">{label}</p>
+        <div className="bg-stone-900 text-white p-3 rounded-md shadow-xl border border-stone-800 text-xs">
+          <p className="font-bold text-stone-400 mb-1 uppercase tracking-wider">{label}</p>
           <p className="text-lg font-bold text-white tabular-nums">
             {payload[0].value.toLocaleString()}
           </p>
@@ -332,37 +328,27 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-// --- UPDATED LOADING COMPONENT ---
+// --- LOADING COMPONENT ---
 function BufferingLoader() {
     return (
-        <div className="relative min-h-[80vh] w-full">
-            {/* 1. Background Skeleton (Kept subtle for context) */}
-            <div className="space-y-8 opacity-10 blur-[2px] pointer-events-none select-none transition-all duration-500">
-                <div className="flex justify-between items-end">
-                   <div className="space-y-3">
-                       <div className="h-10 w-48 bg-stone-400 rounded-lg"></div>
-                       <div className="h-4 w-64 bg-stone-300 rounded-lg"></div>
-                   </div>
+        <div className="relative min-h-[80vh] w-full bg-stone-50 p-6 font-gov">
+            {/* 1. Background Skeleton */}
+            <div className="space-y-8 opacity-20 pointer-events-none select-none">
+                <div className="flex justify-between items-end border-b border-stone-300 pb-4">
+                   <div className="h-8 w-48 bg-stone-400 rounded-sm"></div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[...Array(4)].map((_, i) => (
-                        <div key={i} className="h-40 bg-stone-200 rounded-3xl"></div>
+                        <div key={i} className="h-32 bg-stone-300 rounded-md"></div>
                     ))}
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 h-80 bg-stone-200 rounded-3xl"></div>
-                    <div className="lg:col-span-1 h-80 bg-stone-200 rounded-3xl"></div>
                 </div>
             </div>
 
-            {/* 2. Clean Loader Overlay */}
+            {/* 2. Loader Overlay */}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                {/* Red Spinner */}
-                <Loader2 size={48} className="text-red-500 animate-spin mb-4" strokeWidth={2.5} />
-                
-                {/* Text: SYNCING RECORDS... */}
-                <p className="text-sm font-bold text-stone-500 uppercase tracking-[0.2em] animate-pulse">
-                    Syncing Records...
+                <Loader2 size={32} className="text-red-900 animate-spin mb-4" />
+                <p className="text-xs font-bold text-stone-600 uppercase tracking-widest">
+                    Retrieving Data...
                 </p>
             </div>
         </div>
