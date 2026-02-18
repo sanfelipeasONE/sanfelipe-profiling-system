@@ -152,15 +152,42 @@ async def get_current_user(
 # ---------------------------------------------------
 
 @app.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends(),
-          db: Session = Depends(get_db)):
-
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     user = db.query(models.User).filter(
         models.User.username == form_data.username
     ).first()
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    # 🔒 Check if account is locked
+    if user.locked_until and user.locked_until > datetime.utcnow():
+        raise HTTPException(
+            status_code=403,
+            detail="Account locked. Try again later."
+        )
+
+    # 🔐 Check password
+    if not verify_password(form_data.password, user.hashed_password):
+
+        user.failed_attempts += 1
+
+        # Lock after 5 failed attempts
+        if user.failed_attempts >= 5:
+            user.locked_until = datetime.utcnow() + timedelta(minutes=1)
+            user.failed_attempts = 0
+
+        db.commit()
+
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    # ✅ Successful login
+    user.failed_attempts = 0
+    user.locked_until = None
+    db.commit()
 
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role}

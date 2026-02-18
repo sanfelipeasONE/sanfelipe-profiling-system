@@ -18,6 +18,9 @@ class User(Base):
     hashed_password = Column(String)
     role = Column(String, default="admin")
     
+    failed_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime, nullable=True)
+    
     is_archived = Column(Boolean, default=False)
     archived_at = Column(DateTime(timezone=True), nullable=True)
 
