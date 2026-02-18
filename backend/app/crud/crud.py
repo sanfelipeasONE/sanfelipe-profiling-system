@@ -20,12 +20,24 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     valid_columns = {c.name for c in models.ResidentProfile.__table__.columns}
     filtered_data = {k: v for k, v in resident_data.items() if k in valid_columns}
 
-    # 🔥 Optional: normalize to avoid fake duplicates
-    if "first_name" in filtered_data:
-        filtered_data["first_name"] = filtered_data["first_name"].strip().title()
-    if "last_name" in filtered_data:
-        filtered_data["last_name"] = filtered_data["last_name"].strip().title()
+    # 🔥 Normalize identity fields (avoid fake duplicates)
+    for field in ["first_name", "last_name", "barangay"]:
+        if field in filtered_data and filtered_data[field]:
+            filtered_data[field] = filtered_data[field].strip().upper()
 
+    # 🔎 CHECK IF ALREADY EXISTS (excluding deleted)
+    existing = db.query(models.ResidentProfile).filter(
+        func.upper(models.ResidentProfile.first_name) == filtered_data.get("first_name"),
+        func.upper(models.ResidentProfile.last_name) == filtered_data.get("last_name"),
+        models.ResidentProfile.birthdate == filtered_data.get("birthdate"),
+        func.upper(models.ResidentProfile.barangay) == filtered_data.get("barangay"),
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if existing:
+        raise ValueError("Resident already registered.")
+
+    # ✅ Only create if no duplicate
     db_resident = models.ResidentProfile(**filtered_data)
     db.add(db_resident)
 
