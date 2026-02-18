@@ -198,6 +198,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       if (residentToEdit) {
         await api.put(`/residents/${residentToEdit.id}`, formData);
@@ -213,9 +214,13 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           onSuccess();
         }, 1000);
       }
-    } catch (error) { 
-      toast.error("Submission Failed: Please check your input."); 
-      setLoading(false); 
+    } catch (err) {
+      if (err.response?.data?.detail) {
+        toast.error(err.response.data.detail);
+      } else {
+        toast.error("Registration failed.");
+      }
+      setLoading(false);
     }
   };
 

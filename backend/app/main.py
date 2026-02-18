@@ -276,7 +276,11 @@ def create_resident(resident: schemas.ResidentCreate,
                 break
         resident.barangay = official_name or current_user.username.replace("_", " ").title()
 
-    return crud.create_resident(db=db, resident=resident)
+    try:
+        return crud.create_resident(db=db, resident=resident)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.put("/residents/{resident_id}", response_model=schemas.Resident)
 def update_resident(

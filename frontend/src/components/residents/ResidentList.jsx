@@ -28,7 +28,8 @@ export default function ResidentList({ userRole, onEdit }) {
   const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const [assistanceModal, setAssistanceModal] = useState({ isOpen: false, resident: null });
+  const [assistanceModal, setAssistanceModal] = useState({ isOpen: false, resident: null, assistance: null });
+  const [deleteAssistanceModal, setDeleteAssistanceModal] = useState({ isOpen: false, assistance: null })
 
 
   // --- HELPERS ---
@@ -179,6 +180,22 @@ export default function ResidentList({ userRole, onEdit }) {
     }
   };
 
+  const handleDeleteAssistance = async (id) => {
+  try {
+    await api.delete(`/assistances/${id}`);
+    toast.success("Assistance record deleted.");
+
+    setDeleteAssistanceModal({
+      isOpen: false,
+      assistance: null
+    });
+
+    fetchResidents();
+
+  } catch {
+    toast.error("Failed to delete assistance.");
+  }
+};
 
 
   // --- DETAILS SUB-COMPONENT ---
@@ -229,6 +246,7 @@ export default function ResidentList({ userRole, onEdit }) {
                     <th className="pb-2 font-normal">Claimed</th>
                     <th className="pb-2 font-normal">Amount</th>
                     <th className="pb-2 font-normal">Office</th>
+                    <th className="pb-2 font-normal text-right">Actions</th> {/* ADD THIS */}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -237,12 +255,46 @@ export default function ResidentList({ userRole, onEdit }) {
                       <td className="py-2 font-bold text-stone-700 uppercase">
                         {a.type_of_assistance}
                       </td>
+
                       <td className="py-2">{a.date_processed || "-"}</td>
                       <td className="py-2">{a.date_claimed || "-"}</td>
+
                       <td className="py-2">
                         {a.amount ? `₱${a.amount.toLocaleString()}` : "-"}
                       </td>
+
                       <td className="py-2">{a.implementing_office || "-"}</td>
+
+                      {/* 🔥 ACTIONS COLUMN */}
+                      <td className="py-2 text-right">
+                        {userRole === "admin" && (
+                        <div className="flex justify-end gap-2">
+
+                          {/* EDIT */}
+                          <button
+                            onClick={() =>
+                              setAssistanceModal({
+                                isOpen: true,
+                                resident: r,
+                                assistance: a
+                              })
+                            }
+                            className="text-indigo-600 hover:text-indigo-800"
+                          >
+                            <Edit size={14} />
+                          </button>
+
+                          {/* DELETE */}
+                          <button
+                            onClick={() => handleDeleteAssistance(a.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+
+                        </div>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -341,7 +393,7 @@ export default function ResidentList({ userRole, onEdit }) {
           <div className="relative bg-white w-[500px] rounded-sm border shadow-2xl p-6">
 
             <h3 className="text-sm font-bold uppercase mb-4">
-              Add Assistance – {assistanceModal.resident?.last_name}
+              {assistanceModal.assistance ? "Edit Assistance" : "Add Assistance"} – {assistanceModal.resident?.last_name}
             </h3>
 
             <form
@@ -349,29 +401,47 @@ export default function ResidentList({ userRole, onEdit }) {
                 e.preventDefault();
                 const formData = new FormData(e.target);
 
-                try {
-                  await api.post(
-                    `/residents/${assistanceModal.resident.id}/assistance`,
-                    {
-                      type_of_assistance: formData.get("type"),
-                      date_processed: formData.get("processed"),
-                      date_claimed: formData.get("claimed"),
-                      amount: formData.get("amount"),
-                      implementing_office: formData.get("office")
-                    }
-                  );
+                const payload = {
+                  type_of_assistance: formData.get("type"),
+                  date_processed: formData.get("processed") || null,
+                  date_claimed: formData.get("claimed") || null,
+                  amount: formData.get("amount") || null,
+                  implementing_office: formData.get("office") || null,
+                };
 
-                  toast.success("Assistance recorded.");
-                  setAssistanceModal({ isOpen: false, resident: null });
+                try {
+
+                  if (assistanceModal.assistance) {
+                    // ✏ EDIT MODE
+                    await api.put(
+                      `/assistances/${assistanceModal.assistance.id}`,
+                      payload
+                    );
+                    toast.success("Assistance updated.");
+                  } else {
+                    // ➕ ADD MODE
+                    await api.post(
+                      `/residents/${assistanceModal.resident.id}/assistance`,
+                      payload
+                    );
+                    toast.success("Assistance recorded.");
+                  }
+
+                  setAssistanceModal({
+                    isOpen: false,
+                    resident: null,
+                    assistance: null
+                  });
+
                   fetchResidents();
 
                 } catch {
-                  toast.error("Failed to add assistance.");
+                  toast.error("Operation failed.");
                 }
               }}
             >
 
-              <select name="type" className="w-full border p-2 mb-3 text-sm">
+              <select name="type" className="w-full border p-2 mb-3 text-sm" defaultValue={assistanceModal.assistance?.type_of_assistance}>
                 <option>Burial Assistance</option>
                 <option>Financial</option>
                 <option>Educational</option>
@@ -381,13 +451,13 @@ export default function ResidentList({ userRole, onEdit }) {
               </select>
               
               <label className="block text-sm mb-1">Date Processed</label>
-              <input type="date" name="processed" className="w-full border p-2 mb-3 text-sm" />
+              <input type="date" name="processed" className="w-full border p-2 mb-3 text-sm" defaultValue={assistanceModal.assistance?.date_processed} />
 
               <label className="block text-sm mb-1">Date Claimed</label>
-              <input type="date" name="claimed" className="w-full border p-2 mb-3 text-sm" />
+              <input type="date" name="claimed" className="w-full border p-2 mb-3 text-sm" defaultValue={assistanceModal.assistance?.date_claimed} />
 
-              <input type="number" name="amount" placeholder="Amount" className="w-full border p-2 mb-3 text-sm" />
-              <input type="text" name="office" placeholder="Implementing Office" className="w-full border p-2 mb-4 text-sm" />
+              <input type="number" name="amount" placeholder="Amount" className="w-full border p-2 mb-3 text-sm" defaultValue={assistanceModal.assistance?.amount} />
+              <input type="text" name="office" placeholder="Implementing Office" className="w-full border p-2 mb-4 text-sm" defaultValue={assistanceModal.assistance?.implementing_office} />
 
               <div className="flex justify-end gap-2">
                 <button
@@ -407,6 +477,64 @@ export default function ResidentList({ userRole, onEdit }) {
               </div>
 
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+      {deleteAssistanceModal.isOpen && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+
+          {/* BACKDROP */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setDeleteAssistanceModal({ isOpen: false, assistance: null })}
+          />
+
+          {/* MODAL */}
+          <div className="relative bg-white w-[420px] rounded-sm border shadow-2xl overflow-hidden">
+
+            {/* HEADER */}
+            <div className="bg-red-700 text-white px-5 py-4 flex items-center gap-3">
+              <Trash2 size={18} />
+              <h3 className="text-sm font-bold uppercase tracking-wider">
+                Delete Assistance Record
+              </h3>
+            </div>
+
+            {/* BODY */}
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-stone-700">
+                You are about to permanently remove this assistance record:
+              </p>
+
+              <p className="text-xs font-bold text-red-700 uppercase">
+                {deleteAssistanceModal.assistance?.type_of_assistance}
+              </p>
+
+              <p className="text-xs text-stone-500">
+                This action cannot be undone.
+              </p>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() =>
+                    setDeleteAssistanceModal({ isOpen: false, assistance: null })
+                  }
+                  className="px-4 py-2 border border-stone-300 text-xs font-bold uppercase rounded-sm hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={() =>
+                    handleDeleteAssistance(deleteAssistanceModal.assistance.id)
+                  }
+                  className="px-4 py-2 bg-red-700 text-white text-xs font-bold uppercase rounded-sm hover:bg-red-800"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>,
         document.body
@@ -626,7 +754,7 @@ export default function ResidentList({ userRole, onEdit }) {
                     {/* ACTIONS */}
                     <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => onEdit(r)} className="p-1.5 text-stone-500 hover:text-white hover:bg-stone-700 rounded-sm transition-all" title="Edit File">
+                          <button onClick={() => onEdit(r)} className="p-1.5 text-stone-500 hover:text-white hover:bg-stone-700 rounded-sm transition-all" title="Edit Residents">
                              <Edit size={14} />
                           </button>
                           {userRole === "admin" && (
@@ -638,12 +766,17 @@ export default function ResidentList({ userRole, onEdit }) {
                               <FileText size={14} />
                             </button>
                           )}
-                          <button onClick={() => handleArchive(r.id)} className="p-1.5 text-stone-500 hover:text-white hover:bg-orange-600 rounded-sm transition-all" title="Archive File">
-                             <Archive size={14} />
-                          </button>
-                          <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: `${r.first_name} ${r.last_name}` })} className="p-1.5 text-stone-500 hover:text-white hover:bg-red-700 rounded-sm transition-all" title="Delete File">
-                             <Trash2 size={14} />
-                          </button>
+                          {userRole === "admin" && (
+                            <>
+                              {/* ARCHIVE */}
+                              <button
+                                onClick={() => handleArchive(r.id)}
+                                className="text-amber-600 hover:text-amber-800" title="Archive Residents"
+                              >
+                                <Archive size={14} />
+                              </button>
+                            </>
+                          )}
                        </div>
                     </td>
                   </tr>

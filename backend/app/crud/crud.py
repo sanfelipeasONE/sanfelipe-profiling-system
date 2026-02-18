@@ -3,6 +3,7 @@ from sqlalchemy import or_, func
 from app import models, schemas
 from datetime import datetime
 from app.core.audit import log_action
+from sqlalchemy.exc import IntegrityError
 
 
 
@@ -19,10 +20,21 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     valid_columns = {c.name for c in models.ResidentProfile.__table__.columns}
     filtered_data = {k: v for k, v in resident_data.items() if k in valid_columns}
 
+    # 🔥 Optional: normalize to avoid fake duplicates
+    if "first_name" in filtered_data:
+        filtered_data["first_name"] = filtered_data["first_name"].strip().title()
+    if "last_name" in filtered_data:
+        filtered_data["last_name"] = filtered_data["last_name"].strip().title()
+
     db_resident = models.ResidentProfile(**filtered_data)
     db.add(db_resident)
-    db.commit()
-    db.refresh(db_resident)
+
+    try:
+        db.commit()
+        db.refresh(db_resident)
+    except IntegrityError:
+        db.rollback()
+        raise ValueError("Resident already registered.")
 
     # Attach sectors
     if sector_ids:
@@ -31,13 +43,10 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         ).all()
 
         db_resident.sectors = sectors
-
-        # 🔥 AUTO GENERATE SUMMARY
         sector_names = [s.name for s in sectors]
         db_resident.sector_summary = ", ".join(sector_names)
     else:
         db_resident.sector_summary = "None"
-
 
     # Add family members
     for member_data in family_members_data:
@@ -51,7 +60,6 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     db.refresh(db_resident)
 
     return db_resident
-
 
 # =====================================================
 # UPDATE RESIDENT
