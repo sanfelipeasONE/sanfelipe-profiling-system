@@ -724,7 +724,7 @@ export default function ResidentList({ userRole, onEdit }) {
                     {/* IDENTITY */}
                     <td className="py-3 px-4 border-r border-stone-200">
                        <div className="flex flex-col">
-                          <span className="font-bold text-stone-800 uppercase text-[13px]">{r.last_name}, {r.first_name} {r.ext_name || ''}</span>
+                          <span className="font-bold text-stone-800 uppercase text-[13px]">{r.last_name}, {r.first_name}, {r.middle_name} {r.ext_name || ''}</span>
                           <div className="flex items-center gap-2 mt-0.5">
                              <span className="text-[10px] bg-stone-100 border border-stone-200 px-1 rounded text-stone-500 font-mono">{r.sex}</span>
                              <span className="text-[10px] text-rose-700 font-bold uppercase">{r.occupation || "N/A"}</span>
