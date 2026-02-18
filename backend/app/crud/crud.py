@@ -24,18 +24,24 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     for field in ["first_name", "middle_name", "last_name"]:
         if field in filtered_data and filtered_data[field]:
             filtered_data[field] = filtered_data[field].strip().upper()
+        else:
+            filtered_data[field] = ""
 
-    # 🔎 Check duplicate by FULL NAME only
+    # 🔥 Ensure birthdate exists
+    if not filtered_data.get("birthdate"):
+        raise ValueError("Birthdate is required.")
+
+    # 🔎 Duplicate check (Full name + birthdate)
     existing = db.query(models.ResidentProfile).filter(
-        func.upper(models.ResidentProfile.first_name) == filtered_data.get("first_name"),
-        func.upper(models.ResidentProfile.middle_name) == filtered_data.get("middle_name"),
-        func.upper(models.ResidentProfile.last_name) == filtered_data.get("last_name"),
+        func.upper(func.coalesce(models.ResidentProfile.first_name, "")) == filtered_data["first_name"],
+        func.upper(func.coalesce(models.ResidentProfile.middle_name, "")) == filtered_data["middle_name"],
+        func.upper(func.coalesce(models.ResidentProfile.last_name, "")) == filtered_data["last_name"],
+        models.ResidentProfile.birthdate == filtered_data["birthdate"],
         models.ResidentProfile.is_deleted == False
     ).first()
 
     if existing:
         raise ValueError("Resident already registered.")
-
 
     # ✅ Only create if no duplicate
     db_resident = models.ResidentProfile(**filtered_data)
@@ -120,6 +126,33 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
                 profile_id=resident_id
             )
             db.add(new_fm)
+    
+    # 🔥 Normalize identity fields
+    for field in ["first_name", "middle_name", "last_name"]:
+        value = getattr(db_resident, field)
+        if value:
+            setattr(db_resident, field, value.strip().upper())
+        else:
+            setattr(db_resident, field, "")
+
+    # 🔥 Ensure birthdate exists
+    if not db_resident.birthdate:
+        raise ValueError("Birthdate is required.")
+
+    # 🔎 Duplicate check (exclude self)
+    existing = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id != resident_id,
+        func.upper(func.coalesce(models.ResidentProfile.first_name, "")) == db_resident.first_name,
+        func.upper(func.coalesce(models.ResidentProfile.middle_name, "")) == db_resident.middle_name,
+        func.upper(func.coalesce(models.ResidentProfile.last_name, "")) == db_resident.last_name,
+        models.ResidentProfile.birthdate == db_resident.birthdate,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if existing:
+        db.rollback()
+        raise ValueError("Resident already registered.")
+
 
     db.commit()
     db.refresh(db_resident)
