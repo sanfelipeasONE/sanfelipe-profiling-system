@@ -463,6 +463,10 @@ def get_dashboard_stats(db: Session):
         "population_by_sector": stats_sector
     }
 
+# ----------------------
+# ADD ASSISTANCE
+# ----------------------
+
 def add_assistance(db: Session, resident_id: int, assistance: schemas.AssistanceCreate):
     new_assistance = models.ResidentAssistance(
         resident_id=resident_id,
@@ -472,6 +476,38 @@ def add_assistance(db: Session, resident_id: int, assistance: schemas.Assistance
     db.commit()
     db.refresh(new_assistance)
     return new_assistance
+
+def update_assistance(db: Session, assistance_id: int, data: schemas.AssistanceUpdate):
+    assistance = db.query(models.ResidentAssistance).filter(
+        models.ResidentAssistance.id == assistance_id
+    ).first()
+
+    if not assistance:
+        return None
+
+    update_data = data.model_dump(exclude_unset=True)
+
+    for key, value in update_data.items():
+        setattr(assistance, key, value)
+
+    db.commit()
+    db.refresh(assistance)
+
+    return assistance
+
+
+def delete_assistance(db: Session, assistance_id: int):
+    assistance = db.query(models.ResidentAssistance).filter(
+        models.ResidentAssistance.id == assistance_id
+    ).first()
+
+    if not assistance:
+        return None
+
+    db.delete(assistance)
+    db.commit()
+
+    return True
 
 
     # ------------------------------

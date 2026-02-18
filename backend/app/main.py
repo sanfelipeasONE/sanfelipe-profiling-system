@@ -309,6 +309,41 @@ def create_assistance(
 
     return crud.add_assistance(db, resident_id, assistance)
 
+@app.put("/assistances/{assistance_id}")
+def edit_assistance(
+    assistance_id: int,
+    assistance: schemas.AssistanceUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403)
+
+    result = crud.update_assistance(db, assistance_id, assistance)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Assistance not found")
+
+    return result
+
+
+@app.delete("/assistances/{assistance_id}")
+def remove_assistance(
+    assistance_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403)
+
+    result = crud.delete_assistance(db, assistance_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Assistance not found")
+
+    return {"message": "Assistance record deleted"}
+
+
 
 # ------------------------------
 # ARCHIVED ROUTE (MUST BE FIRST)

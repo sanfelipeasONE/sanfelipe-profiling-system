@@ -124,6 +124,13 @@ class Resident(ResidentBase):
     class Config:
         from_attributes = True
 
+class AssistanceUpdate(BaseModel):
+    type_of_assistance: str | None = None
+    date_processed: date | None = None
+    date_claimed: date | None = None
+    amount: float | None = None
+    implementing_office: str | None = None
+
 class ResidentPagination(BaseModel):
     items: List[Resident]
     total: int
