@@ -1,260 +1,177 @@
+import io
 import pandas as pd
+from datetime import date
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
-from app.models.models import ResidentProfile, FamilyMember
+from app import models
 
 
-# ===============================
-# CLEAN STRING
-# ===============================
-def clean_str(val):
-    if val is None:
+# --------------------------------------------------
+# HELPERS
+# --------------------------------------------------
+
+def calculate_age(birthdate):
+    if not birthdate:
         return ""
-    text = str(val).strip()
-    if text.lower() in ["nan", "none", "null", "-", "na", "n/a"]:
-        return ""
-    return text
+    today = date.today()
+    return (
+        today.year
+        - birthdate.year
+        - ((today.month, today.day) < (birthdate.month, birthdate.day))
+    )
 
 
-# ===============================
-# PARSE DATE
-# ===============================
-def parse_date(date_val):
-    if date_val is None or pd.isna(date_val):
-        return None
-
-    if isinstance(date_val, pd.Timestamp):
-        return date_val.date()
-
-    if isinstance(date_val, (int, float)):
-        try:
-            return pd.to_datetime(date_val, origin="1899-12-30", unit="D").date()
-        except:
-            return None
-
-    try:
-        return pd.to_datetime(clean_str(date_val)).date()
-    except:
-        return None
+def excel_col_letter(col_idx):
+    letter = ""
+    while col_idx >= 0:
+        letter = chr(col_idx % 26 + 65) + letter
+        col_idx = col_idx // 26 - 1
+    return letter
 
 
-# ===============================
-# CHECK RESIDENT EXISTS
-# (Now includes birthdate)
-# ===============================
-def resident_exists(db: Session, last_name, first_name, middle_name, birthdate, barangay):
-    return db.query(ResidentProfile).filter(
-        and_(
-            func.upper(ResidentProfile.last_name) == last_name.upper(),
-            func.upper(ResidentProfile.first_name) == first_name.upper(),
-            func.upper(func.coalesce(ResidentProfile.middle_name, "")) == middle_name.upper(),
-            ResidentProfile.birthdate == birthdate,
-            ResidentProfile.barangay == barangay,
-            ResidentProfile.is_deleted == False
+# --------------------------------------------------
+# MAIN EXPORT FUNCTION
+# --------------------------------------------------
+
+def generate_household_excel(db: Session, barangay_name: str = None):
+
+    # 1️⃣ FETCH DATA
+    query = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.is_deleted == False
+    )
+
+    if barangay_name:
+        query = query.filter(
+            models.ResidentProfile.barangay.ilike(f"%{barangay_name}%")
         )
-    ).first()
 
+    residents = query.order_by(
+        models.ResidentProfile.barangay,
+        models.ResidentProfile.last_name
+    ).all()
 
-# ===============================
-# CHECK IF FAMILY MEMBER EXISTS
-# ===============================
-def family_member_exists(db: Session, profile_id, lname, fname, rel):
-    return db.query(FamilyMember).filter(
-        and_(
-            FamilyMember.profile_id == profile_id,
-            FamilyMember.last_name == lname,
-            FamilyMember.first_name == fname,
-            FamilyMember.relationship == rel
-        )
-    ).first()
+    # 2️⃣ DETERMINE MAX FAMILY MEMBERS
+    max_family_count = 0
+    for r in residents:
+        max_family_count = max(max_family_count, len(r.family_members))
 
+    # 3️⃣ TRANSFORM DATA
+    data_list = []
 
-# ===============================
-# CHECK IF SECTOR CHECKED
-# ===============================
-def is_checked(value):
-    val = clean_str(value).lower()
+    for r in residents:
 
-    if val in ["\\", "/", "✓", "1", "yes", "y", "true"]:
-        return True
+        mi = f"{r.middle_name[0]}." if r.middle_name else ""
+        full_name = f"{r.last_name}, {r.first_name} {mi} {r.ext_name or ''}".strip()
 
-    if val != "":
-        return True
+        spouse_name = ""
+        if r.spouse_first_name:
+            s_mi = f"{r.spouse_middle_name[0]}." if r.spouse_middle_name else ""
+            spouse_name = f"{r.spouse_last_name}, {r.spouse_first_name} {s_mi} {r.spouse_ext_name or ''}".strip()
 
-    return False
+        total_members = 1 + len(r.family_members)
 
+        row = {
+            "Barangay": r.barangay,
+            "Purok": r.purok,
+            "House #": r.house_no,
+            "Household Head": full_name.upper(),
+            "Spouse": spouse_name.upper(),
+            "Sex": r.sex,
+            "Birthdate": r.birthdate,
+            "Age": calculate_age(r.birthdate),
+            "Civil Status": r.civil_status,
+            "Religion": r.religion,
+            "Occupation": r.occupation,
+            "Precinct No": r.precinct_no,
+            "Contact": r.contact_no,
+            "Total Members": total_members,
+            "Sectors": r.sector_summary,
+        }
 
-# ===============================
-# MAIN IMPORT FUNCTION
-# ===============================
-def process_excel_import(file_content, db: Session):
+        # Dynamic Family Members
+        for i in range(max_family_count):
+            if i < len(r.family_members):
+                fm = r.family_members[i]
+                row[f"{i+1}. LAST NAME"] = fm.last_name
+                row[f"{i+1}. FIRST NAME"] = fm.first_name
+                row[f"{i+1}. MIDDLE NAME"] = fm.middle_name
+                row[f"{i+1}. RELATIONSHIP"] = fm.relationship
+            else:
+                row[f"{i+1}. LAST NAME"] = ""
+                row[f"{i+1}. FIRST NAME"] = ""
+                row[f"{i+1}. MIDDLE NAME"] = ""
+                row[f"{i+1}. RELATIONSHIP"] = ""
 
-    df = pd.read_excel(file_content, dtype=object, engine="openpyxl")
-    df = df.replace({pd.NaT: None})
-    df = df.where(pd.notnull(df), None)
-    df.columns = df.columns.str.strip()
+        data_list.append(row)
 
-    success_count = 0
-    skipped_duplicates = 0
-    errors = []
+    df = pd.DataFrame(data_list)
 
-    # ---------------------------
-    # Sector Columns
-    # ---------------------------
-    possible_sectors = [
-        "FARMER",
-        "FISHERFOLK",
-        "FISHERMAN/BANCA OWNER",
-        "TODA",
-        "BRGY BNS/BHW",
-        "BRGY TANOD",
-        "BRGY OFFICIAL",
-        "LGU EMPLOYEE",
-        "INDIGENOUS PEOPLE",
-        "PWD",
-        "OFW",
-        "STUDENT",
-        "SENIOR CITIZEN",
-        "LIFEGUARD",
-        "SOLO PARENT",
-        "OTHERS"
-    ]
+    # 4️⃣ GENERATE EXCEL FILE
+    output = io.BytesIO()
 
-    excel_columns = [col.strip().upper() for col in df.columns]
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
 
-    sector_columns = [
-        col for col in possible_sectors
-        if col in excel_columns
-    ]
+        df.to_excel(writer, sheet_name="Master_List", startrow=5, index=False)
 
-    # ---------------------------
-    # PROCESS EACH ROW
-    # ---------------------------
-    for index, row in df.iterrows():
-        try:
-            last_name = clean_str(row.get("LAST NAME"))
-            first_name = clean_str(row.get("FIRST NAME"))
-            middle_name = clean_str(row.get("MIDDLE NAME"))
-            barangay = clean_str(row.get("BARANGAY"))
+        workbook = writer.book
+        worksheet = writer.sheets["Master_List"]
 
-            if last_name == "" and first_name == "":
-                continue
+        worksheet.hide_gridlines(2)
 
-            birthdate = parse_date(row.get("BIRTHDATE"))
+        # --------------------------------------------------
+        # FORMATTING
+        # --------------------------------------------------
 
-            # Duplicate check
-            existing = resident_exists(
-                db,
-                last_name,
-                first_name,
-                middle_name,
-                birthdate,
-                barangay
-            )
+        fmt_title = workbook.add_format({
+            "bold": True,
+            "font_size": 14,
+            "align": "center"
+        })
 
-            if existing:
-                skipped_duplicates += 1
-                continue
+        fmt_sub = workbook.add_format({
+            "italic": True,
+            "font_size": 11,
+            "align": "center"
+        })
 
-            # Precinct (handles misspelling)
-            precinct_no = ""
-            for col in df.columns:
-                if col.strip().upper() in ["PRECINT NO", "PRECINCT NO", "PRECINCT"]:
-                    precinct_no = clean_str(row.get(col))
-                    break
+        fmt_header = workbook.add_format({
+            "bold": True,
+            "bg_color": "#2E8B57",
+            "font_color": "white",
+            "border": 1,
+            "align": "center",
+            "text_wrap": True
+        })
 
-            # Sector processing
-            active_sectors = []
-            for col in sector_columns:
-                if is_checked(row.get(col)):
-                    active_sectors.append(col)
+        fmt_cell = workbook.add_format({
+            "border": 1,
+            "font_size": 10
+        })
 
-            sector_summary = ", ".join(active_sectors) if active_sectors else "None"
+        # Title
+        last_col_letter = excel_col_letter(len(df.columns) - 1)
 
-            # Spouse
-            spouse_last = clean_str(row.get("LAST NAME.1"))
-            spouse_first = clean_str(row.get("FIRST NAME.1"))
-            spouse_middle = clean_str(row.get("MIDDLE NAME.1"))
-            spouse_ext = clean_str(row.get("EXT NAME.1"))
+        worksheet.merge_range(f"A1:{last_col_letter}1", "REPUBLIC OF THE PHILIPPINES", fmt_sub)
+        worksheet.merge_range(f"A2:{last_col_letter}2", "PROVINCE OF ZAMBALES", fmt_sub)
+        worksheet.merge_range(f"A3:{last_col_letter}3", "MUNICIPALITY OF SAN FELIPE", fmt_title)
 
-            # Create resident
-            resident = ResidentProfile(
-                last_name=last_name.upper(),
-                first_name=first_name.upper(),
-                middle_name=middle_name.upper(),
-                ext_name=clean_str(row.get("EXT NAME")),
-                house_no=clean_str(row.get("HOUSE NO. / STREET")),
-                purok=clean_str(row.get("PUROK/SITIO")),
-                barangay=barangay,
-                birthdate=birthdate,
-                sex=clean_str(row.get("SEX")),
-                civil_status=clean_str(row.get("CIVIL STATUS")),
-                religion=clean_str(row.get("RELIGION")),
-                occupation=clean_str(row.get("OCCUPATION")),
-                contact_no=clean_str(row.get("CONTACT")),
-                precinct_no=precinct_no,
-                spouse_last_name=spouse_last,
-                spouse_first_name=spouse_first,
-                spouse_middle_name=spouse_middle,
-                spouse_ext_name=spouse_ext,
-                sector_summary=sector_summary
-            )
+        title_text = f"MASTER LIST - {barangay_name.upper()}" if barangay_name else "MASTER LIST - ALL BARANGAYS"
+        worksheet.merge_range(f"A4:{last_col_letter}4", title_text, fmt_title)
 
-            db.add(resident)
-            db.flush()
+        # Apply header style
+        for col_num, column in enumerate(df.columns):
+            worksheet.write(5, col_num, column, fmt_header)
 
-            # ---------------------------
-            # FAMILY MEMBERS
-            # ---------------------------
-            for i in range(1, 6):
+        # Apply cell borders
+        for row_num in range(len(df)):
+            worksheet.set_row(row_num + 6, None, fmt_cell)
 
-                lname = ""
-                fname = ""
-                mname = ""
-                rel = ""
+        # Auto column width
+        for i, col in enumerate(df.columns):
+            column_len = max(
+                df[col].astype(str).map(len).max(),
+                len(col)
+            ) + 2
+            worksheet.set_column(i, i, column_len)
 
-                for col in df.columns:
-                    clean_col = col.strip().upper()
-
-                    if clean_col.startswith(f"{i}. LAST NAME"):
-                        lname = clean_str(row.get(col))
-
-                    if clean_col.startswith(f"{i}. FIRST NAME"):
-                        fname = clean_str(row.get(col))
-
-                    if clean_col.startswith(f"{i}. MIDDLE NAME"):
-                        mname = clean_str(row.get(col))
-
-                    if clean_col.startswith(f"{i}. RELATIONSHIP"):
-                        rel = clean_str(row.get(col))
-
-                if lname == "" and fname == "" and rel == "":
-                    continue
-
-                if family_member_exists(db, resident.id, lname, fname, rel):
-                    continue
-
-                db.add(FamilyMember(
-                    profile_id=resident.id,
-                    last_name=lname,
-                    first_name=fname,
-                    middle_name=mname,
-                    relationship=rel
-                ))
-
-            success_count += 1
-
-        except Exception as e:
-            errors.append(f"Row {index+2}: {str(e)}")
-
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        return {"added": 0, "errors": [str(e)]}
-
-    return {
-        "added": success_count,
-        "skipped_duplicates": skipped_duplicates,
-        "errors": errors
-    }
+    output.seek(0)
+    return output
