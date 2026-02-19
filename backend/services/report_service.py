@@ -167,11 +167,14 @@ def generate_household_excel(db: Session, barangay_name: str = None):
 
         # Auto column width
         for i, col in enumerate(df.columns):
-            column_len = max(
-                df[col].astype(str).map(len).max(),
-                len(col)
-            ) + 2
+            try:
+                max_length = df[col].fillna("").astype(str).map(len).max()
+                column_len = max(max_length, len(col)) + 2
+            except:
+                column_len = len(col) + 2
+
             worksheet.set_column(i, i, column_len)
+
 
     output.seek(0)
     return output
