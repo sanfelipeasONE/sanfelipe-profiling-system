@@ -73,6 +73,9 @@ def is_checked(value):
 def process_excel_import(file_content, db: Session):
 
     df = pd.read_excel(file_content, dtype=object, engine="openpyxl")
+    print("=== ALL COLUMNS ===")
+    print(df.columns.tolist())
+    print("===================")
     df = df.replace({pd.NaT: None})
     df = df.where(pd.notnull(df), None)
 
@@ -214,49 +217,47 @@ def process_excel_import(file_content, db: Session):
             # --------------------------------------------------
             # FAMILY MEMBERS (ROBUST MATCHING)
             # --------------------------------------------------
-            fname1_col = next((c for c in df.columns if c.startswith("1. FIRST NAME")), None)
-            mname1_col = next((c for c in df.columns if c.startswith("1. MIDDLE NAME")), None)
-            rel1_col = next((c for c in df.columns if c.startswith("1. RELATIONSHIP")), None)
+            family_columns = [col for col in df.columns if re.match(r"\d+\.\s", col)]
 
-            fname1 = clean_str(row.get(fname1_col)) if fname1_col else ""
-            mname1 = clean_str(row.get(mname1_col)) if mname1_col else ""
-            rel1 = clean_str(row.get(rel1_col)) if rel1_col else ""
+            # Group columns by member number
+            members = {}
 
-            # Only create if relationship is valid (prevents SON misread)
-            if fname1 and rel1:
+            for col in family_columns:
+                match = re.match(r"(\d+)\.\s*(.*)", col)
+                if match:
+                    member_no = int(match.group(1))
+                    field_name = match.group(2)
+
+                    if member_no not in members:
+                        members[member_no] = {}
+
+                    members[member_no][field_name] = col
+
+            # Process each detected member
+            for member_no in sorted(members.keys()):
+
+                cols = members[member_no]
+
+                lname = clean_str(row.get(cols.get("LAST NAME", "")))
+                fname = clean_str(row.get(cols.get("FIRST NAME", "")))
+                mname = clean_str(row.get(cols.get("MIDDLE NAME", "")))
+                rel = clean_str(row.get(cols.get("RELATIONSHIP", "")))
+
+                # Skip empty member
+                if fname == "" and rel == "":
+                    continue
+
+                # If no last name column exists, inherit household surname
+                if lname == "":
+                    lname = resident.last_name
 
                 db.add(FamilyMember(
                     profile_id=resident.id,
-                    last_name=resident.last_name,  # inherit household surname
-                    first_name=fname1,
-                    middle_name=mname1,
-                    relationship=rel1
+                    last_name=lname,
+                    first_name=fname,
+                    middle_name=mname,
+                    relationship=rel
                 ))
-
-
-            # ----- MEMBERS 2 to 5 (normal structure)
-            for i in range(2, 6):
-
-                lname_col = next((c for c in df.columns if c.startswith(f"{i}. LAST NAME")), None)
-                fname_col = next((c for c in df.columns if c.startswith(f"{i}. FIRST NAME")), None)
-                mname_col = next((c for c in df.columns if c.startswith(f"{i}. MIDDLE NAME")), None)
-                rel_col = next((c for c in df.columns if c.startswith(f"{i}. RELATIONSHIP")), None)
-
-                lname = clean_str(row.get(lname_col)) if lname_col else ""
-                fname = clean_str(row.get(fname_col)) if fname_col else ""
-                mname = clean_str(row.get(mname_col)) if mname_col else ""
-                rel = clean_str(row.get(rel_col)) if rel_col else ""
-
-                # Only create if relationship exists (this prevents SON being treated as name)
-                if fname and rel:
-
-                    db.add(FamilyMember(
-                        profile_id=resident.id,
-                        last_name=lname if lname else resident.last_name,
-                        first_name=fname,
-                        middle_name=mname,
-                        relationship=rel
-                    ))
 
 
             success_count += 1
