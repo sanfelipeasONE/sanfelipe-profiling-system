@@ -221,17 +221,27 @@ def process_excel_import(file_content, db: Session):
                 mname = ""
                 rel = ""
 
-                for col in df.columns:
-                    if col.startswith(f"{i}. LAST NAME"):
-                        lname = clean_str(row.get(col))
-                    if col.startswith(f"{i}. FIRST NAME"):
-                        fname = clean_str(row.get(col))
-                    if col.startswith(f"{i}. MIDDLE NAME"):
-                        mname = clean_str(row.get(col))
-                    if col.startswith(f"{i}. RELATIONSHIP"):
-                        rel = clean_str(row.get(col))
+                lname_col = next((c for c in df.columns if c.startswith(f"{i}. LAST NAME")), None)
+                fname_col = next((c for c in df.columns if c.startswith(f"{i}. FIRST NAME")), None)
+                mname_col = next((c for c in df.columns if c.startswith(f"{i}. MIDDLE NAME")), None)
+                rel_col = next((c for c in df.columns if c.startswith(f"{i}. RELATIONSHIP")), None)
 
-                if lname == "" and fname == "" and rel == "":
+                # Some Excel templates skip LAST NAME for #1
+                if fname_col:
+                    fname = clean_str(row.get(fname_col))
+                if mname_col:
+                    mname = clean_str(row.get(mname_col))
+                if rel_col:
+                    rel = clean_str(row.get(rel_col))
+                if lname_col:
+                    lname = clean_str(row.get(lname_col))
+
+                # If no last name provided, inherit household head last name
+                if lname == "":
+                    lname = resident.last_name
+
+                # Skip empty
+                if fname == "" and rel == "":
                     continue
 
                 db.add(FamilyMember(
