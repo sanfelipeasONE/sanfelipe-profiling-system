@@ -219,7 +219,6 @@ def process_excel_import(file_content, db: Session):
             # --------------------------------------------------
             family_columns = [col for col in df.columns if re.match(r"\d+\.\s", col)]
 
-            # Group columns by member number
             members = {}
 
             for col in family_columns:
@@ -228,12 +227,21 @@ def process_excel_import(file_content, db: Session):
                     member_no = int(match.group(1))
                     field_name = match.group(2)
 
+                    # Normalize field names
+                    if "LAST NAME" in field_name:
+                        field_name = "LAST NAME"
+                    elif "FIRST NAME" in field_name:
+                        field_name = "FIRST NAME"
+                    elif "MIDDLE NAME" in field_name:
+                        field_name = "MIDDLE NAME"
+                    elif "RELATIONSHIP" in field_name:
+                        field_name = "RELATIONSHIP"
+
                     if member_no not in members:
                         members[member_no] = {}
 
                     members[member_no][field_name] = col
 
-            # Process each detected member
             for member_no in sorted(members.keys()):
 
                 cols = members[member_no]
@@ -243,11 +251,20 @@ def process_excel_import(file_content, db: Session):
                 mname = clean_str(row.get(cols.get("MIDDLE NAME", "")))
                 rel = clean_str(row.get(cols.get("RELATIONSHIP", "")))
 
-                # Skip empty member
+                # --- SHIFT FIX ---
+                # If last name is empty but first name equals household surname,
+                # and relationship looks like a name (not SON/DAUGHTER/etc),
+                # then shift values left.
+
+                if lname == "" and fname == resident.last_name:
+                    lname = resident.last_name
+                    fname = mname
+                    mname = ""
+                    rel = clean_str(row.get(cols.get("RELATIONSHIP", "")))
+
                 if fname == "" and rel == "":
                     continue
 
-                # If no last name column exists, inherit household surname
                 if lname == "":
                     lname = resident.last_name
 
