@@ -124,6 +124,18 @@ class Resident(ResidentBase):
     class Config:
         from_attributes = True
 
+class ResidentVerification(BaseModel):
+    resident_code: str
+    last_name: str
+    first_name: str
+    middle_name: Optional[str] = None
+    barangay: str
+    purok: str
+    status: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class AssistanceUpdate(BaseModel):
     type_of_assistance: str | None = None
     date_processed: date | None = None

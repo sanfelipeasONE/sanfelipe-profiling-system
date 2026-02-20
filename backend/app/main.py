@@ -691,7 +691,7 @@ def generate_resident_qr(
 
     return StreamingResponse(buffer, media_type="image/png")
 
-@app.get("/residents/code/{resident_code}", response_model=schemas.Resident)
+@app.get("/residents/code/{resident_code}", response_model=schemas.ResidentVerification)
 def get_resident_by_code(
     resident_code: str,
     db: Session = Depends(get_db),
