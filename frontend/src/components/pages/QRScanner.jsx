@@ -14,7 +14,14 @@ export default function QRScanner() {
     const startScanner = async () => {
       try {
         const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        const selectedDeviceId = devices[0]?.deviceId;
+
+        const backCamera = devices.find(device =>
+        device.label.toLowerCase().includes("back")
+        );
+
+        const selectedDeviceId = backCamera
+        ? backCamera.deviceId
+        : devices[0]?.deviceId;
 
         if (!selectedDeviceId) {
           setError("No camera found");
