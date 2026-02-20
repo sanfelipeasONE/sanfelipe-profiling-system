@@ -50,6 +50,13 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     try:
         db.commit()
         db.refresh(db_resident)
+
+        # 🔥 Generate resident_code based on ID
+        db_resident.resident_code = f"SF-{db_resident.id:06d}"
+        
+        db.commit()
+        db.refresh(db_resident)
+
     except IntegrityError:
         db.rollback()
         raise ValueError("Resident already registered.")
