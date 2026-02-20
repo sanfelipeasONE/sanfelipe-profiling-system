@@ -7,7 +7,8 @@ import {
   Menu,
   X,
   ChevronRight,
-  Settings
+  Settings,
+  QrCode
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArchiveRestore } from 'lucide-react';
@@ -24,6 +25,7 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin' }, 
   { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
   { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
+  { label: 'Scan QR', path: '/dashboard/scan', Icon: LayoutDashboard, role: 'all' },
   { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, role: 'admin' }, // 🔥 NEW
   ];
 

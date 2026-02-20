@@ -18,7 +18,7 @@ const SectionHeader = ({ icon: Icon, title, colorClass = "text-stone-600" }) => 
 );
 
 const SelectGroup = ({ label, name, value, onChange, options, required = false, disabled = false, placeholder, className = "" }) => (
-  <div className={`space-y-1 w-full ${className}`}>
+  <div className="space-y-1 w-full">
     <div className="flex justify-between">
       <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
         {label} {required && <span className="text-red-600">*</span>}
@@ -32,7 +32,9 @@ const SelectGroup = ({ label, name, value, onChange, options, required = false, 
         required={required} 
         disabled={disabled}
         className={`
-          w-full pl-3 pr-8 py-2.5 border rounded-sm outline-none text-xs font-semibold appearance-none transition-all
+          w-full h-[40px] pl-3 pr-8 border rounded-sm
+          text-xs font-semibold appearance-none outline-none transition-all
+          ${className}
           ${disabled 
             ? 'bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed' 
             : 'bg-white text-stone-800 border-stone-300 focus:border-rose-600 focus:ring-1 focus:ring-rose-600'
@@ -48,31 +50,48 @@ const SelectGroup = ({ label, name, value, onChange, options, required = false, 
           return <option key={key} value={val}>{val}</option>
         })}
       </select>
-      <ChevronDown className="absolute right-2.5 top-3 text-stone-400 pointer-events-none" size={14} />
+      <ChevronDown
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"
+        size={14}
+      />
     </div>
   </div>
 );
 
-const InputGroup = ({ label, name, value, onChange, type = "text", required = false, placeholder, className = "" }) => (
-  <div className={`space-y-1 w-full ${className}`}>
+const InputGroup = ({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+  placeholder,
+  className = ""
+}) => (
+  <div className={`flex flex-col gap-1 w-full ${className}`}>
     <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
       {label} {required && <span className="text-red-600">*</span>}
     </label>
-    <input 
-      type={type} 
-      name={name} 
-      value={value || ''} 
-      onChange={onChange} 
-      required={required} 
+
+    <input
+      type={type}
+      name={name}
+      value={value || ""}
+      onChange={onChange}
+      required={required}
       placeholder={placeholder}
-      className="
-        w-full px-3 py-2.5 bg-white border border-stone-300 rounded-sm 
-        text-xs font-semibold text-stone-800 placeholder:text-stone-300 placeholder:font-normal
-        focus:border-rose-600 focus:ring-1 focus:ring-rose-600 outline-none transition-all
-      " 
+      className={`
+        w-full h-[40px] px-3
+        bg-white border border-stone-300 rounded-sm
+        text-xs font-semibold text-stone-800
+        focus:border-rose-600 focus:ring-1 focus:ring-rose-600
+        outline-none transition-all
+        ${type === "date" ? "date-input-fix" : ""}
+      `}
     />
   </div>
 );
+
 
 // --- INITIAL STATE ---
 const getInitialFormState = () => ({
@@ -257,7 +276,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
               <InputGroup label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required placeholder="DELA CRUZ" className="lg:col-span-1" />
               <InputGroup label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required placeholder="JUAN" className="lg:col-span-1" />
               <InputGroup label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="SANTOS" />
-              <InputGroup label="Suffix (e.g. Jr, III)" name="ext_name" value={formData.ext_name} onChange={handleChange} placeholder="-" />
+              <InputGroup label="Suffix (e.g. Jr, III)" name="spouse_ext_name" value={formData.spouse_ext_name} onChange={handleChange} placeholder="JR, SR, III" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -309,6 +328,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                 required={userRole === 'admin'} 
                 disabled={userRole !== 'admin'} 
                 placeholder={userRole === 'admin' ? "SELECT BARANGAY" : "AUTO-ASSIGNED"}
+                className="uppercase tracking-wide"
               />
             </div>
           </div>

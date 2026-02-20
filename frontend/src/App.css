@@ -5,3 +5,15 @@
     height: 100%;
   }
 }
+
+/* Fix Chrome date input alignment */
+.date-input-fix {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 0.75rem;
+}
+
+/* Remove weird Chrome inner spacing */
+.date-input-fix::-webkit-calendar-picker-indicator {
+  margin-right: 6px;
+}

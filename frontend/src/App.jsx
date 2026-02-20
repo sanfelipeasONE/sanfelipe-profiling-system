@@ -9,6 +9,7 @@ import ResidentList from './components/residents/ResidentList';
 import AddResidentForm from './components/residents/AddResidentForm';
 import UserManagement from './components/users/UserManagement';
 import ArchivedResidents from './components/residents/ArchivedResidents';
+import QRScanner from './components/pages/QRScanner';
 
 /**
  * DashboardLayout
@@ -116,6 +117,8 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard/overview" replace />} />
 
         <Route path="archived" element={<ArchivedResidents />} />
+
+        <Route path="scan" element={<QRScanner />} />
 
       </Route>
 
