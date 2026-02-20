@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from sqlalchemy import text, func
 from services.import_service import process_excel_import
 import io
+import qrcode
+from io import BytesIO
 
 # Authentication
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -666,6 +668,28 @@ def read_resident(resident_id: int,
         raise HTTPException(status_code=404)
 
     return resident
+
+@app.get("/residents/code/{resident_code}/qr")
+def generate_resident_qr(
+    resident_code: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.resident_code == resident_code,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    qr = qrcode.make(resident.resident_code)
+
+    buffer = BytesIO()
+    qr.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return StreamingResponse(buffer, media_type="image/png")
 
 @app.delete("/residents/{resident_id}")
 def soft_delete_resident(resident_id: int,

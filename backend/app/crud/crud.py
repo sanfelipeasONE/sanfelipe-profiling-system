@@ -101,7 +101,7 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     # 1️⃣ Update basic fields
     # ------------------------------
     update_data = resident_data.model_dump(
-        exclude={"sector_ids", "family_members"}
+        exclude={"sector_ids", "family_members", "resident_code"}
     )
 
     for key, value in update_data.items():
@@ -391,7 +391,8 @@ def get_resident_count(
         query = query.filter(
             or_(
                 models.ResidentProfile.last_name.ilike(search_fmt),
-                models.ResidentProfile.first_name.ilike(search_fmt)
+                models.ResidentProfile.first_name.ilike(search_fmt),
+                models.ResidentProfile.resident_code.ilike(search_fmt)
             )
         )
 
