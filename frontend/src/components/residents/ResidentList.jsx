@@ -11,6 +11,8 @@ import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from "react-dom";
 import ImportButton from './ImportButton';
 import { Archive } from 'lucide-react';
+import { QrCode } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function ResidentList({ userRole, onEdit }) {
   const [residents, setResidents] = useState([]);
@@ -29,7 +31,8 @@ export default function ResidentList({ userRole, onEdit }) {
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const [assistanceModal, setAssistanceModal] = useState({ isOpen: false, resident: null, assistance: null });
-  const [deleteAssistanceModal, setDeleteAssistanceModal] = useState({ isOpen: false, assistance: null })
+  const [deleteAssistanceModal, setDeleteAssistanceModal] = useState({ isOpen: false, assistance: null });
+  const navigate = useNavigate();
 
 
   // --- HELPERS ---
@@ -771,6 +774,15 @@ export default function ResidentList({ userRole, onEdit }) {
                               <FileText size={14} />
                             </button>
                           )}
+                          {userRole === "admin" && (
+                          <button
+                            onClick={() => navigate(`/dashboard/residents/${r.resident_code}/qr`)}
+                            className="p-1.5 text-stone-500 hover:text-white hover:bg-emerald-700 rounded-sm transition-all"
+                            title="Generate QR"
+                          >
+                            <QrCode size={14} />
+                          </button>
+                        )}
                           {userRole === "admin" && (
                             <>
                               {/* ARCHIVE */}

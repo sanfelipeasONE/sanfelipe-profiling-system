@@ -10,6 +10,7 @@ import AddResidentForm from './components/residents/AddResidentForm';
 import UserManagement from './components/users/UserManagement';
 import ArchivedResidents from './components/residents/ArchivedResidents';
 import QRScanner from './components/pages/QRScanner';
+import ResidentQRPage from "./components/pages/ResidentQRPage";
 
 /**
  * DashboardLayout
@@ -109,6 +110,14 @@ export default function App() {
             )
           } 
         />
+        <Route
+          path="residents/:code/qr"
+          element={
+            role?.toLowerCase() === "admin"
+              ? <ResidentQRPage />
+              : <Navigate to="/dashboard/residents" replace />
+          }
+        />
 
         <Route path="create" element={<AddResidentForm onSuccess={handleFinishEditing} />} />
         
@@ -118,7 +127,14 @@ export default function App() {
 
         <Route path="archived" element={<ArchivedResidents />} />
 
-        <Route path="scan" element={<QRScanner />} />
+        <Route
+          path="scan"
+          element={
+            role?.toLowerCase() === "admin"
+              ? <QRScanner />
+              : <Navigate to="/dashboard/residents" replace />
+          }
+        />
 
       </Route>
 

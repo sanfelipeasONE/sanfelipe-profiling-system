@@ -17,3 +17,50 @@
 .date-input-fix::-webkit-calendar-picker-indicator {
   margin-right: 6px;
 }
+
+@media print {
+
+  /* Hide everything */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Ensure color prints */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Show only ID card */
+  .qr-print-area,
+  .qr-print-area * {
+    visibility: visible;
+  }
+
+  /* Remove page margins */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  /* Make the page EXACT ID size */
+  @page {
+    size: 3.5in 5in;  /* ID badge size */
+    margin: 0;
+  }
+
+  /* Position ID perfectly */
+  .qr-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3.5in;
+    height: 5in;
+    box-shadow: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
