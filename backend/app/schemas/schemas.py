@@ -116,6 +116,7 @@ class ResidentUpdate(ResidentBase):
 
 class Resident(ResidentBase):
     id: int
+    resident_code: str
     created_at: Optional[datetime] = None
     family_members: List[FamilyMember] = []
     sectors: List[Sector] = []
