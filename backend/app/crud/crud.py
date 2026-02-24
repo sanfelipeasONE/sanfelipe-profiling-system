@@ -461,6 +461,11 @@ def get_residents(
     # 🔥 RETURN MUST BE OUTSIDE
     return query.offset(skip).limit(limit).all()
 
+    print("SORT ORDER:", sort_order)
+    print("FIRST 5:", [(r.last_name, r.first_name) for r in results[:5]])
+    
+    return results
+
 
 # =====================================================
 # DASHBOARD STATS
