@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: "https://sanfelipe-profiling-system-production.up.railway.app", // Your FastAPI URL
+  baseURL: "https://sanfelipe-profiling-system-production-13e4.up.railway.app", // Your FastAPI URL
 });
 
 api.interceptors.request.use(

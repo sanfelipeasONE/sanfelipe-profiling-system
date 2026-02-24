@@ -34,6 +34,9 @@ export default function ResidentList({ userRole, onEdit }) {
   const [deleteAssistanceModal, setDeleteAssistanceModal] = useState({ isOpen: false, assistance: null });
   const navigate = useNavigate();
 
+  const [sortBy, setSortBy] = useState("last_name");
+  const [sortOrder, setSortOrder] = useState("asc");
+
 
   // --- HELPERS ---
   const calculateAge = (dob) => {
@@ -74,19 +77,21 @@ export default function ResidentList({ userRole, onEdit }) {
     barangay = selectedBarangay,
     sector = selectedSector,
     page = currentPage,
-    limit = itemsPerPage
-  ) => {
-
+    limit = itemsPerPage,
+    currentSortBy = sortBy,        // ← ADD
+    currentSortOrder = sortOrder   // ← ADD
+) => {
     setLoading(true);
     const skip = (page - 1) * limit;
     try {
-      const params = new URLSearchParams();
-      if (search) params.append('search', search);
-      if (userRole === 'admin' && barangay) params.append('barangay', barangay);
-      if (sector) params.append('sector', sector);
-
-      params.append('skip', skip);
-      params.append('limit', limit);
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        if (userRole === 'admin' && barangay) params.append('barangay', barangay);
+        if (sector) params.append('sector', sector);
+        params.append('skip', skip);
+        params.append('limit', limit);
+        params.append('sort_by', currentSortBy);      // ← CHANGE
+        params.append('sort_order', currentSortOrder);
 
       const response = await api.get(`/residents/?${params.toString()}`);
       if (response.data.items) {
@@ -103,6 +108,16 @@ export default function ResidentList({ userRole, onEdit }) {
     }
   };
 
+  const handleSort = (field) => {
+  if (sortBy === field) {
+    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+  } else {
+    setSortBy(field);
+    setSortOrder("asc");
+  }
+  setCurrentPage(1);
+};
+
   useEffect(() => {
     const fetchBarangays = async () => {
       try {
@@ -115,7 +130,16 @@ export default function ResidentList({ userRole, onEdit }) {
 
   useEffect(() => {
     fetchResidents();
-  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, searchTerm]);
+  }, [
+    userRole,
+    currentPage,
+    itemsPerPage,
+    selectedBarangay,
+    selectedSector,
+    searchTerm,
+    sortBy,
+    sortOrder
+  ]);
 
 
   // --- HANDLERS ---
@@ -691,7 +715,19 @@ export default function ResidentList({ userRole, onEdit }) {
           <thead>
             <tr className="bg-stone-200 border-b-2 border-stone-300 text-[11px] uppercase font-black text-stone-600 tracking-wider">
               <th className="py-3 px-4 w-10 text-center border-r border-stone-300">#</th>
-              <th className="py-3 px-4 border-r border-stone-300 w-1/4">Resident Identity</th>
+              <th
+                onClick={() => handleSort("last_name")}
+                className="py-3 px-4 border-r border-stone-300 w-1/4 cursor-pointer hover:text-rose-700 select-none"
+              >
+                <div className="flex items-center gap-1">
+                  RESIDENT IDENTITY
+                  {sortBy === "last_name" ? (
+                    sortOrder === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+                  ) : (
+                    <ChevronDown size={12} className="opacity-30" />
+                  )}
+                </div>
+              </th>
               <th className="py-3 px-4 border-r border-stone-300">Birthdate</th>
               <th className="py-3 px-4 border-r border-stone-300">Residency</th>
               <th className="py-3 px-4 border-r border-stone-300">Class/Sector</th>
