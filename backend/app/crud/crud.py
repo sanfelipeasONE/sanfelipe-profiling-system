@@ -477,7 +477,8 @@ def get_residents(
         else:
             query = query.order_by(column.asc())
 
-        return query.offset(skip).limit(limit).all()
+    # 🔥 RETURN MUST BE OUTSIDE
+    return query.offset(skip).limit(limit).all()
 
 
 # =====================================================
