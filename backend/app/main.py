@@ -40,7 +40,7 @@ origins = [
     "http://127.0.0.1:5173",
     "https://sanfelipe-profiling-system.vercel.app",
     "https://sanfelipe-profiling-system-production.up.railway.app",
-    "sanfelipe-profiling-system-production-13e4.up.railway.app"
+    "https://sanfelipe-profiling-system-production-13e4.up.railway.app"
 ]
 
 app.add_middleware(
