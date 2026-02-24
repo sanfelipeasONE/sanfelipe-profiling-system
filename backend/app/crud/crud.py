@@ -78,7 +78,8 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     except IntegrityError as e:
         db.rollback()
         print("REAL DB ERROR:", str(e))
-        raise ValueError("Database constraint error.")
+        print("ORIG:", e.orig)
+        raise ValueError(f"Database constraint error: {str(e.orig)}") 
 
 # =====================================================
 # UPDATE RESIDENT
