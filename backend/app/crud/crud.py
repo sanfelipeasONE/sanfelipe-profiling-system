@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 # =====================================================
 def create_resident(db: Session, resident: schemas.ResidentCreate):
     print("DATABASE URL:", db.bind.url)
+
     resident_data = resident.model_dump()
 
     family_members_data = resident_data.pop("family_members", [])
@@ -23,7 +24,7 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
 
     # 🔥 Normalize identity fields
     for field in ["first_name", "middle_name", "last_name"]:
-        if field in filtered_data and filtered_data[field]:
+        if filtered_data.get(field):
             filtered_data[field] = filtered_data[field].strip().upper()
         else:
             filtered_data[field] = ""
@@ -44,49 +45,50 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     if existing:
         raise ValueError("Resident already registered.")
 
-    # ✅ Only create if no duplicate
-    db_resident = models.ResidentProfile(**filtered_data)
-    db.add(db_resident)
-
     try:
+        # ✅ Create resident WITHOUT committing yet
+        db_resident = models.ResidentProfile(**filtered_data)
+        db.add(db_resident)
+
+        db.flush()  # 🔥 This generates ID without committing
+
+        # ✅ Generate resident_code BEFORE commit
+        db_resident.resident_code = f"SF-{db_resident.id:06d}"
+
+        # ------------------------------
+        # Attach sectors
+        # ------------------------------
+        if sector_ids:
+            sectors = db.query(models.Sector).filter(
+                models.Sector.id.in_(sector_ids)
+            ).all()
+
+            db_resident.sectors = sectors
+            sector_names = [s.name for s in sectors]
+            db_resident.sector_summary = ", ".join(sector_names)
+        else:
+            db_resident.sector_summary = "None"
+
+        # ------------------------------
+        # Add family members
+        # ------------------------------
+        for member_data in family_members_data:
+            db_member = models.FamilyMember(
+                **member_data,
+                profile_id=db_resident.id
+            )
+            db.add(db_member)
+
+        # ✅ Single final commit
         db.commit()
         db.refresh(db_resident)
 
-        # 🔥 Generate resident_code based on ID
-        db_resident.resident_code = f"SF-{db_resident.id:06d}"
-        
-        db.commit()
-        db.refresh(db_resident)
+        return db_resident
 
     except IntegrityError as e:
         db.rollback()
         print("REAL DB ERROR:", str(e))
         raise ValueError("Database constraint error.")
-
-    # Attach sectors
-    if sector_ids:
-        sectors = db.query(models.Sector).filter(
-            models.Sector.id.in_(sector_ids)
-        ).all()
-
-        db_resident.sectors = sectors
-        sector_names = [s.name for s in sectors]
-        db_resident.sector_summary = ", ".join(sector_names)
-    else:
-        db_resident.sector_summary = "None"
-
-    # Add family members
-    for member_data in family_members_data:
-        db_member = models.FamilyMember(
-            **member_data,
-            profile_id=db_resident.id
-        )
-        db.add(db_member)
-
-    db.commit()
-    db.refresh(db_resident)
-
-    return db_resident
 
 # =====================================================
 # UPDATE RESIDENT
