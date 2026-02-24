@@ -58,9 +58,10 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         db.commit()
         db.refresh(db_resident)
 
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        raise ValueError("Resident already registered.")
+        print("REAL DB ERROR:", str(e))
+        raise ValueError("Database constraint error.")
 
     # Attach sectors
     if sector_ids:
