@@ -22,6 +22,9 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     valid_columns = {c.name for c in models.ResidentProfile.__table__.columns}
     filtered_data = {k: v for k, v in resident_data.items() if k in valid_columns}
 
+    # 🚨 REMOVE resident_code IF PRESENT
+    filtered_data.pop("resident_code", None)
+
     # 🔥 Normalize identity fields
     for field in ["first_name", "middle_name", "last_name"]:
         if filtered_data.get(field):
@@ -29,11 +32,9 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         else:
             filtered_data[field] = ""
 
-    # 🔥 Ensure birthdate exists
     if not filtered_data.get("birthdate"):
         raise ValueError("Birthdate is required.")
 
-    # 🔎 Duplicate check (Full name + birthdate)
     existing = db.query(models.ResidentProfile).filter(
         func.upper(func.coalesce(models.ResidentProfile.first_name, "")) == filtered_data["first_name"],
         func.upper(func.coalesce(models.ResidentProfile.middle_name, "")) == filtered_data["middle_name"],
@@ -46,32 +47,22 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         raise ValueError("Resident already registered.")
 
     try:
-        # ✅ Create resident WITHOUT committing yet
         db_resident = models.ResidentProfile(**filtered_data)
         db.add(db_resident)
 
-        db.flush()  # 🔥 This generates ID without committing
+        db.flush()  # get ID
 
-        # ✅ Generate resident_code BEFORE commit
         db_resident.resident_code = f"SF-{db_resident.id:06d}"
 
-        # ------------------------------
-        # Attach sectors
-        # ------------------------------
         if sector_ids:
             sectors = db.query(models.Sector).filter(
                 models.Sector.id.in_(sector_ids)
             ).all()
-
             db_resident.sectors = sectors
-            sector_names = [s.name for s in sectors]
-            db_resident.sector_summary = ", ".join(sector_names)
+            db_resident.sector_summary = ", ".join([s.name for s in sectors])
         else:
             db_resident.sector_summary = "None"
 
-        # ------------------------------
-        # Add family members
-        # ------------------------------
         for member_data in family_members_data:
             db_member = models.FamilyMember(
                 **member_data,
@@ -79,7 +70,6 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
             )
             db.add(db_member)
 
-        # ✅ Single final commit
         db.commit()
         db.refresh(db_resident)
 
