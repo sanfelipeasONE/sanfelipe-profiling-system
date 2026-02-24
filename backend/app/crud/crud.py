@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, subqueryload
 from sqlalchemy import or_, func
 from app import models, schemas
 from datetime import datetime
@@ -416,9 +416,9 @@ def get_residents(
     sort_order: str = "asc"
 ):
     query = db.query(models.ResidentProfile).options(
-        joinedload(models.ResidentProfile.family_members),
-        joinedload(models.ResidentProfile.sectors),
-        joinedload(models.ResidentProfile.assistances)
+        subqueryload(models.ResidentProfile.family_members),
+        subqueryload(models.ResidentProfile.sectors),
+        subqueryload(models.ResidentProfile.assistances)
     )
     
     query = query.filter(models.ResidentProfile.is_deleted == False)
