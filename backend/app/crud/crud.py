@@ -450,32 +450,26 @@ def get_residents(
     if sort_by == "last_name":
         if sort_order.lower() == "desc":
             query = query.order_by(
-                func.lower(models.ResidentProfile.last_name).desc(),
-                func.lower(models.ResidentProfile.first_name).desc()
+                models.ResidentProfile.last_name.desc(),
+                models.ResidentProfile.first_name.desc()
             )
         else:
             query = query.order_by(
-                func.lower(models.ResidentProfile.last_name).asc(),
-                func.lower(models.ResidentProfile.first_name).asc()
+                models.ResidentProfile.last_name.asc(),
+                models.ResidentProfile.first_name.asc()
             )
 
     elif sort_by == "first_name":
         if sort_order.lower() == "desc":
             query = query.order_by(
-                func.lower(models.ResidentProfile.first_name).desc(),
-                func.lower(models.ResidentProfile.last_name).desc()
+                models.ResidentProfile.first_name.desc(),
+                models.ResidentProfile.last_name.desc()
             )
         else:
             query = query.order_by(
-                func.lower(models.ResidentProfile.first_name).asc(),
-                func.lower(models.ResidentProfile.last_name).asc()
+                models.ResidentProfile.first_name.asc(),
+                models.ResidentProfile.last_name.asc()
             )
-
-    else:
-        if sort_order.lower() == "desc":
-            query = query.order_by(column.desc())
-        else:
-            query = query.order_by(column.asc())
 
     # 🔥 RETURN MUST BE OUTSIDE
     return query.offset(skip).limit(limit).all()
