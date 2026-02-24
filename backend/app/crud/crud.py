@@ -447,29 +447,16 @@ def get_residents(
 
     column = valid_columns.get(sort_by, models.ResidentProfile.last_name)
 
-    if sort_by == "last_name":
-        if sort_order.lower() == "desc":
-            query = query.order_by(
-                models.ResidentProfile.last_name.desc(),
-                models.ResidentProfile.first_name.desc()
-            )
-        else:
-            query = query.order_by(
-                models.ResidentProfile.last_name.asc(),
-                models.ResidentProfile.first_name.asc()
-            )
-
-    elif sort_by == "first_name":
-        if sort_order.lower() == "desc":
-            query = query.order_by(
-                models.ResidentProfile.first_name.desc(),
-                models.ResidentProfile.last_name.desc()
-            )
-        else:
-            query = query.order_by(
-                models.ResidentProfile.first_name.asc(),
-                models.ResidentProfile.last_name.asc()
-            )
+    if sort_order.lower() == "desc":
+        query = query.order_by(
+            func.upper(models.ResidentProfile.last_name).desc(),
+            func.upper(models.ResidentProfile.first_name).desc()
+        )
+    else:
+        query = query.order_by(
+            func.upper(models.ResidentProfile.last_name).asc(),
+            func.upper(models.ResidentProfile.first_name).asc()
+        )
 
     # 🔥 RETURN MUST BE OUTSIDE
     return query.offset(skip).limit(limit).all()
