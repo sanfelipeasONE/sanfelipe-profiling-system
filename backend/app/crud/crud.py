@@ -6,13 +6,10 @@ from app.core.audit import log_action
 from sqlalchemy.exc import IntegrityError
 
 
-
 # =====================================================
 # CREATE RESIDENT
 # =====================================================
 def create_resident(db: Session, resident: schemas.ResidentCreate):
-    print("DATABASE URL:", db.bind.url)
-
     resident_data = resident.model_dump()
 
     family_members_data = resident_data.pop("family_members", [])
@@ -21,16 +18,10 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
 
     valid_columns = {c.name for c in models.ResidentProfile.__table__.columns}
     filtered_data = {k: v for k, v in resident_data.items() if k in valid_columns}
-
-    # 🚨 REMOVE resident_code IF PRESENT
     filtered_data.pop("resident_code", None)
 
-    # 🔥 Normalize identity fields
     for field in ["first_name", "middle_name", "last_name"]:
-        if filtered_data.get(field):
-            filtered_data[field] = filtered_data[field].strip().upper()
-        else:
-            filtered_data[field] = ""
+        filtered_data[field] = filtered_data[field].strip().upper() if filtered_data.get(field) else ""
 
     if not filtered_data.get("birthdate"):
         raise ValueError("Birthdate is required.")
@@ -48,44 +39,32 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
 
     try:
         db_resident = models.ResidentProfile(**filtered_data)
-        
-        # ✅ Set a temporary placeholder so NOT NULL constraint doesn't fire
         db_resident.resident_code = "TEMP"
-        
         db.add(db_resident)
-        db.flush()  # get ID
+        db.flush()
 
-        # ✅ Now set the real resident_code using the generated ID
         db_resident.resident_code = f"SF-{db_resident.id:06d}"
 
         if sector_ids:
-            sectors = db.query(models.Sector).filter(
-                models.Sector.id.in_(sector_ids)
-            ).all()
+            sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
             db_resident.sectors = sectors
             db_resident.sector_summary = ", ".join([s.name for s in sectors])
         else:
             db_resident.sector_summary = "None"
 
+        valid_fm_columns = {c.name for c in models.FamilyMember.__table__.columns}
         for member_data in family_members_data:
-            valid_fm_columns = {c.name for c in models.FamilyMember.__table__.columns}
             filtered_member = {k: v for k, v in member_data.items() if k in valid_fm_columns}
-            db_member = models.FamilyMember(
-                **filtered_member,
-                profile_id=db_resident.id
-            )
-            db.add(db_member)
+            db.add(models.FamilyMember(**filtered_member, profile_id=db_resident.id))
 
         db.commit()
         db.refresh(db_resident)
-
         return db_resident
 
     except IntegrityError as e:
         db.rollback()
-        print("REAL DB ERROR:", str(e))
-        print("ORIG:", e.orig)
         raise ValueError("Database constraint error.")
+
 
 # =====================================================
 # UPDATE RESIDENT
@@ -98,35 +77,17 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     if not db_resident:
         return None
 
-    # ------------------------------
-    # 1️⃣ Update basic fields
-    # ------------------------------
-    update_data = resident_data.model_dump(
-        exclude={"sector_ids", "family_members", "resident_code"}
-    )
-
+    update_data = resident_data.model_dump(exclude={"sector_ids", "family_members", "resident_code"})
     for key, value in update_data.items():
         setattr(db_resident, key, value)
 
-    # ------------------------------
-    # 2️⃣ Normalize identity fields
-    # ------------------------------
     for field in ["first_name", "middle_name", "last_name"]:
         value = getattr(db_resident, field)
-        if value:
-            setattr(db_resident, field, value.strip().upper())
-        else:
-            setattr(db_resident, field, "")
+        setattr(db_resident, field, value.strip().upper() if value else "")
 
-    # ------------------------------
-    # 3️⃣ Ensure birthdate exists
-    # ------------------------------
     if not db_resident.birthdate:
         raise ValueError("Birthdate is required.")
 
-    # ------------------------------
-    # 4️⃣ Check duplicate (exclude self)
-    # ------------------------------
     existing = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.id != resident_id,
         func.upper(func.coalesce(models.ResidentProfile.first_name, "")) == db_resident.first_name,
@@ -140,36 +101,21 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         db.rollback()
         raise ValueError("Resident already registered.")
 
-    # ------------------------------
-    # 5️⃣ Update sectors
-    # ------------------------------
     db_resident.sectors.clear()
-
     if resident_data.sector_ids:
-        new_sectors = db.query(models.Sector).filter(
-            models.Sector.id.in_(resident_data.sector_ids)
-        ).all()
-
+        new_sectors = db.query(models.Sector).filter(models.Sector.id.in_(resident_data.sector_ids)).all()
         db_resident.sectors = new_sectors
-        sector_names = [s.name for s in new_sectors]
-        db_resident.sector_summary = ", ".join(sector_names)
+        db_resident.sector_summary = ", ".join([s.name for s in new_sectors])
     else:
         db_resident.sector_summary = "None"
 
-    # ------------------------------
-    # 6️⃣ Update family members
-    # ------------------------------
     db.query(models.FamilyMember).filter(
         models.FamilyMember.profile_id == resident_id
     ).delete(synchronize_session=False)
 
     if resident_data.family_members:
         for fm_data in resident_data.family_members:
-            new_fm = models.FamilyMember(
-                **fm_data.model_dump(),
-                profile_id=resident_id
-            )
-            db.add(new_fm)
+            db.add(models.FamilyMember(**fm_data.model_dump(), profile_id=resident_id))
 
     db.commit()
     db.refresh(db_resident)
@@ -177,10 +123,9 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
 
 
 # =====================================================
-# PROMOTOE FAMILY MEMBER TO HEAD
+# PROMOTE FAMILY MEMBER TO HEAD
 # =====================================================
 def promote_family_member_to_head(db: Session, resident_id: int, new_head_member_id: int, reason: str):
-    
     current_head = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.id == resident_id
     ).first()
@@ -188,12 +133,10 @@ def promote_family_member_to_head(db: Session, resident_id: int, new_head_member
     if not current_head:
         return None
 
-    # 1️⃣ Mark old head
-    current_head.status = reason  # "Deceased" or "OFW"
+    current_head.status = reason
     current_head.is_deleted = True
     current_head.is_family_head = False
 
-    # 2️⃣ Get family member
     member = db.query(models.FamilyMember).filter(
         models.FamilyMember.id == new_head_member_id
     ).first()
@@ -201,7 +144,6 @@ def promote_family_member_to_head(db: Session, resident_id: int, new_head_member
     if not member:
         return None
 
-    # 3️⃣ Convert member to new ResidentProfile
     new_head = models.ResidentProfile(
         first_name=member.first_name,
         last_name=member.last_name,
@@ -213,37 +155,16 @@ def promote_family_member_to_head(db: Session, resident_id: int, new_head_member
     )
 
     db.add(new_head)
-
-    # 4️⃣ Remove family member entry
     db.delete(member)
-
     db.commit()
     db.refresh(new_head)
-
     return new_head
 
+
 # =====================================================
-# DELETE RESIDENT
+# SOFT DELETE RESIDENT
 # =====================================================
-def delete_resident(db: Session, resident_id: int):
-    db_resident = db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.id == resident_id
-    ).first()
-
-    if not db_resident:
-        return None
-
-    db_resident.is_deleted = True
-    db_resident.deleted_at = datetime.utcnow()
-
-    db.commit()
-    db.refresh(db_resident)
-
-    return db_resident
-
 def soft_delete_resident(db: Session, resident_id: int):
-    print("DATABASE URL:", db.bind.url)
-
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.id == resident_id
     ).first()
@@ -252,8 +173,9 @@ def soft_delete_resident(db: Session, resident_id: int):
         return None
 
     resident.is_deleted = True
+    resident.deleted_at = datetime.utcnow()
     db.commit()
-
+    db.refresh(resident)
     return resident
 
 
@@ -270,16 +192,14 @@ def restore_resident(db: Session, resident_id: int):
 
     resident.is_deleted = False
     resident.deleted_at = None
-
     db.commit()
     db.refresh(resident)
-
     return resident
+
 
 # =====================================================
 # ARCHIVE RESIDENT
 # =====================================================
-
 def archive_resident(db: Session, resident_id: int, user_id: int):
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.id == resident_id
@@ -291,18 +211,28 @@ def archive_resident(db: Session, resident_id: int, user_id: int):
     resident.is_deleted = True
     resident.is_archived = True
 
-    log_action(
-        db,
-        user_id,
-        "Deleted assistance",
-        "assistance",
-        resident_id
-    )
+    log_action(db, user_id, "Archived resident", "resident", resident_id)
 
     db.commit()
     db.refresh(resident)
-
     return resident
+
+
+# =====================================================
+# PERMANENT DELETE RESIDENT
+# =====================================================
+def permanently_delete_resident(db: Session, resident_id: int):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id
+    ).first()
+
+    if not resident:
+        return None
+
+    db.delete(resident)
+    db.commit()
+    return True
+
 
 # =====================================================
 # FILTER HELPERS
@@ -310,8 +240,7 @@ def archive_resident(db: Session, resident_id: int, user_id: int):
 def apply_barangay_filter(query, barangay: str):
     if barangay:
         query = query.filter(
-            func.lower(models.ResidentProfile.barangay)
-            .like(f"%{barangay.lower()}%")
+            func.lower(models.ResidentProfile.barangay).like(f"%{barangay.lower()}%")
         )
     return query
 
@@ -325,17 +254,13 @@ def apply_sector_filter(query, sector: str):
     if normalized == "others":
         return query.filter(
             or_(
-                func.lower(
-                    func.coalesce(models.ResidentProfile.sector_summary, "")
-                ).like("%others%"),
+                func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like("%others%"),
                 func.coalesce(models.ResidentProfile.other_sector_details, "") != ""
             )
         )
 
     return query.filter(
-        func.lower(
-            func.coalesce(models.ResidentProfile.sector_summary, "")
-        ).like(f"%{normalized}%")
+        func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{normalized}%")
     )
 
 
@@ -351,27 +276,12 @@ def get_resident(db: Session, resident_id: int):
             joinedload(models.ResidentProfile.assistances)
         )
         .filter(
-        models.ResidentProfile.id == resident_id,
-        models.ResidentProfile.is_deleted == False
-    )
+            models.ResidentProfile.id == resident_id,
+            models.ResidentProfile.is_deleted == False
+        )
         .first()
     )
 
-# =====================================================
-# PERMANENT DELETE RESIDENTS
-# =====================================================
-def permanently_delete_resident(db: Session, resident_id: int):
-    resident = db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.id == resident_id
-    ).first()
-
-    if not resident:
-        return None
-
-    db.delete(resident)
-    db.commit()
-
-    return True
 
 # =====================================================
 # COUNT RESIDENTS
@@ -382,10 +292,9 @@ def get_resident_count(
     barangay: str = None,
     sector: str = None
 ):
-    query = db.query(models.ResidentProfile)
-    
-    query = query.filter(models.ResidentProfile.is_deleted == False)
-
+    query = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.is_deleted == False
+    )
 
     if search:
         search_fmt = f"%{search.strip()}%"
@@ -399,12 +308,11 @@ def get_resident_count(
 
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
-
     return query.count()
 
 
 # =====================================================
-# GET RESIDENT LIST (WITH DYNAMIC SORTING)
+# GET RESIDENT LIST
 # =====================================================
 def get_residents(
     db: Session,
@@ -420,10 +328,7 @@ def get_residents(
         subqueryload(models.ResidentProfile.family_members),
         subqueryload(models.ResidentProfile.sectors),
         subqueryload(models.ResidentProfile.assistances)
-    )
-    
-    query = query.filter(models.ResidentProfile.is_deleted == False)
-
+    ).filter(models.ResidentProfile.is_deleted == False)
 
     if search:
         search_fmt = f"%{search.strip()}%"
@@ -437,17 +342,6 @@ def get_residents(
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
 
-    valid_columns = {
-        "last_name": models.ResidentProfile.last_name,
-        "first_name": models.ResidentProfile.first_name,
-        "barangay": models.ResidentProfile.barangay,
-        "purok": models.ResidentProfile.purok,
-        "created_at": models.ResidentProfile.created_at,
-        "birthdate": models.ResidentProfile.birthdate
-    }
-
-    column = valid_columns.get(sort_by, models.ResidentProfile.last_name)
-
     if sort_order.lower() == "desc":
         query = query.order_by(
             func.upper(models.ResidentProfile.last_name).desc(),
@@ -459,22 +353,13 @@ def get_residents(
             func.upper(models.ResidentProfile.first_name).asc()
         )
 
-    # 🔥 RETURN MUST BE OUTSIDE
-    results = query.offset(skip).limit(limit).all()
-    
-    # DEBUG - remove after fix confirmed
-    print("SORT ORDER:", sort_order)
-    print("FIRST 5:", [(r.last_name, r.first_name) for r in results[:5]])
-    
-    return results
+    return query.offset(skip).limit(limit).all()
 
 
 # =====================================================
 # DASHBOARD STATS
 # =====================================================
 def get_dashboard_stats(db: Session):
-
-    # 🔥 Base query: ONLY active residents
     base_query = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == False
     )
@@ -489,9 +374,7 @@ def get_dashboard_stats(db: Session):
                 func.coalesce(func.trim(models.ResidentProfile.house_no), "")
             )
         )
-    ).filter(
-        models.ResidentProfile.is_deleted == False
-    ).scalar() or 0
+    ).filter(models.ResidentProfile.is_deleted == False).scalar() or 0
 
     total_male = base_query.filter(
         func.lower(models.ResidentProfile.sex).in_(["male", "m"])
@@ -501,9 +384,6 @@ def get_dashboard_stats(db: Session):
         func.lower(models.ResidentProfile.sex).in_(["female", "f"])
     ).count() or 0
 
-    # ------------------------------
-    # POPULATION BY BARANGAY
-    # ------------------------------
     barangay_counts = db.query(
         func.upper(func.trim(models.ResidentProfile.barangay)).label("barangay"),
         func.count(models.ResidentProfile.id)
@@ -515,9 +395,6 @@ def get_dashboard_stats(db: Session):
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
-    # ------------------------------
-    # POPULATION BY SECTOR
-    # ------------------------------
     sector_counts = db.query(
         models.ResidentProfile.sector_summary,
         func.count(models.ResidentProfile.id)
@@ -531,10 +408,7 @@ def get_dashboard_stats(db: Session):
     for sector_summary, count in sector_counts:
         if not sector_summary or sector_summary.lower() == "none":
             continue
-
-        sectors = [s.strip() for s in sector_summary.split(",")]
-
-        for s in sectors:
+        for s in [s.strip() for s in sector_summary.split(",")]:
             stats_sector[s] = stats_sector.get(s, 0) + count
 
     return {
@@ -546,10 +420,10 @@ def get_dashboard_stats(db: Session):
         "population_by_sector": stats_sector
     }
 
-# ----------------------
-# ADD ASSISTANCE
-# ----------------------
 
+# =====================================================
+# ASSISTANCE
+# =====================================================
 def add_assistance(db: Session, resident_id: int, assistance: schemas.AssistanceCreate):
     new_assistance = models.ResidentAssistance(
         resident_id=resident_id,
@@ -560,6 +434,7 @@ def add_assistance(db: Session, resident_id: int, assistance: schemas.Assistance
     db.refresh(new_assistance)
     return new_assistance
 
+
 def update_assistance(db: Session, assistance_id: int, data: schemas.AssistanceUpdate):
     assistance = db.query(models.ResidentAssistance).filter(
         models.ResidentAssistance.id == assistance_id
@@ -568,14 +443,11 @@ def update_assistance(db: Session, assistance_id: int, data: schemas.AssistanceU
     if not assistance:
         return None
 
-    update_data = data.model_dump(exclude_unset=True)
-
-    for key, value in update_data.items():
+    for key, value in data.model_dump(exclude_unset=True).items():
         setattr(assistance, key, value)
 
     db.commit()
     db.refresh(assistance)
-
     return assistance
 
 
@@ -589,94 +461,4 @@ def delete_assistance(db: Session, assistance_id: int):
 
     db.delete(assistance)
     db.commit()
-
     return True
-
-
-    # ------------------------------
-    # TOTAL RESIDENTS
-    # ------------------------------
-    total_residents = base_query.count() or 0
-
-    # ------------------------------
-    # TOTAL HOUSEHOLDS
-    # ------------------------------
-    total_households = db.query(
-        func.count(
-            func.distinct(
-                func.trim(models.ResidentProfile.barangay) +
-                "-" +
-                func.coalesce(func.trim(models.ResidentProfile.house_no), "")
-            )
-        )
-    ).filter(
-        models.ResidentProfile.is_deleted == False
-    ).scalar() or 0
-
-    # ------------------------------
-    # TOTAL MALE
-    # ------------------------------
-    total_male = db.query(
-        func.count(models.ResidentProfile.id)
-    ).filter(
-        models.ResidentProfile.is_deleted == False,
-        func.lower(models.ResidentProfile.sex).in_(["male", "m"])
-    ).scalar() or 0
-
-    # ------------------------------
-    # TOTAL FEMALE
-    # ------------------------------
-    total_female = db.query(
-        func.count(models.ResidentProfile.id)
-    ).filter(
-        models.ResidentProfile.is_deleted == False,
-        func.lower(models.ResidentProfile.sex).in_(["female", "f"])
-    ).scalar() or 0
-
-    # ------------------------------
-    # POPULATION BY BARANGAY
-    # ------------------------------
-    barangay_counts = db.query(
-        func.upper(func.trim(models.ResidentProfile.barangay)).label("barangay"),
-        func.count(models.ResidentProfile.id)
-    ).filter(
-        models.ResidentProfile.is_deleted == False,
-        models.ResidentProfile.barangay.isnot(None)
-    ).group_by(
-        func.upper(func.trim(models.ResidentProfile.barangay))
-    ).all()
-
-    stats_barangay = {b: count for b, count in barangay_counts if b}
-
-    # ------------------------------
-    # POPULATION BY SECTOR
-    # ------------------------------
-    sector_counts = db.query(
-        models.ResidentProfile.sector_summary,
-        func.count(models.ResidentProfile.id)
-    ).filter(
-        models.ResidentProfile.is_deleted == False,
-        models.ResidentProfile.sector_summary.isnot(None)
-    ).group_by(
-        models.ResidentProfile.sector_summary
-    ).all()
-
-    stats_sector = {}
-
-    for sector_summary, count in sector_counts:
-        if not sector_summary or sector_summary.lower() == "none":
-            continue
-
-        sectors = [s.strip() for s in sector_summary.split(",")]
-
-        for s in sectors:
-            stats_sector[s] = stats_sector.get(s, 0) + count
-
-    return {
-        "total_residents": total_residents,
-        "total_households": total_households,
-        "total_male": total_male,
-        "total_female": total_female,
-        "population_by_barangay": stats_barangay,
-        "population_by_sector": stats_sector
-    }
