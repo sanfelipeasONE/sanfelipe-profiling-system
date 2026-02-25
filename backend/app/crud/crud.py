@@ -19,27 +19,12 @@ def apply_search_filter(query, search: str):
 
     for word in words:
         word_fmt = f"%{word}%"
-        
-        # Full name in multiple orders to handle "Last, First" or "First Last"
-        full_name_fwd = func.concat(
-            func.coalesce(models.ResidentProfile.first_name, ""), " ",
-            func.coalesce(models.ResidentProfile.middle_name, ""), " ",
-            func.coalesce(models.ResidentProfile.last_name, "")
-        )
-        full_name_rev = func.concat(
-            func.coalesce(models.ResidentProfile.last_name, ""), " ",
-            func.coalesce(models.ResidentProfile.first_name, ""), " ",
-            func.coalesce(models.ResidentProfile.middle_name, "")
-        )
 
         query = query.filter(
             or_(
-                models.ResidentProfile.first_name.ilike(word_fmt),
-                models.ResidentProfile.middle_name.ilike(word_fmt),
                 models.ResidentProfile.last_name.ilike(word_fmt),
+                models.ResidentProfile.first_name.ilike(word_fmt),
                 models.ResidentProfile.resident_code.ilike(word_fmt),
-                full_name_fwd.ilike(word_fmt),
-                full_name_rev.ilike(word_fmt),
             )
         )
 
