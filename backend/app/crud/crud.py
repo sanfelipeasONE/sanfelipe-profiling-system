@@ -297,12 +297,28 @@ def get_resident_count(
     )
 
     if search:
-        search_fmt = f"%{search.strip()}%"
+        search = search.strip().upper()
+        search_fmt = f"%{search}%"
+
+        full_name = func.upper(
+            models.ResidentProfile.first_name + ' ' +
+            models.ResidentProfile.middle_name + ' ' +
+            models.ResidentProfile.last_name
+        )
+
+        reversed_name = func.upper(
+            models.ResidentProfile.last_name + ', ' +
+            models.ResidentProfile.first_name
+        )
+
         query = query.filter(
             or_(
-                models.ResidentProfile.last_name.ilike(search_fmt),
-                models.ResidentProfile.first_name.ilike(search_fmt),
-                models.ResidentProfile.resident_code.ilike(search_fmt)
+                full_name.ilike(search_fmt),
+                reversed_name.ilike(search_fmt),
+                func.upper(models.ResidentProfile.first_name).ilike(search_fmt),
+                func.upper(models.ResidentProfile.middle_name).ilike(search_fmt),
+                func.upper(models.ResidentProfile.last_name).ilike(search_fmt),
+                func.upper(models.ResidentProfile.resident_code).ilike(search_fmt)
             )
         )
 
