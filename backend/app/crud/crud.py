@@ -25,6 +25,15 @@ def apply_search_filter(query, search: str):
                 models.ResidentProfile.last_name.ilike(word_fmt),
                 models.ResidentProfile.first_name.ilike(word_fmt),
                 models.ResidentProfile.resident_code.ilike(word_fmt),
+                # Combined so "ALFEROS ERNESTO" can match across fields
+                func.concat(
+                    func.coalesce(models.ResidentProfile.last_name, ""), " ",
+                    func.coalesce(models.ResidentProfile.first_name, "")
+                ).ilike(word_fmt),
+                func.concat(
+                    func.coalesce(models.ResidentProfile.first_name, ""), " ",
+                    func.coalesce(models.ResidentProfile.last_name, "")
+                ).ilike(word_fmt),
             )
         )
 
