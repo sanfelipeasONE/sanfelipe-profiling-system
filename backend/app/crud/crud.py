@@ -8,6 +8,66 @@ import re
 
 
 # =====================================================
+# SEARCH HELPER
+# =====================================================
+def apply_search_filter(query, search: str):
+    if not search:
+        return query
+
+    cleaned = re.sub(r"[^\w\s]", " ", search.strip().upper())
+    words = cleaned.split()
+
+    for word in words:
+        word_fmt = f"%{word}%"
+        full_name = func.concat(
+            func.coalesce(models.ResidentProfile.first_name, ""), " ",
+            func.coalesce(models.ResidentProfile.middle_name, ""), " ",
+            func.coalesce(models.ResidentProfile.last_name, "")
+        )
+        query = query.filter(
+            or_(
+                models.ResidentProfile.first_name.ilike(word_fmt),
+                models.ResidentProfile.middle_name.ilike(word_fmt),
+                models.ResidentProfile.last_name.ilike(word_fmt),
+                models.ResidentProfile.resident_code.ilike(word_fmt),
+                full_name.ilike(word_fmt),
+            )
+        )
+
+    return query
+
+
+# =====================================================
+# FILTER HELPERS
+# =====================================================
+def apply_barangay_filter(query, barangay: str):
+    if barangay:
+        query = query.filter(
+            func.lower(models.ResidentProfile.barangay).like(f"%{barangay.lower()}%")
+        )
+    return query
+
+
+def apply_sector_filter(query, sector: str):
+    if not sector:
+        return query
+
+    normalized = sector.strip().lower()
+
+    if normalized == "others":
+        return query.filter(
+            or_(
+                func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like("%others%"),
+                func.coalesce(models.ResidentProfile.other_sector_details, "") != ""
+            )
+        )
+
+    return query.filter(
+        func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{normalized}%")
+    )
+
+
+# =====================================================
 # CREATE RESIDENT
 # =====================================================
 def create_resident(db: Session, resident: schemas.ResidentCreate):
@@ -236,36 +296,6 @@ def permanently_delete_resident(db: Session, resident_id: int):
 
 
 # =====================================================
-# FILTER HELPERS
-# =====================================================
-def apply_barangay_filter(query, barangay: str):
-    if barangay:
-        query = query.filter(
-            func.lower(models.ResidentProfile.barangay).like(f"%{barangay.lower()}%")
-        )
-    return query
-
-
-def apply_sector_filter(query, sector: str):
-    if not sector:
-        return query
-
-    normalized = sector.strip().lower()
-
-    if normalized == "others":
-        return query.filter(
-            or_(
-                func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like("%others%"),
-                func.coalesce(models.ResidentProfile.other_sector_details, "") != ""
-            )
-        )
-
-    return query.filter(
-        func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{normalized}%")
-    )
-
-
-# =====================================================
 # GET SINGLE RESIDENT
 # =====================================================
 def get_resident(db: Session, resident_id: int):
@@ -297,24 +327,10 @@ def get_resident_count(
         models.ResidentProfile.is_deleted == False
     )
 
-    if search:
-    # Remove commas and extra symbols
-        cleaned = re.sub(r"[^\w\s]", " ", search.upper())
-        words = cleaned.split()
-
-        for word in words:
-            word_fmt = f"%{word}%"
-            query = query.filter(
-                or_(
-                    models.ResidentProfile.first_name.ilike(word_fmt),
-                    models.ResidentProfile.middle_name.ilike(word_fmt),
-                    models.ResidentProfile.last_name.ilike(word_fmt),
-                    models.ResidentProfile.resident_code.ilike(word_fmt)
-                )
-            )
-
+    query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
+
     return query.count()
 
 
@@ -337,20 +353,7 @@ def get_residents(
         subqueryload(models.ResidentProfile.assistances)
     ).filter(models.ResidentProfile.is_deleted == False)
 
-    if search:
-        words = search.strip().upper().split()
-
-        for word in words:
-            word_fmt = f"%{word}%"
-            query = query.filter(
-                or_(
-                    models.ResidentProfile.first_name.ilike(word_fmt),
-                    models.ResidentProfile.middle_name.ilike(word_fmt),
-                    models.ResidentProfile.last_name.ilike(word_fmt),
-                    models.ResidentProfile.resident_code.ilike(word_fmt)
-                )
-            )
-
+    query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
 
