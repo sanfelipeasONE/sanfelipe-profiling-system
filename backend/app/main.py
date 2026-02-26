@@ -23,6 +23,9 @@ from app import models, schemas, crud
 from app.core.database import engine, get_db
 from services import report_service
 
+import cloudinary.uploader
+from app.core.cloudinary_config import *
+
 # ---------------------------------------------------
 # INITIALIZE APP
 # ---------------------------------------------------
@@ -414,6 +417,50 @@ def remove_assistance(
         raise HTTPException(status_code=404, detail="Assistance not found")
 
     return {"message": "Assistance record deleted"}
+
+@app.post("/residents/{resident_id}/upload-photo")
+async def upload_resident_photo(
+    resident_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # 🔒 Only admin can upload photo
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    # Validate file type
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    try:
+        # Upload to Cloudinary
+        result = cloudinary.uploader.upload(
+            file.file,
+            folder="san_felipe_residents",
+            public_id=f"resident_{resident.id}",
+            overwrite=True
+        )
+
+        # Save URL to database
+        resident.photo_url = result["secure_url"]
+        db.commit()
+
+        return {
+            "message": "Photo uploaded successfully",
+            "photo_url": resident.photo_url
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 

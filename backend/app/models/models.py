@@ -102,6 +102,9 @@ class ResidentProfile(Base):
     # 6. SECTORS (Text Summary)
     other_sector_details = Column(String, nullable=True) 
     sector_summary = Column(String, nullable=True)
+    
+    # 7. PHOTO
+    photo_url = Column(String, nullable=True)
 
     # System Fields
     is_active = Column(Boolean, default=True)

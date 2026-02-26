@@ -121,6 +121,7 @@ class Resident(ResidentBase):
     family_members: List[FamilyMember] = []
     sectors: List[Sector] = []
     assistances: List[AssistanceOut] = []
+    photo_url: str | None = None
 
     class Config:
         from_attributes = True
