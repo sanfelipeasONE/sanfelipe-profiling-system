@@ -5,8 +5,48 @@ import {
   Fingerprint, FileText, ChevronDown, Check, AlertCircle 
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import Cropper from "react-easy-crop";
 
 // --- REUSABLE COMPONENTS ---
+
+const createImage = (url) =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image));
+    image.addEventListener("error", (error) => reject(error));
+    image.setAttribute("crossOrigin", "anonymous");
+    image.src = url;
+  });
+
+async function getCroppedImg(imageSrc, croppedAreaPixels) {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = croppedAreaPixels.width;
+  canvas.height = croppedAreaPixels.height;
+
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height
+  );
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      const file = new File([blob], "profile.jpg", {
+        type: "image/jpeg",
+      });
+      resolve(file);
+    }, "image/jpeg");
+  });
+}
 
 const SectionHeader = ({ icon: Icon, title, colorClass = "text-stone-600" }) => (
   <div className="flex items-center gap-3 border-b border-stone-200 pb-3 mb-5">
@@ -110,6 +150,13 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const [purokOptions, setPurokOptions] = useState([]);
   const [sectorOptions, setSectorOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageSrc, setImageSrc] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
   
   const userRole = localStorage.getItem('role') || 'staff'; 
 
@@ -166,14 +213,25 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       setFormData({
         ...getInitialFormState(),
         ...residentToEdit,
-        birthdate: residentToEdit.birthdate ? residentToEdit.birthdate.split('T')[0] : '',
+        birthdate: residentToEdit.birthdate
+          ? residentToEdit.birthdate.split("T")[0]
+          : "",
         sex: normalizeSex(residentToEdit.sex),
         civil_status: normalizeCivilStatus(residentToEdit.civil_status),
         barangay: normalizeSelect(residentToEdit.barangay, barangayOptions),
         purok: normalizeSelect(residentToEdit.purok, purokOptions),
-        sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map(s => s.id) : [],
-        family_members: residentToEdit.family_members || []
+        sector_ids: residentToEdit.sectors
+          ? residentToEdit.sectors.map((s) => s.id)
+          : [],
+        family_members: residentToEdit.family_members || [],
       });
+
+      // 👇 THIS is what actually shows the photo
+      if (residentToEdit.photo_url) {
+        setPhotoPreview(residentToEdit.photo_url);
+      } else {
+        setPhotoPreview(null);
+      }
     }
   }, [residentToEdit, barangayOptions, purokOptions]);
 
@@ -219,20 +277,54 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     setLoading(true);
 
     try {
+      let response;
+
       if (residentToEdit) {
-        await api.put(`/residents/${residentToEdit.id}`, formData);
+        // UPDATE MODE
+        response = await api.put(`/residents/${residentToEdit.id}`, formData);
+
+        if (photoFile) {
+          const form = new FormData();
+          form.append("file", photoFile);
+
+          await api.post(
+            `/residents/${residentToEdit.id}/upload-photo`,
+            form,
+            { headers: { "Content-Type": "multipart/form-data" } }
+          );
+        }
+
         toast.success("Resident Record Updated.");
         setTimeout(onSuccess, 1000);
+
       } else {
-        await api.post('/residents/', formData);
+        // CREATE MODE
+        response = await api.post('/residents/', formData);
+
+        const newResident = response.data;
+
+        if (photoFile && newResident?.id) {
+          const form = new FormData();
+          form.append("file", photoFile);
+
+          await api.post(
+            `/residents/${newResident.id}/upload-photo`,
+            form,
+            { headers: { "Content-Type": "multipart/form-data" } }
+          );
+        }
+
         toast.success("New Resident Registered.");
+
         setTimeout(() => {
           setFormData(getInitialFormState());
+          setPhotoFile(null);
           window.scrollTo({ top: 0, behavior: 'smooth' });
           setLoading(false);
           onSuccess();
         }, 1000);
       }
+
     } catch (err) {
       if (err.response?.data?.detail) {
         toast.error(err.response.data.detail);
@@ -276,15 +368,48 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
               <InputGroup label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required placeholder="DELA CRUZ" className="lg:col-span-1" />
               <InputGroup label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required placeholder="JUAN" className="lg:col-span-1" />
               <InputGroup label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="SANTOS" />
-              <InputGroup label="Suffix (e.g. Jr, III)" name="spouse_ext_name" value={formData.spouse_ext_name} onChange={handleChange} placeholder="JR, SR, III" />
+              <InputGroup label="Suffix (e.g. Jr, III)" name="ext_name" value={formData.ext_name} onChange={handleChange} placeholder="JR, SR, III" />
             </div>
+            {/* PHOTO UPLOAD SECTION */}
+            <div className="mt-5">
+              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                Resident Photo
+              </label>
 
+              {photoPreview && (
+                <div className="mt-3 mb-3">
+                  <img
+                    src={photoPreview}
+                    alt="Resident"
+                    className="w-32 h-32 object-cover rounded-md border"
+                  />
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+
+                  const reader = new FileReader();
+                  reader.readAsDataURL(file);
+                  reader.onload = () => {
+                    setImageSrc(reader.result);
+                    setCropModalOpen(true);
+                  };
+                }}
+                className="mt-2 text-xs"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <InputGroup label="Date of Birth" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
               <SelectGroup label="Sex" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required placeholder="SELECT GENDER" />
               <SelectGroup label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed', 'Live-in Partner']} required placeholder="SELECT STATUS" />
               <InputGroup label="Religion" name="religion" value={formData.religion} onChange={handleChange} placeholder="ROMAN CATHOLIC" />
             </div>
+
 
             {/* SPOUSE SECTION */}
             {(formData.civil_status === 'Married' || formData.civil_status === 'Live-in Partner') && (
@@ -297,7 +422,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                   <InputGroup label="Spouse Last Name" name="spouse_last_name" value={formData.spouse_last_name} onChange={handleChange} />
                   <InputGroup label="Spouse First Name" name="spouse_first_name" value={formData.spouse_first_name} onChange={handleChange} />
                   <InputGroup label="Spouse Middle Name" name="spouse_middle_name" value={formData.spouse_middle_name} onChange={handleChange} />
-                  <InputGroup label="Suffix" name="spouse_ext_name" value={formData.spouse_ext_name} />
+                  <InputGroup label="Suffix" name="spouse_ext_name" value={formData.spouse_ext_name} onChange={handleChange} />
                 </div>
               </div>
             )}
@@ -421,6 +546,67 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
            </div>
         </div>
       </form>
-    </div>
-  );
+        {/* 👇 ADD CROP MODAL HERE 👇 */}
+        {cropModalOpen && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-md w-[400px]">
+              
+              <div className="relative w-full h-[300px] bg-black">
+                <Cropper
+                  image={imageSrc}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  cropShape="round"   // optional (ID style)
+                  showGrid={false}
+                  objectFit="contain"
+                  restrictPosition={false}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={(croppedArea, croppedPixels) =>
+                    setCroppedAreaPixels(croppedPixels)
+                  }
+                />
+              </div>
+
+              <input
+                type="range"
+                value={zoom}
+                min={1}
+                max={3}
+                step={0.1}
+                onChange={(e) => setZoom(e.target.value)}
+                className="w-full mt-4"
+              />
+
+              <div className="mt-4 flex justify-between">
+                <button
+                  onClick={() => setCropModalOpen(false)}
+                  className="px-4 py-2 border"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={async () => {
+                    const croppedImage = await getCroppedImg(
+                      imageSrc,
+                      croppedAreaPixels
+                    );
+
+                    setPhotoFile(croppedImage);
+                    setPhotoPreview(URL.createObjectURL(croppedImage));
+
+                    setCropModalOpen(false);
+                  }}
+                  className="px-4 py-2 bg-rose-700 text-white"
+                >
+                  Save Crop
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
 }

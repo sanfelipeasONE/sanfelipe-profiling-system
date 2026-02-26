@@ -31,7 +31,7 @@
     print-color-adjust: exact !important;
   }
 
-  /* Show only ID card */
+  /* Show only ID card area */
   .qr-print-area,
   .qr-print-area * {
     visibility: visible;
@@ -44,20 +44,38 @@
     background: white !important;
   }
 
-  /* Make the page EXACT ID size */
+  /* Each page is one ID card */
   @page {
-    size: 3.5in 5in;  /* ID badge size */
+    size: 3.5in 5in;
     margin: 0;
   }
 
-  /* Position ID perfectly */
+  /* Stack cards vertically for printing */
   .qr-print-area {
     position: absolute;
     top: 0;
     left: 0;
     width: 3.5in;
-    height: 5in;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     box-shadow: none !important;
+  }
+
+  /* Each card fills exactly one page */
+  .qr-print-area > div {
+    width: 3.5in !important;
+    height: 5in !important;
+    page-break-after: always;
+    break-after: page;
+    box-shadow: none !important;
+    flex-shrink: 0;
+  }
+
+  /* Remove page break after the last card */
+  .qr-print-area > div:last-child {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   .no-print {

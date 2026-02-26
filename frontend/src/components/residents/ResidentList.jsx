@@ -94,13 +94,18 @@ export default function ResidentList({ userRole, onEdit }) {
         params.append('sort_order', currentSortOrder);
 
       const response = await api.get(`/residents/?${params.toString()}`);
-      if (response.data.items) {
-        setResidents(response.data.items);
-        setTotalItems(response.data.total);
-      } else {
-        setResidents(response.data);
-        setTotalItems(response.data.length);
-      }
+      const data = response.data;
+
+    if (Array.isArray(data)) {
+      setResidents(data);
+      setTotalItems(data.length);
+    } else if (Array.isArray(data.items)) {
+      setResidents(data.items);
+      setTotalItems(data.total || data.items.length);
+    } else {
+      setResidents([]);
+      setTotalItems(0);
+    }
     } catch (error) {
       toast.error("System Error: Unable to retrieve records.");
     } finally {
@@ -118,12 +123,23 @@ export default function ResidentList({ userRole, onEdit }) {
 
   useEffect(() => {
     const fetchBarangays = async () => {
-      try {
-        const response = await api.get('/barangays/');
-        setBarangayList(response.data);
-      } catch (err) { console.error(err); }
-    };
-    fetchBarangays();
+  try {
+    const response = await api.get('/barangays/');
+    const data = response.data;
+
+    if (Array.isArray(data)) {
+      setBarangayList(data);
+    } else if (Array.isArray(data.items)) {
+      setBarangayList(data.items);
+    } else {
+      setBarangayList([]);
+    }
+
+  } catch (err) {
+    console.error(err);
+    setBarangayList([]);
+  }
+};
   }, []);
 
   useEffect(() => {
@@ -229,6 +245,15 @@ export default function ResidentList({ userRole, onEdit }) {
       <div className="flex items-center gap-2 mb-6 border-b border-stone-200 pb-2">
          <FileText size={16} className="text-rose-700"/>
          <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wide">Information Background</h3>
+         {r.photo_url && (
+          <div className="mb-4">
+            <img
+              src={r.photo_url}
+              alt="Resident"
+              className="w-32 h-32 object-cover rounded-md border border-stone-300"
+            />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -760,17 +785,39 @@ export default function ResidentList({ userRole, onEdit }) {
 
                     {/* IDENTITY */}
                     <td className="py-3 px-4 border-r border-stone-200">
-                       <div className="flex flex-col">
+                      <div className="flex items-center gap-3">
+
+                        {/* PHOTO */}
+                        {r.photo_url ? (
+                          <img
+                            src={r.photo_url}
+                            alt="Resident"
+                            className="w-10 h-10 rounded-full object-cover border border-stone-300"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center text-xs text-stone-500">
+                            N/A
+                          </div>
+                        )}
+
+                        {/* NAME */}
+                        <div className="flex flex-col">
                           <span className="font-bold text-stone-800 uppercase text-[13px]">
-                            {r.last_name}{r.last_name && ","} {r.first_name} {r.middle_name || ""} {r.ext_name || ""}
+                            {r.last_name},{' '}
+                            {r.first_name} {r.middle_name || ''} {r.ext_name || ''}
                           </span>
                           <div className="flex items-center gap-2 mt-0.5">
-                             <span className="text-[10px] bg-stone-100 border border-stone-200 px-1 rounded text-stone-500 font-mono">{r.sex}</span>
-                             <span className="text-[10px] text-rose-700 font-bold uppercase">{r.occupation || "N/A"}</span>
+                            <span className="text-[10px] bg-stone-100 border border-stone-200 px-1 rounded text-stone-500 font-mono">
+                              {r.sex}
+                            </span>
+                            <span className="text-[10px] text-rose-700 font-bold uppercase">
+                              {r.occupation || "N/A"}
+                            </span>
                           </div>
-                       </div>
-                    </td>
+                        </div>
 
+                      </div>
+                    </td>
                     {/* BIRTH INFO */}
                     <td className="py-3 px-4 border-r border-stone-200 font-mono text-xs text-stone-600">
                        {formatDate(r.birthdate)}
