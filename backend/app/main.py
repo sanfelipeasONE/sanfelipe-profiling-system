@@ -824,28 +824,16 @@ def get_stats(db: Session = Depends(get_db),
 @app.post("/import/excel")
 async def import_residents_excel(
     file: UploadFile = File(...),
+    sheet_name: str | None = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can import data")
-
-    if not file.filename.lower().endswith((".xlsx", ".csv")):
-        raise HTTPException(
-            status_code=400,
-            detail="Please upload an Excel (.xlsx) or CSV file."
-        )
+        raise HTTPException(status_code=403)
 
     contents = await file.read()
 
-    try:
-        result = process_excel_import(
-            io.BytesIO(contents),
-            db
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return process_excel_import(io.BytesIO(contents), db, sheet_name=sheet_name)
 
 @app.get("/export/excel")
 def export_residents_excel(
