@@ -68,55 +68,42 @@ def is_checked(value):
 
 
 # ===============================
+# NORMALIZE COLUMN HEADERS
+# Strips everything from the first newline or parenthesis onward,
+# so multiline Google Form headers are reduced to their core label.
+# e.g. "MIDDLE NAME\n(If not applicable...)" → "MIDDLE NAME"
+#      "PUROK/SITIO \n(Ex. 1, 2, 3...)"      → "PUROK/SITIO"
+# ===============================
+def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df.columns = [
+        re.sub(r'\s*[\(\n].*', '', col).strip().upper()
+        for col in df.columns
+    ]
+    return df
+
+
+# ===============================
 # MAIN IMPORT FUNCTION
 # ===============================
 def process_excel_import(file_content, db: Session):
 
     df = pd.read_excel(file_content, dtype=object, engine="openpyxl")
-    print("=== ALL COLUMNS ===")
-    print(df.columns.tolist())
-    print("===================")
     df = df.replace({pd.NaT: None})
     df = df.where(pd.notnull(df), None)
 
-    # --------------------------------------------------
-    # CLEAN & NORMALIZE HEADERS
-    # --------------------------------------------------
-    df.columns = [
-        re.sub(r'\s+', ' ', col.strip().upper())
-        for col in df.columns
-    ]
+    # Normalize headers
+    df = normalize_columns(df)
 
     print("=== CLEANED COLUMNS ===")
     print(df.columns.tolist())
+    print("=======================")
 
     success_count = 0
     skipped_duplicates = 0
     errors = []
 
     # --------------------------------------------------
-    # IDENTIFY SPOUSE BLOCK
-    # --------------------------------------------------
-    spouse_index = None
-    for i, col in enumerate(df.columns):
-        if col == "SPOUSE/PARTNER":
-            spouse_index = i
-            break
-
-    # Main head columns (fixed order)
-    main_last_col = "LAST NAME"
-    main_first_col = "FIRST NAME"
-    main_middle_col = "MIDDLE NAME"
-    main_ext_col = "EXT NAME"
-
-    # Spouse columns (auto-detected)
-    spouse_last_col = "LAST NAME.1" if "LAST NAME.1" in df.columns else None
-    spouse_first_col = "FIRST NAME.1" if "FIRST NAME.1" in df.columns else None
-    spouse_middle_col = "MIDDLE NAME.1" if "MIDDLE NAME.1" in df.columns else None
-    spouse_ext_col = "EXT NAME.1" if "EXT NAME.1" in df.columns else None
-
-    # --------------------------------------------------
-    # SECTOR COLUMNS
+    # SECTOR COLUMNS (if present in this file)
     # --------------------------------------------------
     possible_sectors = [
         "INDIGENOUS PEOPLE",
@@ -137,7 +124,6 @@ def process_excel_import(file_content, db: Session):
         "LIFEGUARD",
         "OTHERS"
     ]
-
     sector_columns = [col for col in possible_sectors if col in df.columns]
 
     # --------------------------------------------------
@@ -145,15 +131,15 @@ def process_excel_import(file_content, db: Session):
     # --------------------------------------------------
     for index, row in df.iterrows():
         try:
+            # ── Core fields ──────────────────────────────────
+            last_name   = clean_str(row.get("LAST NAME"))
+            first_name  = clean_str(row.get("FIRST NAME"))
+            middle_name = clean_str(row.get("MIDDLE NAME"))
+            ext_name    = clean_str(row.get("EXTENSION NAME"))   # was EXT NAME
+            barangay    = clean_str(row.get("BARANGAY"))
+            birthdate   = parse_date(row.get("BIRTHDATE"))
 
-            last_name = clean_str(row.get(main_last_col))
-            first_name = clean_str(row.get(main_first_col))
-            middle_name = clean_str(row.get(main_middle_col))
-            ext_name = clean_str(row.get(main_ext_col))
-
-            barangay = clean_str(row.get("BARANGAY"))
-            birthdate = parse_date(row.get("BIRTHDATE"))
-
+            # Skip completely empty rows
             if last_name == "" and first_name == "":
                 continue
 
@@ -162,48 +148,45 @@ def process_excel_import(file_content, db: Session):
                 skipped_duplicates += 1
                 continue
 
-            # Precinct
-            precinct_no = ""
-            for col in df.columns:
-                if col in ["PRECINT NO", "PRECINCT NO", "PRECINCT"]:
-                    precinct_no = clean_str(row.get(col))
-                    break
+            # ── Optional / renamed fields ─────────────────────
+            purok       = clean_str(row.get("PUROK/SITIO"))      # long header → normalized
+            contact_no  = clean_str(row.get("PHONE NUMBER"))     # was CONTACT
+            precinct_no = clean_str(row.get("PRECINCT NUMBER"))  # was PRECINT NO / PRECINCT NO
 
-            # Sector processing
-            active_sectors = []
-            for col in sector_columns:
-                if is_checked(row.get(col)):
-                    active_sectors.append(col)
-
+            # ── Sector processing ─────────────────────────────
+            active_sectors = [col for col in sector_columns if is_checked(row.get(col))]
             sector_summary = ", ".join(active_sectors) if active_sectors else "None"
 
-            # Spouse
-            spouse_last = clean_str(row.get(spouse_last_col)) if spouse_last_col else ""
-            spouse_first = clean_str(row.get(spouse_first_col)) if spouse_first_col else ""
-            spouse_middle = clean_str(row.get(spouse_middle_col)) if spouse_middle_col else ""
-            spouse_ext = clean_str(row.get(spouse_ext_col)) if spouse_ext_col else ""
+            # ── Spouse – extracted from family member rows ────
+            # This Excel has no separate spouse block; the spouse appears
+            # as a family member entry with RELATIONSHIP == "SPOUSE".
+            # We'll capture it below when processing family members.
+            spouse_last   = ""
+            spouse_first  = ""
+            spouse_middle = ""
+            spouse_ext    = ""
 
-            # Create Resident
+            # ── Create Resident ───────────────────────────────
             resident = ResidentProfile(
                 last_name=last_name.upper(),
                 first_name=first_name.upper(),
                 middle_name=middle_name.upper(),
                 ext_name=ext_name,
-                house_no=clean_str(row.get("HOUSE NO. / STREET")),
-                purok=clean_str(row.get("PUROK/SITIO")),
+                house_no="",                             # not in this form
+                purok=purok,
                 barangay=barangay,
                 birthdate=birthdate,
                 sex=clean_str(row.get("SEX")),
                 civil_status=clean_str(row.get("CIVIL STATUS")),
-                religion=clean_str(row.get("RELIGION")),
-                occupation=clean_str(row.get("OCCUPATION")),
-                contact_no=clean_str(row.get("CONTACT")),
+                religion="",                             # not in this form
+                occupation="",                           # not in this form
+                contact_no=contact_no,
                 precinct_no=precinct_no,
                 spouse_last_name=spouse_last,
                 spouse_first_name=spouse_first,
                 spouse_middle_name=spouse_middle,
                 spouse_ext_name=spouse_ext,
-                sector_summary=sector_summary
+                sector_summary=sector_summary,
             )
 
             db.add(resident)
@@ -215,81 +198,82 @@ def process_excel_import(file_content, db: Session):
                 continue
 
             # --------------------------------------------------
-            # FAMILY MEMBERS (ROBUST MATCHING)
+            # FAMILY MEMBERS
+            # Columns are already normalized to:
+            #   "1. LAST NAME", "1. FIRST NAME", "1. MIDDLE NAME",
+            #   "1. EXTENSION NAME", "1. RELATIONSHIP"  … up to 5
             # --------------------------------------------------
-            family_columns = [col for col in df.columns if re.match(r"\d+\.\s", col)]
+            family_columns = [col for col in df.columns if re.match(r"^\d+\.\s", col)]
 
-            members = {}
-
+            members: dict[int, dict] = {}
             for col in family_columns:
-                match = re.match(r"(\d+)\.\s*(.*)", col)
+                match = re.match(r"^(\d+)\.\s*(.*)", col)
                 if match:
-                    member_no = int(match.group(1))
-                    field_name = match.group(2)
+                    member_no  = int(match.group(1))
+                    field_name = match.group(2).strip()
 
-                    # Normalize field names
+                    # Normalize field label
                     if "LAST NAME" in field_name:
                         field_name = "LAST NAME"
                     elif "FIRST NAME" in field_name:
                         field_name = "FIRST NAME"
                     elif "MIDDLE NAME" in field_name:
                         field_name = "MIDDLE NAME"
+                    elif "EXTENSION NAME" in field_name:
+                        field_name = "EXTENSION NAME"
                     elif "RELATIONSHIP" in field_name:
                         field_name = "RELATIONSHIP"
 
-                    if member_no not in members:
-                        members[member_no] = {}
-
-                    members[member_no][field_name] = col
+                    members.setdefault(member_no, {})[field_name] = col
 
             for member_no in sorted(members.keys()):
-
                 cols = members[member_no]
 
                 lname = clean_str(row.get(cols.get("LAST NAME", "")))
                 fname = clean_str(row.get(cols.get("FIRST NAME", "")))
                 mname = clean_str(row.get(cols.get("MIDDLE NAME", "")))
-                rel = clean_str(row.get(cols.get("RELATIONSHIP", "")))
+                ext   = clean_str(row.get(cols.get("EXTENSION NAME", "")))
+                rel   = clean_str(row.get(cols.get("RELATIONSHIP", "")))
 
-                # --- SHIFT FIX ---
-                # If last name is empty but first name equals household surname,
-                # and relationship looks like a name (not SON/DAUGHTER/etc),
-                # then shift values left.
-
-                if lname == "" and fname == resident.last_name:
-                    lname = resident.last_name
-                    fname = mname
-                    mname = ""
-                    rel = clean_str(row.get(cols.get("RELATIONSHIP", "")))
-
+                # Skip blank entries
                 if fname == "" and rel == "":
                     continue
 
+                # Default last name to household surname if blank
                 if lname == "":
                     lname = resident.last_name
+
+                # Populate spouse fields on the resident record if not yet set
+                if rel.upper() == "SPOUSE" and resident.spouse_first_name == "":
+                    resident.spouse_last_name   = lname
+                    resident.spouse_first_name  = fname
+                    resident.spouse_middle_name = mname
+                    resident.spouse_ext_name    = ext
 
                 db.add(FamilyMember(
                     profile_id=resident.id,
                     last_name=lname,
                     first_name=fname,
                     middle_name=mname,
-                    relationship=rel
+                    relationship=rel,
                 ))
-
 
             success_count += 1
 
         except Exception as e:
-            errors.append(f"Row {index+2}: {str(e)}")
+            errors.append(f"Row {index + 2}: {str(e)}")
 
+    # --------------------------------------------------
+    # COMMIT
+    # --------------------------------------------------
     try:
         db.commit()
     except Exception as e:
         db.rollback()
-        return {"added": 0, "errors": [str(e)]}
+        return {"added": 0, "skipped_duplicates": 0, "errors": [str(e)]}
 
     return {
         "added": success_count,
         "skipped_duplicates": skipped_duplicates,
-        "errors": errors
+        "errors": errors,
     }
