@@ -122,25 +122,18 @@ export default function ResidentList({ userRole, onEdit }) {
 
 
   useEffect(() => {
-    const fetchBarangays = async () => {
-  try {
-    const response = await api.get('/barangays/');
-    const data = response.data;
-
-    if (Array.isArray(data)) {
-      setBarangayList(data);
-    } else if (Array.isArray(data.items)) {
-      setBarangayList(data.items);
-    } else {
+  const fetchBarangays = async () => {
+    try {
+      const res = await api.get("/barangays/");
+      setBarangayList(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Failed to fetch barangays", err);
       setBarangayList([]);
     }
+  };
 
-  } catch (err) {
-    console.error(err);
-    setBarangayList([]);
-  }
-};
-  }, []);
+  fetchBarangays(); // ✅ you were missing this call
+}, []);
 
   useEffect(() => {
     fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
