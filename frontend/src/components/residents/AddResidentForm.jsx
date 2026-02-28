@@ -428,7 +428,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 border-t border-stone-100 pt-5">
               <InputGroup label="Occupation / Profession" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="E.G. FARMER, GOVT EMPLOYEE" />
-              <InputGroup label="Mobile Number" name="contact_no" value={formData.contact_no} onChange={handleChange} placeholder="09XX-XXX-XXXX" />
+              <InputGroup label="Mobile Number" name="contact_no" value={formData.contact_no} onChange={(e) => { const val = e.target.value.replace(/\D/g, ''); setFormData(prev => ({ ...prev, contact_no: val })); }} placeholder="09XX-XXX-XXXX" />
               <InputGroup label="Precinct / Voter ID" name="precinct_no" value={formData.precinct_no} onChange={handleChange} placeholder="OPTIONAL" />
             </div>
           </div>
