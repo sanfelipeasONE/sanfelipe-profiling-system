@@ -178,11 +178,6 @@ const handlePermanentDelete = async (id) => {
              <ShieldAlert size={14} />
              <span className="text-xs font-bold uppercase tracking-wider">Restricted Access • Archival View</span>
            </div>
-           
-           <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-stone-200 rounded-sm">
-             <Search size={14} className="text-stone-400"/>
-             <span className="text-xs text-stone-400">Filter records...</span>
-           </div>
         </div>
 
         {residents.length === 0 ? (

@@ -226,7 +226,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         family_members: residentToEdit.family_members || [],
       });
 
-      // 👇 THIS is what actually shows the photo
       if (residentToEdit.photo_url) {
         setPhotoPreview(residentToEdit.photo_url);
       } else {
@@ -525,7 +524,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
            </div>
         </div>
 
-        {/* --- STICKY FOOTER --- */}
+        {/* STICKY FOOTER  */}
         <div className="fixed bottom-0 left-0 md:left-[260px] right-0 p-4 bg-white border-t border-stone-300 flex items-center justify-between z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
            <div className="hidden md:flex items-center gap-2 text-xs text-stone-500 font-medium">
              <AlertCircle size={14} />
@@ -546,7 +545,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
            </div>
         </div>
       </form>
-        {/* 👇 ADD CROP MODAL HERE 👇 */}
+        {/*  ADD CROP MODAL */}
         {cropModalOpen && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-md w-[400px]">
@@ -557,7 +556,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                   crop={crop}
                   zoom={zoom}
                   aspect={1}
-                  cropShape="round"   // optional (ID style)
+                  cropShape="round"
                   showGrid={false}
                   objectFit="contain"
                   restrictPosition={false}

@@ -132,7 +132,7 @@ export default function ResidentList({ userRole, onEdit }) {
     }
   };
 
-  fetchBarangays(); // ✅ you were missing this call
+  fetchBarangays();
 }, []);
 
   useEffect(() => {
@@ -308,7 +308,7 @@ export default function ResidentList({ userRole, onEdit }) {
 
                       <td className="py-2">{a.implementing_office || "-"}</td>
 
-                      {/* 🔥 ACTIONS COLUMN */}
+                      {/* ACTIONS COLUMN */}
                       <td className="py-2 text-right">
                         {userRole === "admin" && (
                         <div className="flex justify-end gap-2">
@@ -425,7 +425,7 @@ export default function ResidentList({ userRole, onEdit }) {
     <div className="font-sans text-stone-800 animate-in fade-in duration-300">
       <Toaster position="top-right" toastOptions={{ style: { background: '#333', color: '#fff', borderRadius: '4px' } }} />
 
-      {/* --- ASSISTANCE MODAL --- */}
+      {/*  ASSISTANCE MODAL */}
       {assistanceModal.isOpen && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
           <div
@@ -455,14 +455,12 @@ export default function ResidentList({ userRole, onEdit }) {
                 try {
 
                   if (assistanceModal.assistance) {
-                    // ✏ EDIT MODE
                     await api.put(
                       `/assistances/${assistanceModal.assistance.id}`,
                       payload
                     );
                     toast.success("Assistance updated.");
                   } else {
-                    // ➕ ADD MODE
                     await api.post(
                       `/residents/${assistanceModal.resident.id}/assistance`,
                       payload
