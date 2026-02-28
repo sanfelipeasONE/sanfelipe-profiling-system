@@ -10,6 +10,16 @@ from app.models.models import ResidentProfile, FamilyMember
 # ===============================
 # Helpers
 # ===============================
+def get_any(row, *keys):
+    for k in keys:
+        v = row.get(k)
+        if v is None:
+            continue
+        s = clean_str(v)
+        if s != "":
+            return s
+    return ""
+
 def clean_str(val):
     if val is None:
         return ""
@@ -59,9 +69,11 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         # Standardize
         c = c.replace("EXTENSION NAME", "EXT NAME")
         c = c.replace("CONTACT", "PHONE NUMBER")
+        c = c.replace("PRECINCT NUMBER ", "PRECINCT NUMBER")
+        c = c.replace("PRECINCT NUMBER.", "PRECINCT NUMBER")
+        c = c.replace("PRECINCT NO.", "PRECINCT NUMBER")
         c = c.replace("PRECINT NO", "PRECINCT NUMBER")
-        c = c.replace("PRECINCT NO", "PRECINCT NUMBER")
-        c = c.replace("PRECINCT", "PRECINCT NUMBER")
+        c = c.replace("PRECINT NO.", "PRECINCT NUMBER")
 
         cols.append(c)
 
@@ -213,7 +225,13 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
                 "religion": clean_str(row.get("RELIGION")) or None,
                 "occupation": clean_str(row.get("OCCUPATION")) or None,
                 "contact_no": clean_str(row.get("PHONE NUMBER")) or None,
-                "precinct_no": clean_str(row.get("PRECINCT NUMBER")) or None,
+                "precinct_no": get_any(
+                    row,
+                    "PRECINCT NUMBER",
+                    "PRECINCT NO",
+                    "PRECINT NO",
+                    "PRECINCT"
+                ) or None,
 
                 # spouse fields
                 "spouse_last_name": spouse_last or None,
