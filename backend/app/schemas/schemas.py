@@ -294,6 +294,7 @@ class AssistanceTrackingResponse(BaseModel):
     sector_summary: Optional[str] = None
     status: str  # "Claimed" or "Unclaimed"
     date_claimed: Optional[date] = None
+    type_of_assistance: str
 
     class Config:
         from_attributes = True
