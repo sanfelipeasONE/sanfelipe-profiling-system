@@ -275,20 +275,3 @@ class DashboardStats(BaseModel):
     total_female: int
     population_by_barangay: Dict[str, int] # Fix: Use Dict for type safety
     population_by_sector: Dict[str, int]
-
-# =======================
-# ASSISTANCE PROGRAM SCHEMAS
-# =======================
-class AssistanceProgramCreate(BaseModel):
-    name: str
-    sector: str
-    amount: float
-
-class AssistanceProgramOut(BaseModel):
-    id: int
-    name: str
-    sector: str
-    amount: float
-
-    class Config:
-        from_attributes = True
