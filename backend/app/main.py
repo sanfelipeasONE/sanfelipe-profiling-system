@@ -881,6 +881,8 @@ def read_residents(skip: int = 0,
                    search: str = None,
                    barangay: str = Query(None),
                    sector: str = Query(None),
+                   status: str = Query(None),
+                   program_id: int = Query(None),
                    sort_by: str = Query("last_name"),
                    sort_order: str = Query("asc"),
                    db: Session = Depends(get_db),
@@ -1369,3 +1371,38 @@ def permanently_delete_user(
     db.commit()
 
     return {"message": f"User '{user_to_delete.username}' permanently deleted"}
+
+# =======================
+# ASSISTANCE
+# =======================
+
+@app.post("/assistance/programs", response_model=schemas.AssistanceProgramOut)
+def create_program(
+    data: schemas.AssistanceProgramCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role(["admin", "super_admin"]))
+):
+    return crud.create_program(db, data)
+
+@app.get("/assistance/programs", response_model=list[schemas.AssistanceProgramOut])
+def get_programs(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_programs(db)
+
+@app.post("/assistance/claim")
+def claim_assistance(
+    resident_code: str,
+    program_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        result = crud.claim_assistance(db, resident_code, program_id)
+        return {
+            "message": "Assistance claimed successfully",
+            "claimed_at": result.claimed_at
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

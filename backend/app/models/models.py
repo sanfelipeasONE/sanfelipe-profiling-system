@@ -162,6 +162,12 @@ class ResidentAssistance(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     resident = relationship("ResidentProfile", back_populates="assistances")
+    
+    program_id = Column(Integer, ForeignKey("assistance_programs.id"))
+    status = Column(String, default="unclaimed")
+    claimed_at = Column(DateTime, nullable=True)
+    program = relationship("AssistanceProgram")
+    
 
 # Audit Log Table
 class AuditLog(Base):
@@ -173,3 +179,14 @@ class AuditLog(Base):
     target_type = Column(String)  # "resident", "user", "system"
     target_id = Column(Integer, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    
+# Assistance Programs
+class AssistanceProgram(Base):
+    __tablename__ = "assistance_programs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # e.g. "TODA AYUDA 2026"
+    sector = Column(String, nullable=False)  # target sector
+    amount = Column(Float, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)

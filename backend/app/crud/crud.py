@@ -452,7 +452,9 @@ def get_residents(
     sector: str = None,
     sort_by: str = "last_name",
     sort_order: str = "asc",
-    allowed_sector_names: list[str] | None = None
+    allowed_sector_names: list[str] | None = None,
+    status: str = None,
+    program_id: int = None
 ):
     query = db.query(models.ResidentProfile).options(
         subqueryload(models.ResidentProfile.family_members),
@@ -464,6 +466,7 @@ def get_residents(
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
     query = apply_allowed_sector_filter(query, allowed_sector_names)
+    query = apply_claim_filter(query, status, program_id)
 
     if sort_order.lower() == "desc":
         query = query.order_by(
@@ -614,3 +617,74 @@ def delete_assistance(db: Session, assistance_id: int):
     db.delete(assistance)
     db.commit()
     return True
+
+def create_program(db: Session, data: schemas.AssistanceProgramCreate):
+    program = models.AssistanceProgram(**data.model_dump())
+    db.add(program)
+    db.commit()
+    db.refresh(program)
+    return program
+
+def get_programs(db: Session):
+    return db.query(models.AssistanceProgram).all()
+
+def claim_assistance(db: Session, resident_code: str, program_id: int):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.resident_code == resident_code,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise ValueError("Resident not found")
+
+    program = db.query(models.AssistanceProgram).filter(
+        models.AssistanceProgram.id == program_id
+    ).first()
+
+    if not program:
+        raise ValueError("Program not found")
+
+    # 🔒 CHECK: sector match
+    if program.sector.upper() not in (resident.sector_summary or "").upper():
+        raise ValueError("Resident not eligible for this program")
+
+    existing = db.query(models.ResidentAssistance).filter(
+        models.ResidentAssistance.resident_id == resident.id,
+        models.ResidentAssistance.program_id == program_id
+    ).first()
+
+    if existing and existing.status == "claimed":
+        raise ValueError("Already claimed")
+
+    if not existing:
+        existing = models.ResidentAssistance(
+            resident_id=resident.id,
+            program_id=program_id
+        )
+        db.add(existing)
+
+    existing.status = "claimed"
+    existing.claimed_at = datetime.utcnow()
+
+    db.commit()
+    return existing
+
+def apply_claim_filter(query, status: str, program_id: int):
+    if not program_id:
+        return query
+
+    if status == "claimed":
+        return query.join(models.ResidentAssistance).filter(
+            models.ResidentAssistance.program_id == program_id,
+            models.ResidentAssistance.status == "claimed"
+        )
+
+    if status == "unclaimed":
+        return query.outerjoin(models.ResidentAssistance).filter(
+            or_(
+                models.ResidentAssistance.id == None,
+                models.ResidentAssistance.status != "claimed"
+            )
+        )
+
+    return query
