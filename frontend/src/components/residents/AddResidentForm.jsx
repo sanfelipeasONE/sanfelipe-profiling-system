@@ -19,7 +19,7 @@ import {
   Loader2,
   Camera,
   Upload,
-  Calendar,
+  Webcam,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Cropper from "react-easy-crop";
@@ -67,20 +67,33 @@ async function getCroppedImg(imageSrc, croppedAreaPixels) {
 
 // --- DATE HELPERS ---
 
+function formatBirthdateInput(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 6);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 6)}`;
+}
+
 function isoToDisplayDate(isoDate) {
   if (!isoDate) return "";
+
   const clean = String(isoDate).split("T")[0];
   const [year, month, day] = clean.split("-");
   if (!year || !month || !day) return "";
+
   return `${month}/${day}/${year.slice(-2)}`;
 }
 
 function displayDateToIso(displayDate) {
   const clean = String(displayDate || "").trim();
   const match = clean.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+
   if (!match) return "";
+
   const [, mm, dd, yy] = match;
   const fullYear = Number(yy) >= 50 ? `19${yy}` : `20${yy}`;
+
   return `${fullYear}-${mm}-${dd}`;
 }
 
@@ -139,8 +152,10 @@ const SelectGroup = ({
         {options.map((opt) => {
           const optionValue =
             typeof opt === "object" ? opt.id ?? opt.value ?? opt.name : opt;
+
           const optionLabel =
             typeof opt === "object" ? opt.label ?? opt.name ?? opt.id : opt;
+
           const key =
             typeof opt === "object" ? opt.id ?? opt.value ?? opt.name : opt;
 
@@ -192,218 +207,6 @@ const InputGroup = ({
     />
   </div>
 );
-
-// --- CALENDAR DATE PICKER ---
-
-const DatePickerInput = ({ label, name, value, onChange, required = false }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const now = new Date();
-
-  const parseDisplay = (val) => {
-    const match = String(val || "").match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
-    if (!match) return { month: null, day: null, year: null };
-    const [, mm, dd, yy] = match;
-    const fullYear = Number(yy) >= 50 ? 1900 + Number(yy) : 2000 + Number(yy);
-    return { month: Number(mm) - 1, day: Number(dd), year: fullYear };
-  };
-
-  const { month: selMonth, day: selDay, year: selYear } = parseDisplay(value);
-
-  const [viewMonth, setViewMonth] = useState(
-    selMonth !== null ? selMonth : now.getMonth()
-  );
-  const [viewYear, setViewYear] = useState(
-    selYear !== null ? selYear : now.getFullYear()
-  );
-
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-  ];
-  const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-
-  const handleDayClick = (day) => {
-    const mm = String(viewMonth + 1).padStart(2, "0");
-    const dd = String(day).padStart(2, "0");
-    const yy = String(viewYear).slice(-2);
-    onChange({ target: { name, value: `${mm}/${dd}/${yy}` } });
-    setOpen(false);
-  };
-
-  const prevMonth = () => {
-    if (viewMonth === 0) {
-      setViewMonth(11);
-      setViewYear((y) => y - 1);
-    } else {
-      setViewMonth((m) => m - 1);
-    }
-  };
-
-  const nextMonth = () => {
-    if (viewMonth === 11) {
-      setViewMonth(0);
-      setViewYear((y) => y + 1);
-    } else {
-      setViewMonth((m) => m + 1);
-    }
-  };
-
-  const isSelected = (day) =>
-    selDay === day && selMonth === viewMonth && selYear === viewYear;
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  // Sync view when value changes externally (e.g. edit mode)
-  useEffect(() => {
-    if (selMonth !== null && selYear !== null) {
-      setViewMonth(selMonth);
-      setViewYear(selYear);
-    }
-  }, [value]);
-
-  const cells = [];
-  for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-
-  const yearOptions = Array.from({ length: 110 }, (_, i) => now.getFullYear() - i);
-
-  return (
-    <div className="flex flex-col gap-1.5 w-full relative" ref={ref}>
-      <label className="flex items-center text-[11px] font-normal text-slate-400 uppercase tracking-wider">
-        {label} {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`
-          w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm font-normal text-left
-          outline-none transition-all uppercase flex items-center justify-between gap-2
-          ${open
-            ? "bg-white border-red-400 ring-4 ring-red-50"
-            : "border-slate-200 hover:border-slate-300"
-          }
-        `}
-      >
-        <span className={value ? "text-slate-800" : "text-slate-300"}>
-          {value || "MM/DD/YY"}
-        </span>
-        <Calendar size={16} className="text-slate-400 flex-shrink-0" strokeWidth={2} />
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-72 animate-in fade-in zoom-in-95 duration-150">
-
-          {/* Month/Year Navigation */}
-          <div className="flex items-center justify-between mb-4">
-            <button
-              type="button"
-              onClick={prevMonth}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-
-            <div className="flex items-center gap-1.5">
-              <div className="relative">
-                <select
-                  value={viewMonth}
-                  onChange={(e) => setViewMonth(Number(e.target.value))}
-                  className="text-sm font-medium text-slate-700 bg-transparent border-none outline-none cursor-pointer appearance-none pr-4"
-                >
-                  {monthNames.map((m, i) => (
-                    <option key={i} value={i}>{m}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="relative">
-                <select
-                  value={viewYear}
-                  onChange={(e) => setViewYear(Number(e.target.value))}
-                  className="text-sm font-medium text-slate-700 bg-transparent border-none outline-none cursor-pointer appearance-none pr-4"
-                >
-                  {yearOptions.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={nextMonth}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Day Headers */}
-          <div className="grid grid-cols-7 mb-1">
-            {dayNames.map((d) => (
-              <div
-                key={d}
-                className="text-center text-[10px] font-medium text-slate-400 uppercase py-1"
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Day Cells */}
-          <div className="grid grid-cols-7 gap-y-1">
-            {cells.map((day, idx) =>
-              day === null ? (
-                <div key={`empty-${idx}`} />
-              ) : (
-                <button
-                  key={day}
-                  type="button"
-                  onClick={() => handleDayClick(day)}
-                  className={`
-                    w-full aspect-square flex items-center justify-center text-xs rounded-lg transition-all font-normal
-                    ${
-                      isSelected(day)
-                        ? "bg-slate-900 text-white font-medium shadow-sm"
-                        : "text-slate-700 hover:bg-red-50 hover:text-red-600"
-                    }
-                  `}
-                >
-                  {day}
-                </button>
-              )
-            )}
-          </div>
-
-          {/* Footer: selected value display */}
-          {value && (
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-400 uppercase tracking-wide">Selected</span>
-              <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
-                {value}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 // --- INITIAL STATE ---
 
@@ -542,67 +345,124 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     loadMe();
   }, []);
 
+  // --- NORMALIZATION HELPERS ---
+  // Moved these outside the hooks so both loadAreas and populateEditData can use them.
+  const normalizeText = (v) =>
+    String(v ?? "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const normalizePurokSitioKey = (v) => {
+    const t = normalizeText(v);
+    const numMatch = t.match(/\b(\d{1,2})\b/);
+    if (t.includes("purok") && numMatch) return `purok-${numMatch[1]}`;
+    if (/^\d{1,2}$/.test(t)) return `purok-${t}`;
+    return t;
+  };
+
+  const normalizeSex = (value) => {
+    if (!value) return "";
+    const v = String(value).toLowerCase().trim();
+    if (v === "m" || v === "male") return "Male";
+    if (v === "f" || v === "female") return "Female";
+    return "";
+  };
+
+  const normalizeCivilStatus = (value) => {
+    if (!value) return "";
+    const v = String(value).toLowerCase().trim();
+    if (v === "single") return "Single";
+    if (v === "married") return "Married";
+    if (v === "widowed") return "Widowed";
+    if (v.includes("live")) return "Live-in Partner";
+    if (v === "separated") return "Separated";
+    return "";
+  };
+
+  // --- FETCH DATA ---
+
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        const [bRes, sRes] = await Promise.all([api.get("/barangays/"), api.get("/sectors/")]);
+        setBarangayOptions(
+          (bRes.data || []).map((b) => ({
+            ...b,
+            value: b.id,
+            label: b.name,
+          }))
+        );
+        setSectorOptions(sRes.data || []);
+      } catch {
+        toast.error("System Error: Failed to load form options.");
+      }
+    };
+    fetchOptions();
+  }, []);
+
+  useEffect(() => {
+    const loadAreas = async () => {
+      if (!formData.barangay_id) {
+        setPurokOptions([]);
+        setFormData((prev) => ({ ...prev, purok: "" }));
+        return;
+      }
+
+      try {
+        const res = await api.get(`/barangays/${formData.barangay_id}/areas`);
+        const opts = (res.data || []).map((a) => ({
+          value: a.name,
+          label: a.parent_purok ? `${a.name} (${a.parent_purok})` : a.name,
+        }));
+
+        setPurokOptions(opts);
+
+        // This checks if the current purok exists in the new options. 
+        // If the user changed the barangay, it automatically clears the purok field.
+        setFormData((prev) => {
+          const targetKey = normalizePurokSitioKey(prev.purok || residentToEdit?.purok || "");
+          const exactMatch = opts.find((opt) => normalizePurokSitioKey(opt.value) === targetKey);
+          
+          return {
+            ...prev,
+            purok: exactMatch ? exactMatch.value : "",
+          };
+        });
+      } catch {
+        setPurokOptions([]);
+        toast.error("Failed to load Purok/Sitio for selected barangay.");
+      }
+    };
+
+    loadAreas();
+    // Removed `residentToEdit` from dependencies to stop the loop!
+  }, [formData.barangay_id]); 
+
+  useEffect(() => {
+    const loadMe = async () => {
+      try {
+        const res = await api.get("/me");
+        const { role, barangay_id } = res.data || {};
+
+        if (String(role).toLowerCase() === "barangay" && barangay_id) {
+          setFormData((prev) => ({ ...prev, barangay_id: String(barangay_id) }));
+        }
+      } catch {}
+    };
+    loadMe();
+  }, []);
+
   // --- POPULATE EDIT DATA ---
 
   useEffect(() => {
     if (!residentToEdit) return;
     if (!barangayOptions.length) return;
 
-    const normalizeText = (v) =>
-      String(v ?? "")
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, " ")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-
-    const normalizePurokSitioKey = (v) => {
-      const t = normalizeText(v);
-      const numMatch = t.match(/\b(\d{1,2})\b/);
-      if (t.includes("purok") && numMatch) return `purok-${numMatch[1]}`;
-      if (/^\d{1,2}$/.test(t)) return `purok-${t}`;
-      return t;
-    };
-
-    const normalizeSelect = (value, options, mode = "text") => {
-      if (!value) return "";
-
-      const targetKey =
-        mode === "purok" ? normalizePurokSitioKey(value) : normalizeText(value);
-
-      const match = (options || []).find((opt) => {
-        const optionRaw =
-          typeof opt === "object" ? opt.value ?? opt.name ?? opt.label ?? opt.id : opt;
-
-        const optionKey =
-          mode === "purok" ? normalizePurokSitioKey(optionRaw) : normalizeText(optionRaw);
-
-        return optionKey === targetKey;
-      });
-
-      return match
-        ? String(typeof match === "object" ? match.value ?? match.id ?? match.name : match)
-        : "";
-    };
-
-    const normalizeSex = (value) => {
-      if (!value) return "";
-      const v = String(value).toLowerCase().trim();
-      if (v === "m" || v === "male") return "Male";
-      if (v === "f" || v === "female") return "Female";
-      return "";
-    };
-
-    const normalizeCivilStatus = (value) => {
-      if (!value) return "";
-      const v = String(value).toLowerCase().trim();
-      if (v === "single") return "Single";
-      if (v === "married") return "Married";
-      if (v === "widowed") return "Widowed";
-      if (v.includes("live")) return "Live-in Partner";
-      if (v === "separated") return "Separated";
-      return "";
-    };
+    // PREVENT INFINITE LOOP: Only run this population ONCE per selected resident
+    if (formData.id === residentToEdit.id) return;
 
     const barangayMatch = barangayOptions.find(
       (b) => normalizeText(b.name) === normalizeText(residentToEdit?.barangay)
@@ -611,19 +471,20 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     setFormData({
       ...getInitialFormState(),
       ...residentToEdit,
+      id: residentToEdit.id, // Add ID to track that this record has been populated
       birthdate: residentToEdit.birthdate ? isoToDisplayDate(residentToEdit.birthdate) : "",
       sex: normalizeSex(residentToEdit.sex),
       civil_status: normalizeCivilStatus(residentToEdit.civil_status),
       barangay_id: barangayMatch ? String(barangayMatch.value ?? barangayMatch.id) : "",
-      purok: residentToEdit.purok
-        ? normalizeSelect(residentToEdit.purok, purokOptions, "purok")
-        : "",
+      purok: residentToEdit.purok || "", // Temporarily set the raw string; loadAreas will cleanly map it
       sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map((s) => s.id) : [],
       family_members: residentToEdit.family_members || [],
     });
 
     setPhotoPreview(residentToEdit.photo_url || null);
-  }, [residentToEdit?.id, barangayOptions, purokOptions]);
+    
+    // Removed `purokOptions` from dependencies entirely!
+  }, [residentToEdit, barangayOptions, formData.id]);
 
   // --- CLEANUP CAMERA ---
 
@@ -722,7 +583,10 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     const { name, value } = e.target;
 
     setFormData((prev) => {
-      const newState = { ...prev, [name]: value };
+      const newState = {
+        ...prev,
+        [name]: name === "birthdate" ? formatBirthdateInput(value) : value,
+      };
 
       if (
         name === "civil_status" &&
@@ -1003,15 +867,15 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {/* DATE OF BIRTH — Calendar Picker */}
-                <DatePickerInput
+                <InputGroup
                   label="Date of Birth"
                   name="birthdate"
+                  type="text"
                   value={formData.birthdate}
                   onChange={handleChange}
                   required
+                  placeholder="MM/DD/YY"
                 />
-
                 <SelectGroup
                   label="Sex"
                   name="sex"
@@ -1121,6 +985,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                     onChange={handleChange}
                     placeholder="FULL NAME"
                   />
+
                   <InputGroup
                     label="Emergency Contact Number"
                     name="emergency_contact_no"
@@ -1131,6 +996,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                     }}
                     placeholder="09XXXXXXXXX"
                   />
+
                   <InputGroup
                     label="Emergency Address"
                     name="emergency_address"
@@ -1361,7 +1227,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         </div>
       </form>
 
-      {/* CAMERA MODAL */}
       {cameraOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99998] p-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-2xl shadow-2xl">
@@ -1396,7 +1261,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         </div>
       )}
 
-      {/* CROP MODAL */}
       {cropModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[99999] p-4">
           <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">

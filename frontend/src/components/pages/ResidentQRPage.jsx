@@ -128,7 +128,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#d40000";
-  ctx.strokeStyle = "#ffffff";
+  ctx.strokeStyle = "#000000";
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.lineWidth = X(2);
