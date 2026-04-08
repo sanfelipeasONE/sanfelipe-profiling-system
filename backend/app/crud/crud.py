@@ -645,7 +645,8 @@ def get_assistance_tracking(
             "barangay": r.barangay,
             "sector_summary": r.sector_summary,
             "status": status,
-            "date_claimed": claim.date_claimed if claim else None
+            "date_claimed": claim.date_claimed if claim else None,
+            "type_of_assistance": type_of_assistance
             })
     return results
 
