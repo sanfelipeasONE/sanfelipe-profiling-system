@@ -519,13 +519,26 @@ export default function PublicLandingPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-red-800 mb-2">
-                  Birthdate
+                  Birthdate (MM/DD/YY)
                 </label>
-                {/* Reverted to type="date" to enable the calendar picker */}
                 <input
-                  type="date"
+                  type="text"
+                  placeholder="MM/DD/YY"
+                  maxLength="8"
                   value={birthdate}
-                  onChange={(e) => setBirthdate(e.target.value)}
+                  onChange={(e) => {
+                    // Strip all non-numeric characters
+                    let val = e.target.value.replace(/\D/g, "");
+                    
+                    // Automatically insert slashes
+                    if (val.length > 2 && val.length <= 4) {
+                      val = val.slice(0, 2) + "/" + val.slice(2);
+                    } else if (val.length > 4) {
+                      val = val.slice(0, 2) + "/" + val.slice(2, 4) + "/" + val.slice(4, 6);
+                    }
+                    
+                    setBirthdate(val);
+                  }}
                   className="w-full rounded-xl border border-red-200 bg-white px-4 py-3.5 text-sm font-medium text-slate-800 outline-none focus:border-red-700 focus:ring-2 focus:ring-red-700/20 transition-all"
                 />
               </div>
@@ -549,8 +562,8 @@ export default function PublicLandingPage() {
 
               <button
                 onClick={handleUnlock}
-                // disabled if no date is picked
-                disabled={unlocking || !birthdate}
+                // Updated to check for exactly 8 characters (MM/DD/YY)
+                disabled={unlocking || birthdate.length !== 8}
                 className="flex-1 rounded-xl bg-red-900 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 hover:shadow-lg hover:shadow-red-900/30 transition-all disabled:opacity-60 disabled:hover:bg-red-900 disabled:hover:shadow-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
               >
                 {unlocking ? "Verifying..." : "Unlock ID"}
