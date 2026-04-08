@@ -521,6 +521,7 @@ export default function PublicLandingPage() {
                 <label className="block text-xs font-bold uppercase tracking-wider text-red-800 mb-2">
                   Birthdate
                 </label>
+                {/* Reverted to type="date" to enable the calendar picker */}
                 <input
                   type="date"
                   value={birthdate}
@@ -548,6 +549,7 @@ export default function PublicLandingPage() {
 
               <button
                 onClick={handleUnlock}
+                // disabled if no date is picked
                 disabled={unlocking || !birthdate}
                 className="flex-1 rounded-xl bg-red-900 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 hover:shadow-lg hover:shadow-red-900/30 transition-all disabled:opacity-60 disabled:hover:bg-red-900 disabled:hover:shadow-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
               >
