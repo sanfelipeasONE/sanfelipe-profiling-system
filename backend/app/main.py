@@ -1369,3 +1369,36 @@ def permanently_delete_user(
     db.commit()
 
     return {"message": f"User '{user_to_delete.username}' permanently deleted"}
+
+# ---------------------------------------------------
+# FINANCIAL ASSISTANCE TRACKING (QR SYSTEM)
+# ---------------------------------------------------
+
+@app.get("/assistance-tracking/list", response_model=List[schemas.AssistanceTrackingResponse])
+def get_assistance_tracking_list(
+    sector: str = Query(..., description="Target sector (e.g., TODA)"),
+    type_of_assistance: str = Query(..., description="Name of the program (e.g., TODA Payout)"),
+    status: str = Query("all", description="all, claimed, unclaimed"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role not in ["admin", "super_admin", "admin_limited"]:
+        raise HTTPException(status_code=403, detail="Not allowed to view assistance lists")
+
+    return crud.get_assistance_tracking(db, sector, type_of_assistance, status)
+
+
+@app.post("/assistance-tracking/scan-qr")
+def process_assistance_qr(
+    payload: schemas.QRClaimRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role not in ["admin", "super_admin", "admin_limited"]:
+        raise HTTPException(status_code=403, detail="Not allowed to process claims")
+
+    try:
+        result = crud.process_qr_claim(db, payload)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

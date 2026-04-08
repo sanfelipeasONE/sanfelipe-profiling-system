@@ -609,3 +609,80 @@ def delete_assistance(db: Session, assistance_id: int):
     db.delete(assistance)
     db.commit()
     return True
+
+# =====================================================
+# FINANCIAL ASSISTANCE TRACKING & QR CLAIMING
+# =====================================================
+def get_assistance_tracking(
+    db: Session, 
+    sector_name: str, 
+    type_of_assistance: str, 
+    status_filter: str = "all"
+):
+    normalized_sector = normalize_sector_name(sector_name)
+    
+    query = db.query(models.ResidentProfile).filter(models.ResidentProfile.is_deleted == False)
+    
+    query = apply_sector_filter(query, normalized_sector)
+    residents = query.all()
+    
+    results = []
+    for r in residents:
+        claim = db.query(models.ResidentAssistance).filter(
+            models.ResidentAssistance.resident_id == r.id,
+            models.ResidentAssistance.type_of_assistance == type_of_assistance
+        ).first()
+            
+        status = "Claimed" if claim and claim.date_claimed else "Unclaimed"
+            
+        if status_filter != "all" and status.lower() != status_filter.lower():
+            continue
+            
+        results.append({
+            "resident_id": r.id,
+            "resident_code": r.resident_code,
+            "full_name": f"{r.last_name}, {r.first_name} {r.middle_name or ''}".strip(),
+            "barangay": r.barangay,
+            "sector_summary": r.sector_summary,
+            "status": status,
+            "date_claimed": claim.date_claimed if claim else None
+            })
+    return results
+
+def process_qr_claim(db: Session, request: schemas.QRClaimRequest):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.resident_code == request.resident_code,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise ValueError("Invalid QR: Resident not found")
+    
+    existing_claim = db.query(models.ResidentAssistance).filter(
+        models.ResidentAssistance.resident_id == resident.id,
+        models.ResidentAssistance.type_of_assistance == request.type_of_assistance
+    ).first()
+
+    if existing_claim and existing_claim.date_claimed:
+        raise ValueError(f"Assistance already claimed by {resident.first_name} {resident.last_name}.")
+
+    if existing_claim:
+        existing_claim.date_claimed = datetime.utcnow().date()
+        existing_claim.amount = request.amount
+        existing_claim.implementing_office = request.implementing_office
+    else:
+        new_claim = models.ResidentAssistance(
+            resident_id=resident.id,
+            type_of_assistance=request.type_of_assistance,
+            date_processed=datetime.utcnow().date(),
+            date_claimed=datetime.utcnow().date(),
+            amount=request.amount,
+            implementing_office=request.implementing_office
+        )
+        db.add(new_claim)
+
+    db.commit()
+    return {
+        "message": "Claimed successfully", 
+        "resident": f"{resident.first_name} {resident.last_name}"
+    }   

@@ -275,3 +275,25 @@ class DashboardStats(BaseModel):
     total_female: int
     population_by_barangay: Dict[str, int] # Fix: Use Dict for type safety
     population_by_sector: Dict[str, int]
+    
+# =======================
+# ASSISTANCE SCHEMAS
+# =======================
+
+class QRClaimRequest(BaseModel):
+    resident_code: str
+    type_of_assistance: str
+    amount: float
+    implementing_office: Optional[str] = None
+
+class AssistanceTrackingResponse(BaseModel):
+    resident_id: int
+    resident_code: str
+    full_name: str
+    barangay: Optional[str] = None
+    sector_summary: Optional[str] = None
+    status: str  # "Claimed" or "Unclaimed"
+    date_claimed: Optional[date] = None
+
+    class Config:
+        from_attributes = True
