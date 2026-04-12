@@ -68,11 +68,13 @@ async function getCroppedImg(imageSrc, croppedAreaPixels) {
 // --- DATE HELPERS ---
 
 function formatBirthdateInput(value) {
-  const digits = String(value || "").replace(/\D/g, "").slice(0, 6);
+  // Allow up to 8 digits for MMDDYYYY
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
 
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 6)}`;
+  // Slice out the 4-digit year at the end
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
 }
 
 function isoToDisplayDate(isoDate) {
@@ -82,19 +84,21 @@ function isoToDisplayDate(isoDate) {
   const [year, month, day] = clean.split("-");
   if (!year || !month || !day) return "";
 
-  return `${month}/${day}/${year.slice(-2)}`;
+  // Return full 4-digit year
+  return `${month}/${day}/${year}`;
 }
 
 function displayDateToIso(displayDate) {
   const clean = String(displayDate || "").trim();
-  const match = clean.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+  // Match full 4-digit year
+  const match = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
 
   if (!match) return "";
 
-  const [, mm, dd, yy] = match;
-  const fullYear = Number(yy) >= 50 ? `19${yy}` : `20${yy}`;
+  const [, mm, dd, yyyy] = match;
 
-  return `${fullYear}-${mm}-${dd}`;
+  // Use the full year directly
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 // --- REUSABLE COMPONENTS ---
@@ -184,6 +188,7 @@ const InputGroup = ({
   required = false,
   placeholder,
   className = "",
+  maxLength, // Added maxLength support
 }) => (
   <div className={`flex flex-col gap-1.5 w-full ${className}`}>
     <label className="flex items-center text-[11px] font-normal text-slate-400 uppercase tracking-wider">
@@ -197,6 +202,7 @@ const InputGroup = ({
       onChange={onChange}
       required={required}
       placeholder={placeholder}
+      maxLength={maxLength}
       className={`
         w-full px-4 py-3
         bg-slate-50 border border-slate-200 rounded-xl
@@ -346,7 +352,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   }, []);
 
   // --- NORMALIZATION HELPERS ---
-  // Moved these outside the hooks so both loadAreas and populateEditData can use them.
   const normalizeText = (v) =>
     String(v ?? "")
       .toLowerCase()
@@ -420,8 +425,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
 
         setPurokOptions(opts);
 
-        // This checks if the current purok exists in the new options. 
-        // If the user changed the barangay, it automatically clears the purok field.
         setFormData((prev) => {
           const targetKey = normalizePurokSitioKey(prev.purok || residentToEdit?.purok || "");
           const exactMatch = opts.find((opt) => normalizePurokSitioKey(opt.value) === targetKey);
@@ -438,7 +441,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     };
 
     loadAreas();
-    // Removed `residentToEdit` from dependencies to stop the loop!
   }, [formData.barangay_id]); 
 
   useEffect(() => {
@@ -461,7 +463,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     if (!residentToEdit) return;
     if (!barangayOptions.length) return;
 
-    // PREVENT INFINITE LOOP: Only run this population ONCE per selected resident
     if (formData.id === residentToEdit.id) return;
 
     const barangayMatch = barangayOptions.find(
@@ -471,19 +472,18 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     setFormData({
       ...getInitialFormState(),
       ...residentToEdit,
-      id: residentToEdit.id, // Add ID to track that this record has been populated
+      id: residentToEdit.id,
       birthdate: residentToEdit.birthdate ? isoToDisplayDate(residentToEdit.birthdate) : "",
       sex: normalizeSex(residentToEdit.sex),
       civil_status: normalizeCivilStatus(residentToEdit.civil_status),
       barangay_id: barangayMatch ? String(barangayMatch.value ?? barangayMatch.id) : "",
-      purok: residentToEdit.purok || "", // Temporarily set the raw string; loadAreas will cleanly map it
+      purok: residentToEdit.purok || "",
       sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map((s) => s.id) : [],
       family_members: residentToEdit.family_members || [],
     });
 
     setPhotoPreview(residentToEdit.photo_url || null);
     
-    // Removed `purokOptions` from dependencies entirely!
   }, [residentToEdit, barangayOptions, formData.id]);
 
   // --- CLEANUP CAMERA ---
@@ -874,7 +874,8 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                   value={formData.birthdate}
                   onChange={handleChange}
                   required
-                  placeholder="MM/DD/YY"
+                  placeholder="MM/DD/YYYY"
+                  maxLength={10}
                 />
                 <SelectGroup
                   label="Sex"

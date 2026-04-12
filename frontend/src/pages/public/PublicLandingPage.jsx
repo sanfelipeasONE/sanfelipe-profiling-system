@@ -16,7 +16,6 @@ import {
   ScanLine,
 } from "lucide-react";
 
-
 const SITIO_TO_PUROK = {
   "Sitio Sagpat": 6,
   "Sitio Tektek": 6,
@@ -519,12 +518,12 @@ export default function PublicLandingPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-red-800 mb-2">
-                  Birthdate (MM/DD/YY)
+                  Birthdate (MM/DD/YYYY)
                 </label>
                 <input
                   type="text"
-                  placeholder="MM/DD/YY"
-                  maxLength="8"
+                  placeholder="MM/DD/YYYY"
+                  maxLength="10"
                   value={birthdate}
                   onChange={(e) => {
                     // Strip all non-numeric characters
@@ -534,7 +533,8 @@ export default function PublicLandingPage() {
                     if (val.length > 2 && val.length <= 4) {
                       val = val.slice(0, 2) + "/" + val.slice(2);
                     } else if (val.length > 4) {
-                      val = val.slice(0, 2) + "/" + val.slice(2, 4) + "/" + val.slice(4, 6);
+                      // Updated to slice up to 8 digits for a 4-digit year
+                      val = val.slice(0, 2) + "/" + val.slice(2, 4) + "/" + val.slice(4, 8);
                     }
                     
                     setBirthdate(val);
@@ -562,8 +562,8 @@ export default function PublicLandingPage() {
 
               <button
                 onClick={handleUnlock}
-                // Updated to check for exactly 8 characters (MM/DD/YY)
-                disabled={unlocking || birthdate.length !== 8}
+                // Updated to check for exactly 10 characters (MM/DD/YYYY)
+                disabled={unlocking || birthdate.length !== 10}
                 className="flex-1 rounded-xl bg-red-900 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 hover:shadow-lg hover:shadow-red-900/30 transition-all disabled:opacity-60 disabled:hover:bg-red-900 disabled:hover:shadow-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
               >
                 {unlocking ? "Verifying..." : "Unlock ID"}

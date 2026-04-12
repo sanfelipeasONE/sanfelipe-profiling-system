@@ -73,12 +73,25 @@ export default function ResidentList({ userRole, onEdit }) {
   const formatSectors = (summary, details) => {
     if (!summary) return "None";
     let text = summary;
+    
     if (summary.includes("Others") && details) {
       text = summary.replace("Others", details);
     }
     if (summary.toUpperCase().includes("OTHERS") && details) {
       text = summary.replace(/Others/i, details);
     }
+
+    // NEW: Filter out restricted sectors for non-superadmin users
+    if (!isSuperAdmin) {
+      const restricted = ["HC", "C", "M"];
+      let parts = text.split(",").map(s => s.trim());
+      
+      // Keep only sectors that are NOT in the restricted list
+      parts = parts.filter(p => !restricted.includes(p.toUpperCase()));
+      
+      text = parts.length > 0 ? parts.join(", ") : "None";
+    }
+
     return text;
   };
 
