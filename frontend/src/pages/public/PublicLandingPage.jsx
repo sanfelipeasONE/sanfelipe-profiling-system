@@ -60,7 +60,7 @@ const SkeletonCard = () => (
       <div className="h-9 w-full rounded-xl bg-red-50/70 shimmer" />
       <div className="h-10 w-full rounded-xl bg-red-50/70 shimmer" />
     </div>
-    <style jsx>{`
+    <style>{`
       .shimmer {
         background: linear-gradient(
           90deg,
@@ -85,7 +85,7 @@ const ResidentCard = ({ resident, onOpen, index }) => (
     className="group relative overflow-hidden rounded-2xl bg-white shadow-md hover:shadow-2xl hover:shadow-red-900/10 transition-all duration-500 hover:-translate-y-1 border border-red-100/50 hover:border-red-200"
     style={{ animationDelay: `${index * 60}ms`, animation: 'fadeInUp 0.5s ease-out both' }}
   >
-    <style jsx>{`
+    <style>{`
       @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
@@ -233,9 +233,13 @@ export default function PublicLandingPage() {
     setUnlockError("");
 
     try {
+      // Formats the string from MM/DD/YYYY to YYYY-MM-DD
+      const [mm, dd, yyyy] = birthdate.split("/");
+      const formattedBirthdate = `${yyyy}-${mm}-${dd}`;
+
       const { data } = await api.post("/public/residents/unlock", {
         resident_code: unlockModal.residentCode,
-        birthdate,
+        birthdate: formattedBirthdate,
       });
 
       navigate(`/public/id/${unlockModal.residentCode}?token=${data.access_token}`);

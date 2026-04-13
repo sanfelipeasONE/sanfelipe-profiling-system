@@ -733,7 +733,7 @@ export default function PublicResidentPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-200 p-6 font-sans">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-200 p-4 sm:p-6 font-sans">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800;900&display=swap');
 
@@ -817,7 +817,7 @@ export default function PublicResidentPage() {
       </p>
 
       {renderingPreview && (
-        <div className="mb-4 flex items-center gap-2 text-stone-600 text-sm font-semibold print:hidden">
+        <div className="mb-4 flex items-center justify-center gap-2 text-stone-600 text-sm font-semibold print:hidden">
           <Loader2 size={16} className="animate-spin" />
           Rendering preview...
         </div>
@@ -825,27 +825,29 @@ export default function PublicResidentPage() {
 
       <div
         id="qr-print-area"
-        className="flex flex-col gap-8 items-center print:gap-0 print:flex-col"
+        className="w-full flex flex-col gap-6 sm:gap-8 items-center px-2 print:gap-0 print:flex-col"
       >
-        <div className="print-canvas-wrap rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
+        {/* Changed width to 100% with a max-width, so it squishes on mobile. Used aspect ratio to preserve shape. */}
+        <div className="print-canvas-wrap w-full max-w-[648px] aspect-[648/408] rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
           <canvas
             ref={frontPreviewRef}
-            className="print-canvas block w-[648px] h-[408px]"
+            className="print-canvas block w-full h-auto"
           />
         </div>
 
-        <div className="print-canvas-wrap rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
+        <div className="print-canvas-wrap w-full max-w-[648px] aspect-[648/408] rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
           <canvas
             ref={backPreviewRef}
-            className="print-canvas block w-[648px] h-[408px]"
+            className="print-canvas block w-full h-auto"
           />
         </div>
       </div>
 
-      <div className="mt-10 flex flex-wrap justify-center gap-4 print:hidden">
+      {/* Buttons container is now fully mobile-responsive (stacks on small screens, row on larger) */}
+      <div className="mt-10 w-full max-w-[648px] flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 print:hidden px-2">
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-2 px-6 py-3 bg-rose-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-rose-800 transition-colors shadow-sm"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-rose-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-rose-800 transition-colors shadow-sm"
         >
           <Printer size={18} />
           Print ID Card
@@ -854,7 +856,7 @@ export default function PublicResidentPage() {
         <button
           onClick={handleDownloadPDF}
           disabled={downloadingPdf}
-          className="flex items-center gap-2 px-6 py-3 bg-stone-800 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-stone-900 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-stone-800 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-stone-900 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {downloadingPdf ? (
             <>
@@ -871,7 +873,7 @@ export default function PublicResidentPage() {
 
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 px-6 py-3 bg-white text-stone-700 text-sm font-bold uppercase tracking-wider rounded-xl border border-stone-300 hover:bg-stone-50 transition-colors shadow-sm"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-white text-stone-700 text-sm font-bold uppercase tracking-wider rounded-xl border border-stone-300 hover:bg-stone-50 transition-colors shadow-sm"
         >
           <ArrowLeft size={18} />
           Go Back
