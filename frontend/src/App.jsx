@@ -13,6 +13,7 @@ import QRScanner from './components/pages/QRScanner';
 import ResidentQRPage from "./components/pages/ResidentQRPage";
 import PublicResidentPage from './pages/public/PublicResidentPage';
 import PublicLandingPage from './pages/public/PublicLandingPage';
+import AssistanceFlow from './components/assistance/AssistanceFlow';
 
 const DashboardLayout = ({ userRole, onLogout, onResetView }) => {
   return (
@@ -133,6 +134,15 @@ export default function App() {
           element={
             role?.toLowerCase() === "admin" || role?.toLowerCase() === "super_admin"
               ? <QRScanner />
+              : <Navigate to="/dashboard/residents" replace />
+          }
+        />
+        
+        <Route
+          path="assistance"
+          element={
+            role?.toLowerCase() === "admin" || role?.toLowerCase() === "super_admin"
+              ? <AssistanceFlow />
               : <Navigate to="/dashboard/residents" replace />
           }
         />

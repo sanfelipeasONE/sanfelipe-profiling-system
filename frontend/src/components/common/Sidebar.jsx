@@ -9,7 +9,8 @@ import {
   ChevronRight,
   Settings,
   QrCode,
-  ArchiveRestore
+  ArchiveRestore,
+  HeartHandshake
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -38,6 +39,7 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
     { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
     { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
     { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, role: 'admin_plus' },
+    { label: 'Assistance', path: '/dashboard/assistance', Icon: HeartHandshake, role: 'admin_plus' },
     { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, role: 'admin_plus' },
   ];
 
