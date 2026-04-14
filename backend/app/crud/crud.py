@@ -621,36 +621,42 @@ def get_assistance_tracking(
 ):
     normalized_sector = normalize_sector_name(sector_name)
     
-    query = db.query(models.ResidentProfile).filter(models.ResidentProfile.is_deleted == False)
+    # 🚀 OPTIMIZATION 1: Use an OUTER JOIN
+    # This gets the Resident AND their matching Assistance record in exactly ONE database query
+    query = db.query(models.ResidentProfile, models.ResidentAssistance).outerjoin(
+        models.ResidentAssistance,
+        (models.ResidentProfile.id == models.ResidentAssistance.resident_id) &
+        (models.ResidentAssistance.type_of_assistance == type_of_assistance)
+    ).filter(models.ResidentProfile.is_deleted == False)
     
+    # Apply Sector Filter
     query = apply_sector_filter(query, normalized_sector)
-    residents = query.all()
     
-    results = []
-    for r in residents:
-        claim = db.query(models.ResidentAssistance).filter(
-            models.ResidentAssistance.resident_id == r.id,
-            models.ResidentAssistance.type_of_assistance == type_of_assistance
-        ).first()
+    # 🚀 OPTIMIZATION 2: Filter the Claimed/Unclaimed status directly in the SQL query
+    if status_filter.lower() == "claimed":
+        query = query.filter(models.ResidentAssistance.id.isnot(None))
+    elif status_filter.lower() == "unclaimed":
+        query = query.filter(models.ResidentAssistance.id.is_(None))
         
-        if not claim:
-            continue
-            
+    # Execute the single fast query
+    records = query.all()
+    
+    # Format the results for React
+    results = []
+    for resident, claim in records:
         status = "Claimed" if claim and claim.date_claimed else "Unclaimed"
             
-        if status_filter != "all" and status.lower() != status_filter.lower():
-            continue
-            
         results.append({
-            "resident_id": r.id,
-            "resident_code": r.resident_code,
-            "full_name": f"{r.last_name}, {r.first_name} {r.middle_name or ''}".strip(),
-            "barangay": r.barangay,
-            "sector_summary": r.sector_summary,
+            "resident_id": resident.id,
+            "resident_code": resident.resident_code,
+            "full_name": f"{resident.last_name}, {resident.first_name} {resident.middle_name or ''}".strip(),
+            "barangay": resident.barangay,
+            "sector_summary": resident.sector_summary,
             "status": status,
             "date_claimed": claim.date_claimed if claim else None,
             "type_of_assistance": type_of_assistance
-            })
+        })
+        
     return results
 
 def process_qr_claim(db: Session, request: schemas.QRClaimRequest):
