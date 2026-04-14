@@ -4,6 +4,10 @@ import api from "../../api/api";
 import { Loader2, ShieldAlert, Printer, ArrowLeft, Download } from "lucide-react";
 import jsPDF from "jspdf";
 
+// =========================
+// Canvas helpers
+// =========================
+
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     if (!src) return reject(new Error("Missing image src"));
@@ -37,8 +41,11 @@ function wrapText(ctx, text, maxWidth) {
   return lines.length ? lines : [" "];
 }
 
+// Match preview size
 const DOM_W = 648;
 const DOM_H = 408;
+
+// 2x export for sharper PDF and preview
 const CW = 1296;
 const CH = 816;
 
@@ -53,6 +60,10 @@ const FONT_FAMILY = "Barlow, Arial, sans-serif";
 const FONT_BLACK = "900";
 const FONT_BOLD = "700";
 const FONT_MEDIUM = "500";
+
+// =========================
+// FRONT canvas
+// =========================
 
 async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl) {
   const canvas = document.createElement("canvas");
@@ -117,7 +128,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#ff0000";
+  ctx.fillStyle = "#d40000";
   ctx.strokeStyle = "#000000";
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
@@ -183,7 +194,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.font = `${FONT_BLACK} ${FS(28)}px ${FONT_FAMILY}`;
-  ctx.fillText("RESIDENT", px + pw / 2, py + ph + Y(38));
+  ctx.fillText("RESIDENT", px + pw / 2, Y(358));
 
   const fx = X(320);
   const fw = X(288);
@@ -308,6 +319,10 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
 
   return canvas;
 }
+
+// =========================
+// BACK canvas
+// =========================
 
 async function drawBack(
   resident,
@@ -451,6 +466,10 @@ async function drawBack(
   return canvas;
 }
 
+// =========================
+// Component
+// =========================
+
 export default function PublicResidentPage() {
   const { code } = useParams();
   const navigate = useNavigate();
@@ -461,6 +480,7 @@ export default function PublicResidentPage() {
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [renderingPreview, setRenderingPreview] = useState(false);
+  const [activeSide, setActiveSide] = useState("front"); // "front" | "back"
 
   const frontPreviewRef = useRef(null);
   const backPreviewRef = useRef(null);
@@ -512,6 +532,7 @@ export default function PublicResidentPage() {
     if (!resident?.birthdate) return " ";
     const date = new Date(resident.birthdate);
     if (isNaN(date.getTime())) return resident.birthdate;
+
     return date.toLocaleDateString("en-US", {
       month: "2-digit",
       day: "2-digit",
@@ -562,19 +583,25 @@ export default function PublicResidentPage() {
       setRenderingPreview(true);
 
       try {
-        if (document.fonts) {
-          await document.fonts.load("700 17px Barlow");
-          await document.fonts.load("700 16px Barlow");
-          await document.fonts.load("700 15px Barlow");
-          await document.fonts.load("700 14px Barlow");
-          await document.fonts.load("500 13px Barlow");
-          await document.fonts.load("500 16px Barlow");
-          await document.fonts.load("500 11px Barlow");
-          await document.fonts.load("900 42px Barlow");
-          await document.fonts.load("900 40px Barlow");
-          await document.fonts.load("900 28px Barlow");
-          await document.fonts.load("900 24px Barlow");
-          await document.fonts.ready;
+        try {
+          if (document.fonts) {
+            await Promise.allSettled([
+              document.fonts.load("700 17px Barlow"),
+              document.fonts.load("700 16px Barlow"),
+              document.fonts.load("700 15px Barlow"),
+              document.fonts.load("700 14px Barlow"),
+              document.fonts.load("500 13px Barlow"),
+              document.fonts.load("500 16px Barlow"),
+              document.fonts.load("500 11px Barlow"),
+              document.fonts.load("900 42px Barlow"),
+              document.fonts.load("900 40px Barlow"),
+              document.fonts.load("900 28px Barlow"),
+              document.fonts.load("900 24px Barlow")
+            ]);
+            await document.fonts.ready;
+          }
+        } catch (fontErr) {
+          console.warn("Font loading delayed, using fallback fonts temporarily.");
         }
 
         const [frontCanvas, backCanvas] = await Promise.all([
@@ -635,7 +662,7 @@ export default function PublicResidentPage() {
     emergencyContactNo,
     emergencyAddress,
     bgUrl,
-    logoUrl,
+    logoUrl
   ]);
 
   const handleDownloadPDF = async () => {
@@ -643,20 +670,24 @@ export default function PublicResidentPage() {
 
     setDownloadingPdf(true);
     try {
-      if (document.fonts) {
-        await document.fonts.load("700 17px Barlow");
-        await document.fonts.load("700 16px Barlow");
-        await document.fonts.load("700 15px Barlow");
-        await document.fonts.load("700 14px Barlow");
-        await document.fonts.load("500 13px Barlow");
-        await document.fonts.load("500 16px Barlow");
-        await document.fonts.load("500 11px Barlow");
-        await document.fonts.load("900 42px Barlow");
-        await document.fonts.load("900 40px Barlow");
-        await document.fonts.load("900 28px Barlow");
-        await document.fonts.load("900 24px Barlow");
-        await document.fonts.ready;
-      }
+      try {
+        if (document.fonts) {
+          await Promise.allSettled([
+            document.fonts.load("700 17px Barlow"),
+            document.fonts.load("700 16px Barlow"),
+            document.fonts.load("700 15px Barlow"),
+            document.fonts.load("700 14px Barlow"),
+            document.fonts.load("500 13px Barlow"),
+            document.fonts.load("500 16px Barlow"),
+            document.fonts.load("500 11px Barlow"),
+            document.fonts.load("900 42px Barlow"),
+            document.fonts.load("900 40px Barlow"),
+            document.fonts.load("900 28px Barlow"),
+            document.fonts.load("900 24px Barlow")
+          ]);
+          await document.fonts.ready;
+        }
+      } catch (fontErr) {}
 
       const [frontCanvas, backCanvas] = await Promise.all([
         drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl),
@@ -693,12 +724,13 @@ export default function PublicResidentPage() {
     }
   };
 
+  // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-stone-100 font-sans">
-        <div className="p-6 bg-white rounded-2xl shadow-sm border border-stone-200 flex flex-col items-center">
-          <Loader2 size={36} className="text-rose-700 animate-spin mb-4" />
-          <p className="text-[11px] font-bold text-stone-500 uppercase tracking-widest">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-stone-100 font-sans px-4">
+        <div className="p-6 bg-white rounded-2xl shadow-sm border border-stone-200 flex flex-col items-center w-full max-w-xs">
+          <Loader2 size={32} className="text-rose-700 animate-spin mb-4" />
+          <p className="text-[11px] font-bold text-stone-500 uppercase tracking-widest text-center">
             Retrieving Registry Record...
           </p>
         </div>
@@ -706,23 +738,23 @@ export default function PublicResidentPage() {
     );
   }
 
+  // ── Not found state ────────────────────────────────────────────────────────
   if (!resident) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-stone-100 font-sans p-6">
-        <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center max-w-md shadow-sm">
-          <div className="w-16 h-16 bg-red-50 text-red-700 rounded-full flex items-center justify-center mx-auto mb-5">
-            <ShieldAlert size={32} />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-stone-100 font-sans p-4">
+        <div className="bg-white border border-stone-200 rounded-2xl p-6 text-center w-full max-w-sm shadow-sm">
+          <div className="w-14 h-14 bg-red-50 text-red-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={28} />
           </div>
-          <h2 className="text-xl font-extrabold text-stone-900 tracking-tight mb-2">
+          <h2 className="text-lg font-extrabold text-stone-900 tracking-tight mb-2">
             Record Not Found
           </h2>
-          <p className="text-sm text-stone-500 font-medium mb-8">
-            The requested registry ID is invalid, unauthorized, or has been removed from the
-            system.
+          <p className="text-sm text-stone-500 font-medium mb-6 leading-relaxed">
+            The requested registry ID is invalid, unauthorized, or has been removed from the system.
           </p>
           <button
             onClick={() => navigate(-1)}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-stone-900 text-white text-sm font-semibold rounded-xl hover:bg-stone-800 transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-stone-900 text-white text-sm font-semibold rounded-xl hover:bg-stone-800 active:bg-stone-950 transition-colors"
           >
             <ArrowLeft size={16} />
             Return to Directory
@@ -732,11 +764,13 @@ export default function PublicResidentPage() {
     );
   }
 
+  // ── Main view ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-200 p-4 sm:p-6 font-sans">
+    <div className="min-h-screen flex flex-col bg-stone-200 font-sans">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800;900&display=swap');
 
+        /* ── Print styles ── */
         @media print {
           * {
             -webkit-print-color-adjust: exact !important;
@@ -744,8 +778,7 @@ export default function PublicResidentPage() {
             box-sizing: border-box !important;
           }
 
-          html,
-          body {
+          html, body {
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
@@ -757,14 +790,10 @@ export default function PublicResidentPage() {
             margin: 0;
           }
 
-          body * {
-            visibility: hidden !important;
-          }
+          body * { visibility: hidden !important; }
 
           #qr-print-area,
-          #qr-print-area * {
-            visibility: visible !important;
-          }
+          #qr-print-area * { visibility: visible !important; }
 
           #qr-print-area {
             position: absolute !important;
@@ -805,79 +834,153 @@ export default function PublicResidentPage() {
             display: block !important;
           }
 
-          .print\\:hidden,
-          .no-print {
-            display: none !important;
-          }
+          .print\\:hidden, .no-print { display: none !important; }
         }
+
+        /* ── Mobile card flip animation ── */
+        .card-slider {
+          display: flex;
+          transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+          will-change: transform;
+        }
+
+        .card-slider[data-side="front"] { transform: translateX(0%); }
+        .card-slider[data-side="back"]  { transform: translateX(-50%); }
       `}</style>
 
-      <p className="text-xs font-bold text-stone-500 uppercase tracking-widest mb-6 text-center print:hidden">
-        Resident ID Card Preview — Print Both Sides
-      </p>
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col items-center py-6 px-4 max-w-lg mx-auto w-full">
 
-      {renderingPreview && (
-        <div className="mb-4 flex items-center justify-center gap-2 text-stone-600 text-sm font-semibold print:hidden">
-          <Loader2 size={16} className="animate-spin" />
-          Rendering preview...
+        {/* Rendering indicator */}
+        {renderingPreview && (
+          <div className="flex items-center gap-2 text-stone-500 text-xs font-semibold mb-3 print:hidden">
+            <Loader2 size={13} className="animate-spin" />
+            Rendering preview…
+          </div>
+        )}
+
+        {/* ── Side toggle tabs ── */}
+        <div className="flex w-full max-w-sm rounded-xl overflow-hidden border border-stone-300 bg-stone-100 mb-4 print:hidden">
+          {["front", "back"].map((side) => (
+            <button
+              key={side}
+              onClick={() => setActiveSide(side)}
+              className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${
+                activeSide === side
+                  ? "bg-rose-700 text-white shadow-inner"
+                  : "text-stone-500 hover:text-stone-700 hover:bg-stone-200"
+              }`}
+            >
+              {side === "front" ? "Front Side" : "Back Side"}
+            </button>
+          ))}
         </div>
-      )}
 
-      <div
-        id="qr-print-area"
-        className="w-full flex flex-col gap-6 sm:gap-8 items-center px-2 print:gap-0 print:flex-col"
-      >
-        {/* Changed width to 100% with a max-width, so it squishes on mobile. Used aspect ratio to preserve shape. */}
-        <div className="print-canvas-wrap w-full max-w-[648px] aspect-[648/408] rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
-          <canvas
-            ref={frontPreviewRef}
-            className="print-canvas block w-full h-auto"
-          />
+        {/* ── Canvas slider (mobile) / stacked (print + desktop) ── */}
+
+        {/* Print-only: both canvases always visible and stacked */}
+        <div
+          id="qr-print-area"
+          className="hidden print:flex print:flex-col print:gap-0 print:items-center"
+        >
+          <div className="print-canvas-wrap">
+            <canvas ref={frontPreviewRef} className="print-canvas block w-[648px] h-[408px]" />
+          </div>
+          <div className="print-canvas-wrap">
+            <canvas ref={backPreviewRef} className="print-canvas block w-[648px] h-[408px]" />
+          </div>
         </div>
 
-        <div className="print-canvas-wrap w-full max-w-[648px] aspect-[648/408] rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
-          <canvas
-            ref={backPreviewRef}
-            className="print-canvas block w-full h-auto"
-          />
+        {/* Screen-only: sliding card viewer */}
+        <div className="print:hidden w-full overflow-hidden rounded-2xl">
+          <div
+            className="card-slider w-[200%]"
+            data-side={activeSide}
+          >
+            {/* Front */}
+            <div className="w-1/2 px-0">
+              <div className="rounded-2xl overflow-hidden shadow-xl border border-stone-300 bg-white">
+                <canvas
+                  ref={frontPreviewRef}
+                  className="block w-full h-auto"
+                  style={{ aspectRatio: `${DOM_W} / ${DOM_H}` }}
+                />
+              </div>
+            </div>
+
+            {/* Back */}
+            <div className="w-1/2 px-0">
+              <div className="rounded-2xl overflow-hidden shadow-xl border border-stone-300 bg-white">
+                <canvas
+                  ref={backPreviewRef}
+                  className="block w-full h-auto"
+                  style={{ aspectRatio: `${DOM_W} / ${DOM_H}` }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Buttons container is now fully mobile-responsive (stacks on small screens, row on larger) */}
-      <div className="mt-10 w-full max-w-[648px] flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 print:hidden px-2">
-        <button
-          onClick={() => window.print()}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-rose-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-rose-800 transition-colors shadow-sm"
-        >
-          <Printer size={18} />
-          Print ID Card
-        </button>
+        {/* ── Swipe hint dots ── */}
+        <div className="flex items-center gap-2 mt-4 print:hidden">
+          {["front", "back"].map((side) => (
+            <button
+              key={side}
+              onClick={() => setActiveSide(side)}
+              aria-label={`View ${side}`}
+              className={`rounded-full transition-all duration-300 ${
+                activeSide === side
+                  ? "w-6 h-2 bg-rose-700"
+                  : "w-2 h-2 bg-stone-400 hover:bg-stone-500"
+              }`}
+            />
+          ))}
+        </div>
 
-        <button
-          onClick={handleDownloadPDF}
-          disabled={downloadingPdf}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-stone-800 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-stone-900 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {downloadingPdf ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Generating PDF...
-            </>
-          ) : (
-            <>
-              <Download size={18} />
-              Download PDF
-            </>
-          )}
-        </button>
+        {/* ── Side label ── */}
+        <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mt-2 print:hidden">
+          {activeSide === "front" ? "Front Side" : "Back Side"} — Print Both Sides
+        </p>
 
-        <button
-          onClick={() => navigate(-1)}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-white text-stone-700 text-sm font-bold uppercase tracking-wider rounded-xl border border-stone-300 hover:bg-stone-50 transition-colors shadow-sm"
-        >
-          <ArrowLeft size={18} />
-          Go Back
-        </button>
+        {/* ── Action buttons ── */}
+        <div className="w-full mt-6 flex flex-col gap-3 print:hidden">
+          <button
+            onClick={handleDownloadPDF}
+            disabled={downloadingPdf}
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-rose-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-rose-800 active:bg-rose-900 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {downloadingPdf ? (
+              <>
+                <Loader2 size={17} className="animate-spin" />
+                Generating PDF…
+              </>
+            ) : (
+              <>
+                <Download size={17} />
+                Download PDF
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => window.print()}
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-stone-800 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-stone-900 active:bg-black transition-colors shadow-sm"
+          >
+            <Printer size={17} />
+            Print ID Card
+          </button>
+
+          <button
+            onClick={() => navigate(-1)}
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-white text-stone-700 text-sm font-bold uppercase tracking-wider rounded-xl border border-stone-300 hover:bg-stone-50 active:bg-stone-100 transition-colors"
+          >
+            <ArrowLeft size={17} />
+            Go Back
+          </button>
+        </div>
+
+        {/* ── Bottom safe area spacer for phones ── */}
+        <div className="h-6 print:hidden" />
       </div>
     </div>
   );

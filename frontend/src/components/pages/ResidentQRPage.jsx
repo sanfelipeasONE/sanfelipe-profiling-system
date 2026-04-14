@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../api/api";
-import { Loader2, ShieldAlert, Printer, ArrowLeft, Download } from "lucide-react";
+import { Loader2, ShieldAlert, Printer, ArrowLeft, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import jsPDF from "jspdf";
 
 // =========================
@@ -477,6 +477,7 @@ export default function ResidentQRPage() {
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [renderingPreview, setRenderingPreview] = useState(false);
+  const [activeSide, setActiveSide] = useState("front"); // "front" | "back"
 
   const frontPreviewRef = useRef(null);
   const backPreviewRef = useRef(null);
@@ -491,8 +492,6 @@ export default function ResidentQRPage() {
       try {
         const response = await api.get(`/residents/code/${code}`);
         setResident(response.data);
-        
-        console.log("resident data:", response.data);
 
         const qrResponse = await api.get(`/residents/code/${code}/qr`, {
           responseType: "blob",
@@ -699,12 +698,13 @@ export default function ResidentQRPage() {
     }
   };
 
+  // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-stone-100 font-sans">
-        <div className="p-6 bg-white rounded-2xl shadow-sm border border-stone-200 flex flex-col items-center">
-          <Loader2 size={36} className="text-rose-700 animate-spin mb-4" />
-          <p className="text-[11px] font-bold text-stone-500 uppercase tracking-widest">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-stone-100 font-sans px-4">
+        <div className="p-6 bg-white rounded-2xl shadow-sm border border-stone-200 flex flex-col items-center w-full max-w-xs">
+          <Loader2 size={32} className="text-rose-700 animate-spin mb-4" />
+          <p className="text-[11px] font-bold text-stone-500 uppercase tracking-widest text-center">
             Retrieving Registry Record...
           </p>
         </div>
@@ -712,23 +712,23 @@ export default function ResidentQRPage() {
     );
   }
 
+  // ── Not found state ────────────────────────────────────────────────────────
   if (!resident) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-stone-100 font-sans p-6">
-        <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center max-w-md shadow-sm">
-          <div className="w-16 h-16 bg-red-50 text-red-700 rounded-full flex items-center justify-center mx-auto mb-5">
-            <ShieldAlert size={32} />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-stone-100 font-sans p-4">
+        <div className="bg-white border border-stone-200 rounded-2xl p-6 text-center w-full max-w-sm shadow-sm">
+          <div className="w-14 h-14 bg-red-50 text-red-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={28} />
           </div>
-          <h2 className="text-xl font-extrabold text-stone-900 tracking-tight mb-2">
+          <h2 className="text-lg font-extrabold text-stone-900 tracking-tight mb-2">
             Record Not Found
           </h2>
-          <p className="text-sm text-stone-500 font-medium mb-8">
-            The requested registry ID is invalid, unauthorized, or has been removed from the
-            system.
+          <p className="text-sm text-stone-500 font-medium mb-6 leading-relaxed">
+            The requested registry ID is invalid, unauthorized, or has been removed from the system.
           </p>
           <button
             onClick={() => navigate(-1)}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-stone-900 text-white text-sm font-semibold rounded-xl hover:bg-stone-800 transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-stone-900 text-white text-sm font-semibold rounded-xl hover:bg-stone-800 active:bg-stone-950 transition-colors"
           >
             <ArrowLeft size={16} />
             Return to Directory
@@ -738,11 +738,13 @@ export default function ResidentQRPage() {
     );
   }
 
+  // ── Main view ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-200 p-6 font-sans">
+    <div className="min-h-screen flex flex-col bg-stone-200 font-sans">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800;900&display=swap');
 
+        /* ── Print styles ── */
         @media print {
           * {
             -webkit-print-color-adjust: exact !important;
@@ -750,8 +752,7 @@ export default function ResidentQRPage() {
             box-sizing: border-box !important;
           }
 
-          html,
-          body {
+          html, body {
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
@@ -763,14 +764,10 @@ export default function ResidentQRPage() {
             margin: 0;
           }
 
-          body * {
-            visibility: hidden !important;
-          }
+          body * { visibility: hidden !important; }
 
           #qr-print-area,
-          #qr-print-area * {
-            visibility: visible !important;
-          }
+          #qr-print-area * { visibility: visible !important; }
 
           #qr-print-area {
             position: absolute !important;
@@ -811,74 +808,155 @@ export default function ResidentQRPage() {
             display: block !important;
           }
 
-          .print\\:hidden,
-          .no-print {
-            display: none !important;
-          }
+          .print\\:hidden, .no-print { display: none !important; }
         }
+
+        /* ── Mobile card flip animation ── */
+        .card-slider {
+          display: flex;
+          transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+          will-change: transform;
+        }
+
+        .card-slider[data-side="front"] { transform: translateX(0%); }
+        .card-slider[data-side="back"]  { transform: translateX(-50%); }
       `}</style>
 
-      <p className="text-xs font-bold text-stone-500 uppercase tracking-widest mb-6 text-center print:hidden">
-        Resident ID Card Preview — Print Both Sides
-      </p>
+      {/* ── Top bar ── */}
 
-      {renderingPreview && (
-        <div className="mb-4 flex items-center gap-2 text-stone-600 text-sm font-semibold print:hidden">
-          <Loader2 size={16} className="animate-spin" />
-          Rendering preview...
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col items-center py-6 px-4 max-w-lg mx-auto w-full">
+
+        {/* Rendering indicator */}
+        {renderingPreview && (
+          <div className="flex items-center gap-2 text-stone-500 text-xs font-semibold mb-3 print:hidden">
+            <Loader2 size={13} className="animate-spin" />
+            Rendering preview…
+          </div>
+        )}
+
+        {/* ── Side toggle tabs ── */}
+        <div className="flex w-full max-w-sm rounded-xl overflow-hidden border border-stone-300 bg-stone-100 mb-4 print:hidden">
+          {["front", "back"].map((side) => (
+            <button
+              key={side}
+              onClick={() => setActiveSide(side)}
+              className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${
+                activeSide === side
+                  ? "bg-rose-700 text-white shadow-inner"
+                  : "text-stone-500 hover:text-stone-700 hover:bg-stone-200"
+              }`}
+            >
+              {side === "front" ? "Front Side" : "Back Side"}
+            </button>
+          ))}
         </div>
-      )}
 
-      <div id="qr-print-area" className="flex flex-col gap-8 items-center print:gap-0 print:flex-col">
-        <div className="print-canvas-wrap rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
-          <canvas
-            ref={frontPreviewRef}
-            className="print-canvas block w-[648px] h-[408px]"
-          />
+        {/* ── Canvas slider (mobile) / stacked (print + desktop) ── */}
+
+        {/* Print-only: both canvases always visible and stacked */}
+        <div
+          id="qr-print-area"
+          className="hidden print:flex print:flex-col print:gap-0 print:items-center"
+        >
+          <div className="print-canvas-wrap">
+            <canvas ref={frontPreviewRef} className="print-canvas block w-[648px] h-[408px]" />
+          </div>
+          <div className="print-canvas-wrap">
+            <canvas ref={backPreviewRef} className="print-canvas block w-[648px] h-[408px]" />
+          </div>
         </div>
 
-        <div className="print-canvas-wrap rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
-          <canvas
-            ref={backPreviewRef}
-            className="print-canvas block w-[648px] h-[408px]"
-          />
+        {/* Screen-only: sliding card viewer */}
+        <div className="print:hidden w-full overflow-hidden rounded-2xl">
+          <div
+            className="card-slider w-[200%]"
+            data-side={activeSide}
+          >
+            {/* Front */}
+            <div className="w-1/2 px-0">
+              <div className="rounded-2xl overflow-hidden shadow-xl border border-stone-300 bg-white">
+                <canvas
+                  ref={frontPreviewRef}
+                  className="block w-full h-auto"
+                  style={{ aspectRatio: `${DOM_W} / ${DOM_H}` }}
+                />
+              </div>
+            </div>
+
+            {/* Back */}
+            <div className="w-1/2 px-0">
+              <div className="rounded-2xl overflow-hidden shadow-xl border border-stone-300 bg-white">
+                <canvas
+                  ref={backPreviewRef}
+                  className="block w-full h-auto"
+                  style={{ aspectRatio: `${DOM_W} / ${DOM_H}` }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-10 flex flex-wrap justify-center gap-4 print:hidden">
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 px-6 py-3 bg-rose-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-rose-800 transition-colors shadow-sm"
-        >
-          <Printer size={18} />
-          Print ID Card
-        </button>
+        {/* ── Swipe hint dots ── */}
+        <div className="flex items-center gap-2 mt-4 print:hidden">
+          {["front", "back"].map((side) => (
+            <button
+              key={side}
+              onClick={() => setActiveSide(side)}
+              aria-label={`View ${side}`}
+              className={`rounded-full transition-all duration-300 ${
+                activeSide === side
+                  ? "w-6 h-2 bg-rose-700"
+                  : "w-2 h-2 bg-stone-400 hover:bg-stone-500"
+              }`}
+            />
+          ))}
+        </div>
 
-        <button
-          onClick={handleDownloadPDF}
-          disabled={downloadingPdf}
-          className="flex items-center gap-2 px-6 py-3 bg-stone-800 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-stone-900 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {downloadingPdf ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Generating PDF...
-            </>
-          ) : (
-            <>
-              <Download size={18} />
-              Download PDF
-            </>
-          )}
-        </button>
+        {/* ── Side label ── */}
+        <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mt-2 print:hidden">
+          {activeSide === "front" ? "Front Side" : "Back Side"} — Print Both Sides
+        </p>
 
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 px-6 py-3 bg-white text-stone-700 text-sm font-bold uppercase tracking-wider rounded-xl border border-stone-300 hover:bg-stone-50 transition-colors shadow-sm"
-        >
-          <ArrowLeft size={18} />
-          Go Back
-        </button>
+        {/* ── Action buttons ── */}
+        <div className="w-full mt-6 flex flex-col gap-3 print:hidden">
+          <button
+            onClick={handleDownloadPDF}
+            disabled={downloadingPdf}
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-rose-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-rose-800 active:bg-rose-900 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {downloadingPdf ? (
+              <>
+                <Loader2 size={17} className="animate-spin" />
+                Generating PDF…
+              </>
+            ) : (
+              <>
+                <Download size={17} />
+                Download PDF
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => window.print()}
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-stone-800 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-stone-900 active:bg-black transition-colors shadow-sm"
+          >
+            <Printer size={17} />
+            Print ID Card
+          </button>
+
+          <button
+            onClick={() => navigate(-1)}
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-white text-stone-700 text-sm font-bold uppercase tracking-wider rounded-xl border border-stone-300 hover:bg-stone-50 active:bg-stone-100 transition-colors"
+          >
+            <ArrowLeft size={17} />
+            Go Back
+          </button>
+        </div>
+
+        {/* ── Bottom safe area spacer for phones ── */}
+        <div className="h-6 print:hidden" />
       </div>
     </div>
   );

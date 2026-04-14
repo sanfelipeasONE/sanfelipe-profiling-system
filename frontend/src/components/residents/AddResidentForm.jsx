@@ -263,6 +263,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
 
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState(null);
+  const [facingMode, setFacingMode] = useState("environment"); // Tracks front vs back camera
   const videoRef = useRef(null);
 
   const userRole = (localStorage.getItem("role") || "staff").toLowerCase();
@@ -283,73 +284,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     "In-laws",
     "Relative",
   ];
-
-  // --- FETCH DATA ---
-
-  useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        const [bRes, sRes] = await Promise.all([api.get("/barangays/"), api.get("/sectors/")]);
-
-        setBarangayOptions(
-          (bRes.data || []).map((b) => ({
-            ...b,
-            value: b.id,
-            label: b.name,
-          }))
-        );
-        setSectorOptions(sRes.data || []);
-      } catch {
-        toast.error("System Error: Failed to load form options.");
-      }
-    };
-
-    fetchOptions();
-  }, []);
-
-  useEffect(() => {
-    const loadAreas = async () => {
-      if (!formData.barangay_id) {
-        setPurokOptions([]);
-        setFormData((prev) => ({ ...prev, purok: "" }));
-        return;
-      }
-
-      try {
-        const res = await api.get(`/barangays/${formData.barangay_id}/areas`);
-        const opts = (res.data || []).map((a) => ({
-          value: a.name,
-          label: a.parent_purok ? `${a.name} (${a.parent_purok})` : a.name,
-        }));
-
-        setPurokOptions(opts);
-        setFormData((prev) => ({
-          ...prev,
-          purok: prev.purok || (residentToEdit?.purok ?? ""),
-        }));
-      } catch {
-        setPurokOptions([]);
-        toast.error("Failed to load Purok/Sitio for selected barangay.");
-      }
-    };
-
-    loadAreas();
-  }, [formData.barangay_id, residentToEdit]);
-
-  useEffect(() => {
-    const loadMe = async () => {
-      try {
-        const res = await api.get("/me");
-        const { role, barangay_id } = res.data || {};
-
-        if (String(role).toLowerCase() === "barangay" && barangay_id) {
-          setFormData((prev) => ({ ...prev, barangay_id: String(barangay_id) }));
-        }
-      } catch {}
-    };
-
-    loadMe();
-  }, []);
 
   // --- NORMALIZATION HELPERS ---
   const normalizeText = (v) =>
@@ -528,10 +462,15 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     setImageSrc(null);
   };
 
-  const openCamera = async () => {
+  const openCamera = async (currentMode = facingMode) => {
     try {
+      // Stop the existing stream before switching
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode: currentMode },
         audio: false,
       });
 
@@ -547,6 +486,12 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       console.error(error);
       toast.error("Unable to access camera.");
     }
+  };
+
+  const toggleCamera = () => {
+    const newMode = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(newMode);
+    openCamera(newMode); // Restart with new mode
   };
 
   const closeCamera = () => {
@@ -566,6 +511,13 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext("2d");
+    
+    // If it's the front camera, mirror the image horizontally so it doesn't look backwards
+    if (facingMode === "user") {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const dataUrl = canvas.toDataURL("image/jpeg");
@@ -841,7 +793,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
 
                       <button
                         type="button"
-                        onClick={openCamera}
+                        onClick={() => openCamera()}
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-normal hover:bg-slate-800 transition-colors"
                       >
                         <Camera size={16} />
@@ -1231,14 +1183,25 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       {cameraOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99998] p-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-2xl shadow-2xl">
-            <h3 className="text-lg font-medium text-slate-800 mb-4">Take Photo</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-slate-800">Take Photo</h3>
+              
+              {/* NEW: Switch Camera Button */}
+              <button
+                type="button"
+                onClick={toggleCamera}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-medium transition-colors"
+              >
+                <Camera size={16} /> Switch Camera
+              </button>
+            </div>
 
-            <div className="rounded-xl overflow-hidden bg-black">
+            <div className="rounded-xl overflow-hidden bg-black relative">
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
-                className="w-full h-[360px] object-cover"
+                className={`w-full h-[360px] object-cover ${facingMode === "user" ? "-scale-x-100" : ""}`}
               />
             </div>
 
