@@ -653,7 +653,8 @@ def get_assistance_tracking(
             "sector_summary": resident.sector_summary,
             "status": status,
             "date_claimed": claim.date_claimed,
-            "type_of_assistance": claim.type_of_assistance # <--- Fetch the actual type from the database
+            "type_of_assistance": claim.type_of_assistance,
+            "photo_url": resident.photo_url
         })
         
     return results
