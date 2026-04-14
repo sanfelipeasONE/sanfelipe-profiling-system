@@ -295,6 +295,7 @@ class AssistanceTrackingResponse(BaseModel):
     status: str  # "Claimed" or "Unclaimed"
     date_claimed: Optional[date] = None
     type_of_assistance: str
+    photo_url: Optional[str] = None
 
     class Config:
         from_attributes = True
