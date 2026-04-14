@@ -623,7 +623,7 @@ def get_assistance_tracking(
     
     # 🚀 OPTIMIZATION 1: Use an OUTER JOIN
     # This gets the Resident AND their matching Assistance record in exactly ONE database query
-    query = db.query(models.ResidentProfile, models.ResidentAssistance).outerjoin(
+    query = db.query(models.ResidentProfile, models.ResidentAssistance).join(
         models.ResidentAssistance,
         (models.ResidentProfile.id == models.ResidentAssistance.resident_id) &
         (models.ResidentAssistance.type_of_assistance == type_of_assistance)
