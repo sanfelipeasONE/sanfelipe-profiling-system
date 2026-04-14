@@ -621,30 +621,29 @@ def get_assistance_tracking(
 ):
     normalized_sector = normalize_sector_name(sector_name)
     
-    # 🚀 OPTIMIZATION 1: Use an OUTER JOIN
-    # This gets the Resident AND their matching Assistance record in exactly ONE database query
+    # 1. Base query with INNER JOIN (gets all residents who have ANY assistance record)
     query = db.query(models.ResidentProfile, models.ResidentAssistance).join(
         models.ResidentAssistance,
-        (models.ResidentProfile.id == models.ResidentAssistance.resident_id) &
-        (models.ResidentAssistance.type_of_assistance == type_of_assistance)
+        models.ResidentProfile.id == models.ResidentAssistance.resident_id
     ).filter(models.ResidentProfile.is_deleted == False)
     
+    if type_of_assistance and type_of_assistance.lower() != "all programs":
+        query = query.filter(models.ResidentAssistance.type_of_assistance == type_of_assistance)
+        
     # Apply Sector Filter
     query = apply_sector_filter(query, normalized_sector)
     
-    # 🚀 OPTIMIZATION 2: Filter the Claimed/Unclaimed status directly in the SQL query
+    # Apply Status Filter
     if status_filter.lower() == "claimed":
-        query = query.filter(models.ResidentAssistance.id.isnot(None))
+        query = query.filter(models.ResidentAssistance.date_claimed.isnot(None))
     elif status_filter.lower() == "unclaimed":
-        query = query.filter(models.ResidentAssistance.id.is_(None))
+        query = query.filter(models.ResidentAssistance.date_claimed.is_(None))
         
-    # Execute the single fast query
     records = query.all()
     
-    # Format the results for React
     results = []
     for resident, claim in records:
-        status = "Claimed" if claim and claim.date_claimed else "Unclaimed"
+        status = "Claimed" if claim.date_claimed else "Unclaimed"
             
         results.append({
             "resident_id": resident.id,
@@ -653,8 +652,8 @@ def get_assistance_tracking(
             "barangay": resident.barangay,
             "sector_summary": resident.sector_summary,
             "status": status,
-            "date_claimed": claim.date_claimed if claim else None,
-            "type_of_assistance": type_of_assistance
+            "date_claimed": claim.date_claimed,
+            "type_of_assistance": claim.type_of_assistance # <--- Fetch the actual type from the database
         })
         
     return results
