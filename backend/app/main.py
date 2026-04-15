@@ -1440,10 +1440,26 @@ def get_active_payout_event(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Fetch the currently active template for the scanners to use
     active_event = db.query(models.PayoutEvent).filter(models.PayoutEvent.is_active == True).first()
     
     if not active_event:
         raise HTTPException(status_code=404, detail="No active payout configuration found.")
         
     return active_event
+
+@app.get("/payout-events/all", response_model=list[schemas.PayoutEventResponse])
+def get_all_payout_events(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    events = db.query(models.PayoutEvent).order_by(models.PayoutEvent.created_at.desc()).all()
+    
+    unique_events = []
+    seen = set()
+    for event in events:
+        sig = f"{event.type_of_assistance}-{event.amount}-{event.implementing_office}"
+        if sig not in seen:
+            seen.add(sig)
+            unique_events.append(event)
+            
+    return unique_events
