@@ -281,7 +281,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   drawDomField({
     label: "Contact No.",
     value: resident.contact_no || "",
-    x: fx + X(180),
+    x: fx + X(165),
     y: row3Y,
     w: X(200),
   });

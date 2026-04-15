@@ -199,33 +199,33 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   function drawDomField({ label, value, x, y, w, valueFs = 16, labelFs = 12 }) {
     const safeValue = String(value || "").trim() || " ";
     ctx.save();
-    ctx.textAlign = "left";
+    ctx.textAlign = "center"; // Centered layout
     ctx.textBaseline = "top";
 
-    // Label (Top)
-    ctx.fillStyle = "#333";
-    ctx.font = `${FONT_MEDIUM} ${FS(labelFs)}px ${FONT_FAMILY}`;
-    ctx.fillText(label, x, y);
-
-    // Value (Bottom)
+    // Value (Top - Bold)
     ctx.fillStyle = "#000";
     ctx.font = `${FONT_BOLD} ${FS(valueFs)}px ${FONT_FAMILY}`;
     const lines = wrapText(ctx, safeValue, w);
     lines.forEach((line, i) => {
-      ctx.fillText(line, x, y + Y(16) + i * Y(18));
+      ctx.fillText(line, x, y + i * Y(18));
     });
+
+    // Label (Bottom - Medium)
+    // Shifted down based on number of lines in the value
+    ctx.fillStyle = "#333";
+    ctx.font = `${FONT_MEDIUM} ${FS(labelFs)}px ${FONT_FAMILY}`;
+    ctx.fillText(label, x, y + (lines.length * Y(18)));
 
     ctx.restore();
   }
 
-  const row2Y = Y(225);
-  const row3Y = Y(290);
+  const row2Y = Y(235);
+  const row3Y = Y(305);
 
   // Row 1: Name & Label (FULLY CENTERED)
   ctx.save();
   
   // Define the horizontal center point for this column
-  // Based on your image, it's roughly the middle of the right side area
   const columnCenter = fx + X(180); 
   const row1Y = Y(155);
 
@@ -280,7 +280,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   drawDomField({
     label: "Contact No.",
     value: resident.contact_no || "",
-    x: fx + X(180),
+    x: fx + X(165), // ALIGNED with Date of Birth
     y: row3Y,
     w: X(200),
   });
