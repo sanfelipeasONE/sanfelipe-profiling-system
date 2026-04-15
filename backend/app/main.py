@@ -500,6 +500,18 @@ def create_assistance(
     if current_user.role not in ["admin", "admin_limited", "super_admin"]:
         raise HTTPException(status_code=403, detail="Not allowed")
 
+    existing_record = db.query(models.ResidentAssistance).filter(
+        models.ResidentAssistance.resident_id == resident_id,
+        models.ResidentAssistance.type_of_assistance == assistance.type_of_assistance,
+        models.ResidentAssistance.date_processed == assistance.date_processed,
+        models.ResidentAssistance.date_claimed == assistance.date_claimed
+    ).first()
+
+    if existing_record:
+        raise HTTPException(
+            status_code=400, 
+            detail="ALREADY CLAIMED: Record found for this date."
+        )
     return crud.add_assistance(db, resident_id, assistance)
 
 @app.put("/assistances/{assistance_id}")

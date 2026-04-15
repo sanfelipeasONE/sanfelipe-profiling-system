@@ -572,14 +572,14 @@ def get_dashboard_stats(
 # ASSISTANCE
 # =====================================================
 def add_assistance(db: Session, resident_id: int, assistance: schemas.AssistanceCreate):
-    new_assistance = models.ResidentAssistance(
-        resident_id=resident_id,
-        **assistance.model_dump()
+    db_assistance = models.ResidentAssistance(
+        **assistance.dict(), 
+        resident_id=resident_id
     )
-    db.add(new_assistance)
+    db.add(db_assistance)
     db.commit()
-    db.refresh(new_assistance)
-    return new_assistance
+    db.refresh(db_assistance)
+    return db_assistance
 
 
 def update_assistance(db: Session, assistance_id: int, data: schemas.AssistanceUpdate):
