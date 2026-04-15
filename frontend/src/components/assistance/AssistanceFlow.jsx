@@ -1,25 +1,25 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { 
   Search, Loader2, UserSquare2, ScanLine, 
   HeartHandshake, Plus, Users, ShieldAlert, 
   ChevronDown, X, Filter, FileText, CheckCircle2, 
-  ChevronUp, Edit, Trash2
+  ChevronUp, Edit, Trash2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import api from '../../api/api';
 import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from "react-dom";
 
-// ADDED userRole prop to check for superadmin permissions
 export default function AssistanceFlow({ userRole }) {
+  const scanInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [tableLoading, setTableLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0); 
   const [itemsPerPage, setItemsPerPage] = useState(20);
-  
-  // Role definitions
-  const role = (userRole || "").toLowerCase();
-  const isSuperAdmin = role === "super_admin";
+  const [currentPage, setCurrentPage] = useState(1);
 
+  // Role Definition
+  const isSuperAdmin = (userRole || "").toLowerCase() === "super_admin";
+  
   // Expanded Row State
   const [expandedRow, setExpandedRow] = useState(null);
   const [expandedData, setExpandedData] = useState(null);
@@ -77,7 +77,12 @@ export default function AssistanceFlow({ userRole }) {
     });
   };
 
-  // UPDATED formatSectors with SuperAdmin restriction logic
+  const wasUpdated = (r) => {
+    const created = r?.created_at ? new Date(r.created_at) : null;
+    const updated = r?.updated_at ? new Date(r.updated_at) : null;
+    return created && updated && Math.abs(updated.getTime() - created.getTime()) > 1000;
+  };
+
   const formatSectors = (summary, details) => {
     if (!summary) return "None";
     let text = summary;
@@ -121,6 +126,7 @@ export default function AssistanceFlow({ userRole }) {
         
         let data = res.data || [];
         
+        // Filters
         if (filters.search) {
           const l = filters.search.toLowerCase();
           data = data.filter(r => r.full_name.toLowerCase().includes(l) || r.resident_code.toLowerCase().includes(l));
@@ -129,13 +135,30 @@ export default function AssistanceFlow({ userRole }) {
           data = data.filter(r => r.barangay?.toUpperCase() === filters.barangay.toUpperCase());
         }
 
-        // Deduplicate
+        // and status is NOT "all" or "unclaimed", hide people who have "No Record"
+        if (filters.program_type !== 'All Programs' && filters.status !== 'all' && filters.status !== 'unclaimed') {
+            data = data.filter(item => item.status !== "No Record");
+        }
+
+        // DEDUPLICATE RESIDENTS
         const uniqueMap = new Map();
         data.forEach(item => {
-          uniqueMap.set(item.resident_code, item);
+          if (filters.program_type !== 'All Programs' && 
+              filters.status !== 'all' && 
+              filters.status !== 'unclaimed' && 
+              item.status === "No Record") {
+              return; 
+          }
+
+          const existing = uniqueMap.get(item.resident_code);
+          
+          // Priority Logic: Always prefer an actual record over "No Record"
+          if (!existing || (item.status !== "No Record" && existing.status === "No Record")) {
+              uniqueMap.set(item.resident_code, item);
+          }
         });
-        
         setTrackingList(Array.from(uniqueMap.values()));
+        setCurrentPage(1);
       } catch (err) {
         setTrackingList([]);
       } finally {
@@ -191,14 +214,11 @@ export default function AssistanceFlow({ userRole }) {
     } catch (err) {
       setScanError("No resident found matching this ID. Please try again.");
       setSelectedResident(null);
+      // Ensure focus returns to input on error
+      setTimeout(() => scanInputRef.current?.focus(), 10);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleScanSubmit = (e) => {
-    e.preventDefault();
-    processCode(scanCode);
   };
 
   const handleSaveAssistance = async () => {
@@ -214,20 +234,32 @@ export default function AssistanceFlow({ userRole }) {
       };
       
       await api.post(`/residents/${selectedResident.id}/assistance`, payload);
-      toast.success(`Assistance successfully recorded for ${selectedResident.first_name}!`);
-      
+
+      toast.success(
+        `Assistance successfully recorded for ${selectedResident.first_name}!`
+      );
+
+      // refresh expanded data if needed
       if (expandedData && expandedData.id === selectedResident.id) {
-         try {
-            const res = await api.get(`/residents/code/${selectedResident.resident_code}`);
-            setExpandedData(res.data);
-         } catch (e) {
-            console.error(e);
-         }
+        try {
+          const res = await api.get(`/residents/code/${selectedResident.resident_code}`);
+          setExpandedData(res.data);
+        } catch (e) {
+          console.error(e);
+        }
       }
 
-      setSelectedResident(null); 
-      setIsAddModalOpen(false);
-      setRefreshTrigger(prev => prev + 1); 
+      // 🔥 ONLY RESET SCANNER FLOW (NOT FORM, NOT RESIDENT)
+      setScanCode("");
+      setScanError("");
+
+      // keep modal open + keep resident + keep form data
+      setRefreshTrigger(prev => prev + 1);
+
+      // focus scanner for next person
+      setTimeout(() => {
+        scanInputRef.current?.focus();
+      }, 10);
       
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to save assistance.");
@@ -264,6 +296,7 @@ export default function AssistanceFlow({ userRole }) {
       await api.put(`/assistances/${editModal.assistance.id}`, payload);
       toast.success("Assistance updated successfully.");
       
+      // Safely fetch updated data to redraw the expanded row
       if (expandedData && expandedData.id === editModal.resident.id) {
         try {
           const res = await api.get(`/residents/code/${editModal.resident.resident_code}`);
@@ -290,6 +323,7 @@ export default function AssistanceFlow({ userRole }) {
       await api.delete(`/assistances/${deleteModal.assistance.id}`);
       toast.success("Assistance record deleted.");
       
+      // Safely fetch updated data to redraw the expanded row
       if (expandedData && expandedData.id === deleteModal.resident.id) {
         try {
           const res = await api.get(`/residents/code/${deleteModal.resident.resident_code}`);
@@ -310,11 +344,27 @@ export default function AssistanceFlow({ userRole }) {
   };
 
   const handleCloseModal = () => {
-    setIsAddModalOpen(false);
+    setIsAddModalOpen(false); // IMPORTANT
+
+    // RESET EVERYTHING (fresh session)
     setSelectedResident(null);
     setScanCode("");
     setScanError("");
+
+    setModalFormData({
+      type_of_assistance: 'Medical Assistance',
+      status: 'Claimed',
+      date_processed: new Date().toISOString().split('T')[0],
+      date_claimed: new Date().toISOString().split('T')[0],
+      amount: '',
+      implementing_office: ''
+    });
   };
+
+  const handleScanSubmit = (e) => {
+  e.preventDefault();
+  processCode(scanCode);
+};
 
   // --- EXPANDED DETAILS UI ---
   const renderResidentDetails = (r) => {
@@ -447,6 +497,12 @@ export default function AssistanceFlow({ userRole }) {
     );
   };
 
+  const totalItems = trackingList.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = trackingList.slice(startIndex, endIndex);
+
   return (
     <div className="font-sans text-stone-900 animate-in fade-in duration-300 px-2 sm:px-4 md:px-0 pb-12 pt-2">
       <Toaster position="top-right" toastOptions={{ style: { background: '#1c1917', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: '500' } }} />
@@ -461,7 +517,25 @@ export default function AssistanceFlow({ userRole }) {
            <h1 className="text-2xl md:text-3xl font-medium text-stone-900 tracking-tight">Assistance Distribution</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
-           <button onClick={() => setIsAddModalOpen(true)} className="flex-1 md:flex-none justify-center px-5 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-medium rounded-xl shadow-md transition-all flex items-center gap-2">
+           <button onClick={() => {
+            setIsAddModalOpen(true); 
+            setSelectedResident(null);
+            setScanCode("");
+            setScanError("");
+            setModalFormData({
+              type_of_assistance: 'Medical Assistance',
+              status: 'Claimed',
+              date_processed: new Date().toISOString().split('T')[0],
+              date_claimed: new Date().toISOString().split('T')[0],
+              amount: '',
+              implementing_office: ''
+            });
+
+            setTimeout(() => {
+              scanInputRef.current?.focus();
+            }, 50); 
+          }}
+                className="flex-1 md:flex-none justify-center px-5 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-medium rounded-xl shadow-md transition-all flex items-center gap-2">
              <Plus size={18} />
              Add Assistance
            </button>
@@ -507,7 +581,7 @@ export default function AssistanceFlow({ userRole }) {
             <div className="relative w-full sm:w-auto sm:flex-1 max-w-[160px]">
               <select name="status" value={filters.status} onChange={handleFilterChange} className="w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-medium text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all cursor-pointer shadow-sm uppercase truncate">
                   <option value="all">ALL STATUS</option>
-                  <option value="unclaimed">UNCLAIMED</option>
+                  <option value="unclaimed">UNCLAIMED / NO RECORD</option>
                   <option value="claimed">CLAIMED</option>
               </select>
               <ChevronDown className="absolute right-3 top-3 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
@@ -534,7 +608,10 @@ export default function AssistanceFlow({ userRole }) {
          <div className="w-full xl:w-auto flex justify-end shrink-0">
            <div className="flex items-center gap-2 text-[11px] md:text-sm font-normal text-stone-600 bg-white px-3 md:px-4 py-2 rounded-xl border border-stone-300 shadow-sm">
                <span className="uppercase tracking-widest text-[10px]">Show:</span>
-               <select value={itemsPerPage} onChange={(e) => setItemsPerPage(Number(e.target.value))} className="bg-transparent font-medium text-stone-800 outline-none cursor-pointer hover:text-rose-700 transition-colors">
+               <select value={itemsPerPage} onChange={(e) => {
+                   setItemsPerPage(Number(e.target.value));
+                   setCurrentPage(1);
+               }} className="bg-transparent font-medium text-stone-800 outline-none cursor-pointer hover:text-rose-700 transition-colors">
                  <option value={10}>10</option>
                  <option value={20}>20</option>
                  <option value={50}>50</option>
@@ -577,8 +654,9 @@ export default function AssistanceFlow({ userRole }) {
                    </td>
                  </tr>
               ) : (
-                trackingList.slice(0, itemsPerPage).map((res, index) => {
+                currentData.map((res, index) => {
                   const rowKey = `${res.resident_code}-${index}`;
+
                   return (
                     <Fragment key={rowKey}>
                       <tr onClick={() => toggleRow(rowKey, res.resident_code)} className={`border-b border-stone-100 cursor-pointer transition-colors group ${expandedRow === rowKey ? 'bg-rose-50/50' : 'hover:bg-stone-50'}`}>
@@ -601,7 +679,18 @@ export default function AssistanceFlow({ userRole }) {
                                    {res.full_name}
                                 </span>
                                 <div className="flex items-center gap-1.5 md:gap-2 mt-1">
-                                   <span className="text-[10px] md:text-[11px] font-mono font-medium text-rose-700 tracking-wide uppercase">
+                                   {wasUpdated(res) && (
+                                     <CheckCircle2 size={14} className="text-emerald-600 shrink-0" title="Updated Record" />
+                                   )}
+                                   {res.sex && (
+                                     <span className="px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded text-[9px] md:text-[10px] font-medium uppercase tracking-wider border border-stone-200">
+                                        {res.sex}
+                                     </span>
+                                   )}
+                                   {res.relationship && (res.relationship.toUpperCase() === "HEAD" || res.relationship.toUpperCase() === "OWNER") ? (
+                                     <span className="text-[9px] md:text-[10px] font-medium text-stone-500 uppercase tracking-wide">OWNER</span>
+                                   ) : null}
+                                   <span className="text-[10px] md:text-[11px] font-mono font-medium text-rose-700 tracking-wide uppercase ml-1">
                                       ID: {res.resident_code}
                                    </span>
                                 </div>
@@ -621,11 +710,13 @@ export default function AssistanceFlow({ userRole }) {
                             <span className={`inline-flex items-center px-2.5 py-1 rounded text-[10px] font-bold border tracking-wider uppercase ${
                               res.status === 'Claimed' 
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                                : res.status === 'Unclaimed'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-stone-100 text-stone-500 border-stone-300' // For "No Record"
                             }`}>
                               {res.status}
                             </span>
-                            {filters.program_type === 'All Programs' && (
+                            {filters.program_type === 'All Programs' && res.type_of_assistance !== 'None' && (
                               <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">
                                 {res.type_of_assistance}
                               </span>
@@ -655,6 +746,84 @@ export default function AssistanceFlow({ userRole }) {
             </tbody>
           </table>
         </div>
+        {/* --- PAGINATION CONTROLS --- */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 bg-stone-50 border-t border-stone-200 sm:px-6">
+            <div className="flex justify-between flex-1 sm:hidden">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-stone-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="relative inline-flex items-center px-4 py-2 ml-3 text-sm font-medium text-stone-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-stone-500 font-medium">
+                  Showing <span className="font-bold text-stone-800">{totalItems === 0 ? 0 : startIndex + 1}</span> to <span className="font-bold text-stone-800">{Math.min(endIndex, totalItems)}</span> of <span className="font-bold text-stone-800">{totalItems}</span> results
+                </p>
+              </div>
+              <div>
+                <nav className="inline-flex -space-x-px rounded-lg shadow-sm isolate" aria-label="Pagination">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2 py-2 text-stone-400 bg-white border border-stone-300 rounded-l-lg hover:bg-stone-50 focus:z-20 disabled:opacity-50 transition-colors"
+                  >
+                    <span className="sr-only">Previous</span>
+                    <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+                  </button>
+                  
+                  {/* Dynamic Page Numbers */}
+                  {[...Array(totalPages)].map((_, i) => {
+                    const page = i + 1;
+                    // Only show first, last, and +/- 1 from current to prevent huge lists
+                    if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`relative inline-flex items-center px-4 py-2 text-sm font-bold border focus:z-20 transition-colors ${
+                            currentPage === page 
+                              ? 'z-10 bg-rose-600 border-rose-600 text-white' 
+                              : 'bg-white border-stone-300 text-stone-600 hover:bg-stone-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    }
+                    if (page === currentPage - 2 || page === currentPage + 2) {
+                      return (
+                        <span key={page} className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-stone-700 bg-white border border-stone-300">
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
+                  })}
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-2 py-2 text-stone-400 bg-white border border-stone-300 rounded-r-lg hover:bg-stone-50 focus:z-20 disabled:opacity-50 transition-colors"
+                  >
+                    <span className="sr-only">Next</span>
+                    <ChevronRight className="w-5 h-5" aria-hidden="true" />
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* =========================================
@@ -663,7 +832,7 @@ export default function AssistanceFlow({ userRole }) {
       {isAddModalOpen && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={handleCloseModal} />
-          <div className="relative bg-white w-full max-w-[500px] rounded-2xl border border-stone-200 shadow-2xl p-6 md:p-8 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white w-full max-w-[500px] rounded-2xl border border-stone-200 shadow-2xl p-6 md:p-8 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             
             {/* Header */}
             <div className="mb-6 flex justify-between items-start border-b border-stone-100 pb-4">
@@ -693,6 +862,7 @@ export default function AssistanceFlow({ userRole }) {
                     <Search size={18} strokeWidth={2} />
                   </div>
                   <input
+                    ref={scanInputRef}
                     type="text"
                     value={scanCode}
                     onChange={(e) => setScanCode(e.target.value)}
@@ -721,20 +891,20 @@ export default function AssistanceFlow({ userRole }) {
 
             {/* 2. Verified Resident Info */}
             {selectedResident && (
-              <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 mb-6 shadow-sm animate-in fade-in duration-300">
-                <div className="flex flex-col">
-                  <div className="flex justify-between items-center border-b border-stone-200 pb-3 mb-3">
-                    <span className="font-bold text-stone-500 uppercase tracking-widest text-[10px]">Resident Code</span> 
-                    <span className="font-bold text-[#b5122e] text-sm tracking-wide">{selectedResident.resident_code}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-stone-200 pb-3 mb-3">
-                    <span className="font-bold text-stone-500 uppercase tracking-widest text-[10px]">Resident Name</span> 
-                    <span className="font-bold text-stone-800 text-sm uppercase text-right max-w-[250px] truncate">{selectedResident.last_name}, {selectedResident.first_name} {selectedResident.middle_name}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-stone-500 uppercase tracking-widest text-[10px]">Location</span> 
-                    <span className="font-semibold text-stone-700 text-sm uppercase text-right">{selectedResident.barangay}, {selectedResident.purok}</span>
-                  </div>
+              <div className="bg-stone-50 p-5 rounded-xl border border-stone-200 mb-6 text-[13px] text-stone-700 leading-relaxed shadow-sm animate-in fade-in duration-300">
+                <div className="flex flex-col gap-1.5">
+                  <p className="flex justify-between items-center border-b border-stone-200 pb-1.5">
+                    <span className="font-bold text-stone-500 uppercase tracking-wider text-[10px]">Resident Code</span> 
+                    <span className="font-mono font-bold text-rose-700">{selectedResident.resident_code}</span>
+                  </p>
+                  <p className="flex justify-between items-center border-b border-stone-200 pb-1.5">
+                    <span className="font-bold text-stone-500 uppercase tracking-wider text-[10px]">Resident Name</span> 
+                    <span className="font-bold uppercase text-stone-800 text-right text-xs max-w-[200px] truncate">{selectedResident.last_name}, {selectedResident.first_name} {selectedResident.middle_name}</span>
+                  </p>
+                  <p className="flex justify-between items-center pt-0.5">
+                    <span className="font-bold text-stone-500 uppercase tracking-wider text-[10px]">Location</span> 
+                    <span className="uppercase text-stone-800 text-xs font-medium">{selectedResident.barangay}, {selectedResident.purok}</span>
+                  </p>
                 </div>
               </div>
             )}
@@ -810,7 +980,10 @@ export default function AssistanceFlow({ userRole }) {
                 Cancel
               </button>
               <button 
-                onClick={handleSaveAssistance}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSaveAssistance();
+                }}
                 disabled={loading || !selectedResident}
                 className="w-full sm:w-auto px-8 py-2.5 bg-[#ce5a6b] text-white text-sm font-medium rounded-xl hover:bg-rose-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
@@ -828,7 +1001,7 @@ export default function AssistanceFlow({ userRole }) {
       {editModal.isOpen && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setEditModal({ isOpen: false, resident: null, assistance: null })} />
-          <div className="relative bg-white w-full max-w-[500px] rounded-2xl border border-stone-200 shadow-2xl p-6 md:p-8 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white w-full max-w-[500px] rounded-2xl border border-stone-200 shadow-2xl p-6 md:p-8 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             
             <div className="mb-6 flex justify-between items-start border-b border-stone-100 pb-4">
               <div>

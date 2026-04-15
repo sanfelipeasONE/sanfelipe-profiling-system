@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../api/api";
-import { Loader2, ShieldAlert, Printer, ArrowLeft, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ShieldAlert, Printer, ArrowLeft, Download } from "lucide-react";
 import jsPDF from "jspdf";
 
 // =========================
@@ -71,9 +71,11 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   canvas.height = CH;
   const ctx = canvas.getContext("2d");
 
+  // Base White Background
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, CW, CH);
 
+  // Faint Background Image
   try {
     const bg = await loadImage(bgUrl);
     ctx.save();
@@ -82,6 +84,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
+  // Giant Watermark Logo (Right side)
   try {
     const logo = await loadImage(logoUrl);
     ctx.save();
@@ -94,27 +97,30 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
+  // Diagonal Red Header - SHIFTED DOWN & ALIGNED TO NAME
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(CW, 0);
-  ctx.lineTo(X(DOM_W * 0.72), 0);
-  ctx.lineTo(0, Y(DOM_H * 0.63));
+  ctx.lineTo(CW, Y(DOM_H * 0.26)); // Shifted to align the right side gap
+  ctx.lineTo(0, Y(DOM_H * 0.45));  // Shifted to drop the left side lower
   ctx.closePath();
-  ctx.fillStyle = "#cc0000";
+  ctx.fillStyle = "#e3311b"; // Vibrant orange-red matching picture
   ctx.fill();
   ctx.restore();
 
+  // White Card Border
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
   ctx.strokeRect(X(10), Y(10), X(DOM_W - 20), Y(DOM_H - 20));
 
+  // Top Left Logo
   try {
     const logo = await loadImage(logoUrl);
-    const lx = X(24);
-    const ly = Y(24);
-    const lw = X(88);
-    const lh = Y(88);
+    const lx = X(30);
+    const ly = Y(25);
+    const lw = X(85);
+    const lh = Y(85);
     ctx.save();
     ctx.beginPath();
     ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
@@ -124,44 +130,42 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
+  // Header Text with Drop Shadow
   ctx.save();
   ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#d40000";
-  ctx.strokeStyle = "#000000";
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.lineWidth = X(2);
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ffffff";
+  
+  ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+  ctx.shadowBlur = X(4);
+  ctx.shadowOffsetX = X(2);
+  ctx.shadowOffsetY = X(2);
 
   ctx.font = `${FONT_BLACK} ${FS(42)}px ${FONT_FAMILY}`;
-  ctx.strokeText("SAN FELIPE", CW / 2, Y(52));
-  ctx.fillText("SAN FELIPE", CW / 2, Y(52));
+  ctx.fillText("SAN FELIPE", X(360), Y(50));
 
-  ctx.font = `${FONT_BLACK} ${FS(40)}px ${FONT_FAMILY}`;
-  ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(85));
-  ctx.fillText("RESIDENT ID CARD", CW / 2, Y(85));
+  ctx.font = `${FONT_BLACK} ${FS(38)}px ${FONT_FAMILY}`;
+  ctx.fillText("RESIDENT ID CARD", X(360), Y(95));
   ctx.restore();
 
-  const px = X(95);
-  const py = Y(140);
-  const photoSize = X(170);
-  const pw = photoSize;
-  const ph = photoSize;
+  // Photo Box
+  const px = X(45);
+  const py = Y(145);
+  const pw = X(150);
+  const ph = X(150);
 
   ctx.fillStyle = "#efefef";
   ctx.fillRect(px, py, pw, ph);
   ctx.strokeStyle = "#000";
-  ctx.lineWidth = X(3);
+  ctx.lineWidth = X(2);
   ctx.strokeRect(px, py, pw, ph);
 
   if (resident.photo_url) {
     try {
       const photo = await loadImage(resident.photo_url);
-
       const imgW = photo.width;
       const imgH = photo.height;
       const squareSide = Math.min(imgW, imgH);
-
       const sx = (imgW - squareSide) / 2;
       const sy = (imgH - squareSide) / 2;
 
@@ -169,16 +173,9 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
       ctx.beginPath();
       ctx.rect(px, py, pw, ph);
       ctx.clip();
-
       ctx.fillStyle = "#efefef";
       ctx.fillRect(px, py, pw, ph);
-
-      ctx.drawImage(
-        photo,
-        sx, sy, squareSide, squareSide,
-        px, py, pw, ph
-      );
-
+      ctx.drawImage(photo, sx, sy, squareSide, squareSide, px, py, pw, ph);
       ctx.restore();
     } catch (_) {}
   } else {
@@ -189,131 +186,102 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.fillText("NO PHOTO", px + pw / 2, py + ph / 2);
   }
 
+  // Resident Text
   ctx.fillStyle = "#000";
   ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `${FONT_BLACK} ${FS(28)}px ${FONT_FAMILY}`;
-  ctx.fillText("RESIDENT", px + pw / 2, Y(358));
+  ctx.textBaseline = "top";
+  ctx.font = `${FONT_BLACK} ${FS(22)}px ${FONT_FAMILY}`;
+  ctx.fillText("RESIDENT", px + pw / 2, py + ph + Y(15));
 
-  const fx = X(320);
-  const fw = X(288);
+  // Information Fields Setup
+  const fx = X(220); // Left alignment anchor for text fields
 
-  const col1 = fw * 0.22;
-  const col2 = fw * 0.42;
-  const col3 = fw * 0.36;
-
-  function drawDomField({
-    label,
-    value,
-    x,
-    y,
-    w,
-    valueFs = 16,
-    labelFs = 13,
-    valueWeight = FONT_BOLD,
-    labelWeight = FONT_MEDIUM,
-    boxH = 26,
-    pb = 1,
-    labelGap = 1,
-    nowrap = false,
-  }) {
+  function drawDomField({ label, value, x, y, w, valueFs = 16, labelFs = 12 }) {
     const safeValue = String(value || "").trim() || " ";
-    const boxHeight = Y(boxH);
-    const paddingBottom = Y(pb);
-    const innerWidth = w - X(8);
-
     ctx.save();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+
+    // Label (Top)
+    ctx.fillStyle = "#333";
+    ctx.font = `${FONT_MEDIUM} ${FS(labelFs)}px ${FONT_FAMILY}`;
+    ctx.fillText(label, x, y);
+
+    // Value (Bottom)
     ctx.fillStyle = "#000";
-    ctx.font = `${valueWeight} ${FS(valueFs)}px ${FONT_FAMILY}`;
-
-    const lines = nowrap ? [safeValue] : wrapText(ctx, safeValue, innerWidth);
-    const lineHeight = Math.round(FS(valueFs) * 1.02);
-
-    const firstBaseline =
-      y + boxHeight - paddingBottom - (lines.length - 1) * lineHeight;
-
+    ctx.font = `${FONT_BOLD} ${FS(valueFs)}px ${FONT_FAMILY}`;
+    const lines = wrapText(ctx, safeValue, w);
     lines.forEach((line, i) => {
-      ctx.fillText(line, x + w / 2, firstBaseline + i * lineHeight);
+      ctx.fillText(line, x, y + Y(16) + i * Y(18));
     });
-
-    ctx.fillStyle = "#111";
-    ctx.font = `${labelWeight} ${FS(labelFs)}px ${FONT_FAMILY}`;
-    const labelBaseline = y + boxHeight + FS(labelFs) + Y(labelGap);
-    ctx.fillText(label, x + w / 2, labelBaseline);
 
     ctx.restore();
   }
 
-  const row1Y = Y(142);
-  const row2Y = Y(218);
-  const row3Y = Y(286);
+  const row1Y = Y(160);
+  const row2Y = Y(225);
+  const row3Y = Y(290);
 
-  drawDomField({
-    label: "Last Name, First Name, M.I, Suffix",
-    value: fullName,
-    x: fx,
-    y: row1Y,
-    w: fw,
-    valueFs: 14,
-    labelFs: 12,
-    boxH: 32,
-    pb: 1,
-    labelGap: 2,
+  // Row 1: Name (REVERTED TO SINGLE LINE)
+  ctx.save();
+  ctx.textBaseline = "top";
+  
+  // 1. Draw Label (Left aligned at fx)
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#333";
+  ctx.font = `${FONT_MEDIUM} ${FS(12)}px ${FONT_FAMILY}`;
+  const nameLabel = "Last Name, First Name, M.I., Suffix";
+  ctx.fillText(nameLabel, fx, row1Y);
+  
+  // 2. Calculate the exact center pixel of that specific label
+  const labelWidth = ctx.measureText(nameLabel).width;
+  const centerOfLabel = fx + (labelWidth / 2);
+  
+  // 3. Draw Value (Centered directly beneath the middle of the label)
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BOLD} ${FS(16)}px ${FONT_FAMILY}`;
+  
+  const safeName = String(fullName || "").trim() || " ";
+  const nameLines = wrapText(ctx, safeName, X(400));
+  
+  nameLines.forEach((line, i) => {
+    ctx.fillText(line, centerOfLabel, row1Y + Y(16) + i * Y(18));
   });
+  ctx.restore();
 
+  // Row 2: Sex, DOB, Civil Status
   drawDomField({
     label: "Sex",
     value: resident.sex || "",
     x: fx,
     y: row2Y,
-    w: col1,
-    valueFs: 16,
-    labelFs: 13,
-    boxH: 24,
-    pb: 1,
-    labelGap: 1,
+    w: X(80),
   });
 
   drawDomField({
     label: "Date of Birth",
     value: formattedBirthdate || "",
-    x: fx + col1,
+    x: fx + X(90),
     y: row2Y,
-    w: col2,
-    valueFs: 15,
-    labelFs: 13,
-    boxH: 24,
-    pb: 1,
-    labelGap: 1,
+    w: X(150),
   });
 
   drawDomField({
     label: "Civil Status",
     value: (resident.civil_status || "").replace("Live-in Partner", "Live-in Partner"),
-    x: fx + col1 + col2,
+    x: fx + X(240),
     y: row2Y,
-    w: col3,
-    valueFs: 14,
-    labelFs: 13,
-    boxH: 24,
-    pb: 1,
-    labelGap: 1,
-    nowrap: true,
+    w: X(160),
   });
 
+  // Row 3: Contact No
   drawDomField({
     label: "Contact No.",
     value: resident.contact_no || "",
     x: fx,
     y: row3Y,
-    w: fw * 0.48,
-    valueFs: 16,
-    labelFs: 13,
-    boxH: 26,
-    pb: 1,
-    labelGap: 1,
+    w: X(200),
   });
 
   return canvas;
@@ -360,13 +328,15 @@ async function drawBack(
     ctx.restore();
   } catch (_) {}
 
+  // Matching Diagonal Red Header for the back side - SHIFTED DOWN & ALIGNED TO NAME
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(X(DOM_W * 0.7), 0);
-  ctx.lineTo(0, Y(DOM_H * 0.6));
+  ctx.lineTo(CW, 0);
+  ctx.lineTo(CW, Y(DOM_H * 0.26)); 
+  ctx.lineTo(0, Y(DOM_H * 0.45));  
   ctx.closePath();
-  ctx.fillStyle = "#cc0000";
+  ctx.fillStyle = "#e3311b";
   ctx.fill();
   ctx.restore();
 
@@ -376,10 +346,10 @@ async function drawBack(
 
   try {
     const logo = await loadImage(logoUrl);
-    const lx = X(24);
-    const ly = Y(24);
-    const lw = X(88);
-    const lh = Y(88);
+    const lx = X(30);
+    const ly = Y(25);
+    const lw = X(85);
+    const lh = Y(85);
     ctx.save();
     ctx.beginPath();
     ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
@@ -423,7 +393,7 @@ async function drawBack(
   const rx = X(DOM_W - 34 - 285);
   const ry = Y(60);
 
-  ctx.fillStyle = "#000";
+  ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = `${FONT_BLACK} ${FS(24)}px ${FONT_FAMILY}`;
@@ -477,7 +447,7 @@ export default function ResidentQRPage() {
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [renderingPreview, setRenderingPreview] = useState(false);
-  const [activeSide, setActiveSide] = useState("front"); // "front" | "back"
+  const [activeSide, setActiveSide] = useState("front"); 
 
   const frontPreviewRef = useRef(null);
   const backPreviewRef = useRef(null);
@@ -537,21 +507,19 @@ export default function ResidentQRPage() {
     const rawSuffix = (resident.ext_name || "").trim().toUpperCase();
 
     let cleanFirstName = rawFirstName;
-    let suffix = rawSuffix;
+    let extName = rawSuffix;
 
-    if (!suffix && rawFirstName.includes(",")) {
-      const parts = rawFirstName
-        .split(",")
-        .map((p) => p.trim())
-        .filter(Boolean);
-
+    // Handle cases where suffix might be attached to the first name by a comma
+    if (!extName && rawFirstName.includes(",")) {
+      const parts = rawFirstName.split(",").map((p) => p.trim()).filter(Boolean);
       cleanFirstName = parts[0] || "";
-      suffix = parts.slice(1).join(" ");
+      extName = parts.slice(1).join(" ");
     }
 
     const middleInitial = rawMiddleName ? `${rawMiddleName.charAt(0)}.` : "";
 
-    return [rawLastName ? `${rawLastName},` : "", cleanFirstName, middleInitial, suffix]
+    // CHANGED: Fixed the ReferenceError by replacing "suffix" with "extName"
+    return [rawLastName ? `${rawLastName},` : "", cleanFirstName, middleInitial, extName]
       .filter(Boolean)
       .join(" ")
       .replace(/\s+/g, " ")
@@ -580,7 +548,7 @@ export default function ResidentQRPage() {
           await document.fonts.load("500 16px Barlow");
           await document.fonts.load("500 11px Barlow");
           await document.fonts.load("900 42px Barlow");
-          await document.fonts.load("900 40px Barlow");
+          await document.fonts.load("900 38px Barlow");
           await document.fonts.load("900 28px Barlow");
           await document.fonts.load("900 24px Barlow");
           await document.fonts.ready;
@@ -649,17 +617,6 @@ export default function ResidentQRPage() {
     setDownloadingPdf(true);
     try {
       if (document.fonts) {
-        await document.fonts.load("700 17px Barlow");
-        await document.fonts.load("700 16px Barlow");
-        await document.fonts.load("700 15px Barlow");
-        await document.fonts.load("700 14px Barlow");
-        await document.fonts.load("500 13px Barlow");
-        await document.fonts.load("500 16px Barlow");
-        await document.fonts.load("500 11px Barlow");
-        await document.fonts.load("900 42px Barlow");
-        await document.fonts.load("900 40px Barlow");
-        await document.fonts.load("900 28px Barlow");
-        await document.fonts.load("900 24px Barlow");
         await document.fonts.ready;
       }
 
@@ -821,8 +778,6 @@ export default function ResidentQRPage() {
         .card-slider[data-side="front"] { transform: translateX(0%); }
         .card-slider[data-side="back"]  { transform: translateX(-50%); }
       `}</style>
-
-      {/* ── Top bar ── */}
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col items-center py-6 px-4 max-w-lg mx-auto w-full">
