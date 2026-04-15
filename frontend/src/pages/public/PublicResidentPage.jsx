@@ -218,43 +218,44 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   }
 
-  const row1Y = Y(160);
   const row2Y = Y(225);
   const row3Y = Y(290);
 
-  // Row 1: Name (REVERTED TO SINGLE LINE)
+  // Row 1: Name & Label (FULLY CENTERED)
   ctx.save();
-  ctx.textBaseline = "top";
   
-  // 1. Draw Label (Left aligned at fx)
-  ctx.textAlign = "left";
-  ctx.fillStyle = "#333";
-  ctx.font = `${FONT_MEDIUM} ${FS(12)}px ${FONT_FAMILY}`;
-  const nameLabel = "Last Name, First Name, M.I., Suffix";
-  ctx.fillText(nameLabel, fx, row1Y);
-  
-  // 2. Calculate the exact center pixel of that specific label
-  const labelWidth = ctx.measureText(nameLabel).width;
-  const centerOfLabel = fx + (labelWidth / 2);
-  
-  // 3. Draw Value (Centered directly beneath the middle of the label)
+  // Define the horizontal center point for this column
+  // Based on your image, it's roughly the middle of the right side area
+  const columnCenter = fx + X(180); 
+  const row1Y = Y(155);
+
+  // 1. Draw the Name (Top, Large, Centered)
   ctx.textAlign = "center";
+  ctx.textBaseline = "top";
   ctx.fillStyle = "#000";
-  ctx.font = `${FONT_BOLD} ${FS(16)}px ${FONT_FAMILY}`;
+  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`; // Made it slightly thicker
   
   const safeName = String(fullName || "").trim() || " ";
-  const nameLines = wrapText(ctx, safeName, X(400));
+  const nameLines = wrapText(ctx, safeName, X(380));
   
   nameLines.forEach((line, i) => {
-    ctx.fillText(line, centerOfLabel, row1Y + Y(16) + i * Y(18));
+    ctx.fillText(line, columnCenter, row1Y + i * Y(22));
   });
+
+  // 2. Draw the Label (Bottom, Small, Centered)
+  // Position it relative to how many lines the name took
+  const labelY = row1Y + (nameLines.length * Y(22)) - Y(2);
+  ctx.fillStyle = "#333";
+  ctx.font = `${FONT_MEDIUM} ${FS(11)}px ${FONT_FAMILY}`;
+  ctx.fillText("Last Name, First Name, M.I., Suffix", columnCenter, labelY);
+
   ctx.restore();
 
   // Row 2: Sex, DOB, Civil Status
   drawDomField({
     label: "Sex",
     value: resident.sex || "",
-    x: fx,
+    x: fx + X(40),
     y: row2Y,
     w: X(80),
   });
@@ -262,7 +263,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   drawDomField({
     label: "Date of Birth",
     value: formattedBirthdate || "",
-    x: fx + X(90),
+    x: fx + X(165),
     y: row2Y,
     w: X(150),
   });
@@ -270,7 +271,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   drawDomField({
     label: "Civil Status",
     value: (resident.civil_status || "").replace("Live-in Partner", "Live-in Partner"),
-    x: fx + X(240),
+    x: fx + X(320),
     y: row2Y,
     w: X(160),
   });
@@ -279,7 +280,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   drawDomField({
     label: "Contact No.",
     value: resident.contact_no || "",
-    x: fx,
+    x: fx + X(180),
     y: row3Y,
     w: X(200),
   });
