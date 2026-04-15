@@ -621,45 +621,44 @@ def get_assistance_tracking(
 ):
     normalized_sector = normalize_sector_name(sector_name)
     
+    # 1. Build the join condition dynamically using the bitwise '&' operator 
     join_condition = (models.ResidentProfile.id == models.ResidentAssistance.resident_id)
     
     if type_of_assistance and type_of_assistance.lower() != "all programs":
-        join_condition = join_condition & (
-            func.lower(models.ResidentAssistance.type_of_assistance) ==
-            type_of_assistance.lower()
-        )
+        join_condition = join_condition & (models.ResidentAssistance.type_of_assistance == type_of_assistance)
         
+    # 2. Base query with OUTER JOIN
     query = db.query(models.ResidentProfile, models.ResidentAssistance).outerjoin(
         models.ResidentAssistance,
         join_condition
     ).filter(
         models.ResidentProfile.is_deleted == False,
+        # FILTER: Only residents who have been updated (Profiled)
         models.ResidentProfile.updated_at != None,
         models.ResidentProfile.created_at != None,
         models.ResidentProfile.updated_at > models.ResidentProfile.created_at
     )
     
-    # --- ADDED: ALPHABETICAL SORTING ---
+    # 3. ALPHABETICAL SORTING
     query = query.order_by(
         models.ResidentProfile.last_name.asc(),
         models.ResidentProfile.first_name.asc()
     )
 
-    # Apply Sector Filter
+    # 4. Apply Sector Filter
     query = apply_sector_filter(query, normalized_sector)
     
-    # Apply Status Filter (logic stays the same)
+    # 5. Apply Status Filter
     if status_filter.lower() == "claimed":
         query = query.filter(models.ResidentAssistance.date_claimed != None)
     elif status_filter.lower() == "unclaimed":
+        # Includes those with an unclaimed record OR those with no record at all
         query = query.filter(
             or_(
                 models.ResidentAssistance.id == None,
                 models.ResidentAssistance.date_claimed == None
             )
         )
-    elif status_filter.lower() == "all" and type_of_assistance.lower() != "all programs":
-        pass
         
     records = query.all()
     
@@ -667,12 +666,12 @@ def get_assistance_tracking(
     for resident, claim in records:
         if claim:
             status = "Claimed" if claim.date_claimed else "Unclaimed"
-            prog_name = claim.type_of_assistance
-            d_claimed = claim.date_claimed
+            prog_type = claim.type_of_assistance
+            date_claimed = claim.date_claimed
         else:
             status = "No Record"
-            prog_name = type_of_assistance if type_of_assistance and type_of_assistance.lower() != "all programs" else "None"
-            d_claimed = None
+            prog_type = type_of_assistance if type_of_assistance and type_of_assistance.lower() != "all programs" else "None"
+            date_claimed = None
             
         results.append({
             "resident_id": resident.id,
@@ -681,8 +680,8 @@ def get_assistance_tracking(
             "barangay": resident.barangay,
             "sector_summary": resident.sector_summary,
             "status": status,
-            "date_claimed": d_claimed,
-            "type_of_assistance": prog_name,
+            "date_claimed": date_claimed,
+            "type_of_assistance": prog_type,
             "photo_url": resident.photo_url
         })
         
