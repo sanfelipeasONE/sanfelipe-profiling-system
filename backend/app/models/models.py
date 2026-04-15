@@ -173,3 +173,18 @@ class AuditLog(Base):
     target_type = Column(String)  # "resident", "user", "system"
     target_id = Column(Integer, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+# PayoutEvents
+class PayoutEvent(Base):
+    __tablename__ = "payout_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    type_of_assistance = Column(String, nullable=False)
+    status = Column(String, default="Claimed")
+    date_processed = Column(Date, nullable=True)
+    date_claimed = Column(Date, nullable=True)
+    amount = Column(Float, nullable=True)
+    implementing_office = Column(String, nullable=True)
+
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

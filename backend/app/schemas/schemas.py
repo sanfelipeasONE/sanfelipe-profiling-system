@@ -299,3 +299,24 @@ class AssistanceTrackingResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ======================
+# Payout Events
+# ======================
+class PayoutEventBase(BaseModel):
+    type_of_assistance: str
+    status: str
+    date_processed: Optional[date] = None
+    date_claimed: Optional[date] = None
+    amount: Optional[float] = None
+    implementing_office: Optional[str] = None
+
+class PayoutEventCreate(PayoutEventBase):
+    pass
+
+class PayoutEventResponse(PayoutEventBase):
+    id: int
+    is_active: bool
+    
+    class Config:
+        from_attributes = True

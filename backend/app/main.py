@@ -1402,3 +1402,48 @@ def process_assistance_qr(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ---------------------------------------------------
+# PayoutEvents
+# ---------------------------------------------------
+@app.post("/payout-events/", response_model=schemas.PayoutEventResponse)
+def set_active_payout_event(
+    event_data: schemas.PayoutEventCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Security: Ensure only admins can set the global payout template
+    if current_user.role not in ["admin", "super_admin", "admin_limited"]:
+        raise HTTPException(status_code=403, detail="Not authorized to set payout configurations.")
+
+    # 1. Deactivate all existing templates
+    db.execute(text("UPDATE payout_events SET is_active = False"))
+    
+    # 2. Create the new active template
+    new_event = models.PayoutEvent(
+        type_of_assistance=event_data.type_of_assistance,
+        status=event_data.status,
+        date_processed=event_data.date_processed,
+        date_claimed=event_data.date_claimed if event_data.status == "Claimed" else None,
+        amount=event_data.amount,
+        implementing_office=event_data.implementing_office,
+        is_active=True
+    )
+    
+    db.add(new_event)
+    db.commit()
+    db.refresh(new_event)
+    return new_event
+
+@app.get("/payout-events/active", response_model=schemas.PayoutEventResponse)
+def get_active_payout_event(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Fetch the currently active template for the scanners to use
+    active_event = db.query(models.PayoutEvent).filter(models.PayoutEvent.is_active == True).first()
+    
+    if not active_event:
+        raise HTTPException(status_code=404, detail="No active payout configuration found.")
+        
+    return active_event
