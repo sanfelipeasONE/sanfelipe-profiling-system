@@ -655,6 +655,8 @@ def get_assistance_tracking(
                 models.ResidentAssistance.date_claimed == None
             )
         )
+    elif status_filter.lower() == "all" and type_of_assistance.lower() != "all programs":
+        pass
         
     records = query.all()
     
