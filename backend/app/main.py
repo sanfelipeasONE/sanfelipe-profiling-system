@@ -1463,3 +1463,23 @@ def get_all_payout_events(
             unique_events.append(event)
             
     return unique_events
+
+@app.delete("/payout-events/{event_id}")
+def delete_payout_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Security: Ensure only admins can delete configurations
+    if current_user.role not in ["admin", "super_admin", "admin_limited"]:
+        raise HTTPException(status_code=403, detail="Not authorized to delete configurations.")
+
+    event = db.query(models.PayoutEvent).filter(models.PayoutEvent.id == event_id).first()
+    
+    if not event:
+        raise HTTPException(status_code=404, detail="Preset not found.")
+
+    db.delete(event)
+    db.commit()
+    
+    return {"message": "Preset deleted successfully"}
