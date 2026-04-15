@@ -1424,14 +1424,13 @@ def set_active_payout_event(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Security: Ensure only admins can set the global payout template
     if current_user.role not in ["admin", "super_admin", "admin_limited"]:
-        raise HTTPException(status_code=403, detail="Not authorized to set payout configurations.")
+        raise HTTPException(status_code=403, detail="Not authorized.")
 
-    # 1. Deactivate all existing templates
-    db.execute(text("UPDATE payout_events SET is_active = False"))
+    # ONLY deactivate others if this one is meant to be the global active template
+    if event_data.is_active:
+        db.execute(text("UPDATE payout_events SET is_active = False"))
     
-    # 2. Create the new active template
     new_event = models.PayoutEvent(
         type_of_assistance=event_data.type_of_assistance,
         status=event_data.status,
@@ -1439,7 +1438,7 @@ def set_active_payout_event(
         date_claimed=event_data.date_claimed if event_data.status == "Claimed" else None,
         amount=event_data.amount,
         implementing_office=event_data.implementing_office,
-        is_active=True
+        is_active=event_data.is_active  # <-- Now it listens to the frontend!
     )
     
     db.add(new_event)

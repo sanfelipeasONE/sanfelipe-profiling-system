@@ -312,7 +312,7 @@ class PayoutEventBase(BaseModel):
     implementing_office: Optional[str] = None
 
 class PayoutEventCreate(PayoutEventBase):
-    pass
+    is_active: bool = False
 
 class PayoutEventResponse(PayoutEventBase):
     id: int
