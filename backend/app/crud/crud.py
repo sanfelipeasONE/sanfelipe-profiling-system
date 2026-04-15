@@ -621,15 +621,23 @@ def get_assistance_tracking(
 ):
     normalized_sector = normalize_sector_name(sector_name)
     
-    # 1. Base query with INNER JOIN (gets all residents who have ANY assistance record)
-    query = db.query(models.ResidentProfile, models.ResidentAssistance).join(
-        models.ResidentAssistance,
-        models.ResidentProfile.id == models.ResidentAssistance.resident_id
-    ).filter(models.ResidentProfile.is_deleted == False)
+    # 1. Base query with OUTER JOIN to get ALL updated residents
+    join_conditions = [models.ResidentProfile.id == models.ResidentAssistance.resident_id]
     
     if type_of_assistance and type_of_assistance.lower() != "all programs":
-        query = query.filter(models.ResidentAssistance.type_of_assistance == type_of_assistance)
+        join_conditions.append(models.ResidentAssistance.type_of_assistance == type_of_assistance)
         
+    query = db.query(models.ResidentProfile, models.ResidentAssistance).outerjoin(
+        models.ResidentAssistance,
+        and_(*join_conditions)
+    ).filter(
+        models.ResidentProfile.is_deleted == False,
+        # FILTER: Only residents who have been updated
+        models.ResidentProfile.updated_at.isnot(None),
+        models.ResidentProfile.created_at.isnot(None),
+        models.ResidentProfile.updated_at > models.ResidentProfile.created_at
+    )
+    
     # Apply Sector Filter
     query = apply_sector_filter(query, normalized_sector)
     
@@ -637,13 +645,26 @@ def get_assistance_tracking(
     if status_filter.lower() == "claimed":
         query = query.filter(models.ResidentAssistance.date_claimed.isnot(None))
     elif status_filter.lower() == "unclaimed":
-        query = query.filter(models.ResidentAssistance.date_claimed.is_(None))
+        # Includes those with an unclaimed record OR those with no record at all
+        query = query.filter(
+            or_(
+                models.ResidentAssistance.id.is_(None),
+                models.ResidentAssistance.date_claimed.is_(None)
+            )
+        )
         
     records = query.all()
     
     results = []
     for resident, claim in records:
-        status = "Claimed" if claim.date_claimed else "Unclaimed"
+        if claim:
+            status = "Claimed" if claim.date_claimed else "Unclaimed"
+            prog_type = claim.type_of_assistance
+            date_claimed = claim.date_claimed
+        else:
+            status = "No Record"
+            prog_type = type_of_assistance if type_of_assistance and type_of_assistance.lower() != "all programs" else "None"
+            date_claimed = None
             
         results.append({
             "resident_id": resident.id,
@@ -652,8 +673,8 @@ def get_assistance_tracking(
             "barangay": resident.barangay,
             "sector_summary": resident.sector_summary,
             "status": status,
-            "date_claimed": claim.date_claimed,
-            "type_of_assistance": claim.type_of_assistance,
+            "date_claimed": date_claimed,
+            "type_of_assistance": prog_type,
             "photo_url": resident.photo_url
         })
         
