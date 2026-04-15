@@ -624,7 +624,10 @@ def get_assistance_tracking(
     join_condition = (models.ResidentProfile.id == models.ResidentAssistance.resident_id)
     
     if type_of_assistance and type_of_assistance.lower() != "all programs":
-        join_condition = join_condition & (models.ResidentAssistance.type_of_assistance == type_of_assistance)
+        join_condition = join_condition & (
+            func.lower(models.ResidentAssistance.type_of_assistance) ==
+            type_of_assistance.lower()
+        )
         
     query = db.query(models.ResidentProfile, models.ResidentAssistance).outerjoin(
         models.ResidentAssistance,
