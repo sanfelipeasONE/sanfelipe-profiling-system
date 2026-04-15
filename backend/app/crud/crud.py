@@ -1,7 +1,7 @@
 from unicodedata import name
 
 from sqlalchemy.orm import Session, joinedload, subqueryload
-from sqlalchemy import or_, func, case
+from sqlalchemy import or_, func, case, and_
 from app import models, schemas
 from datetime import datetime
 from app.core.audit import log_action
