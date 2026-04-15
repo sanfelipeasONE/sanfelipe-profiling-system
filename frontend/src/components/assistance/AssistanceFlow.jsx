@@ -301,12 +301,32 @@ export default function AssistanceFlow({ userRole }) {
     setScanError("");
     
     try {
-      // 1. Fetch Resident
       const res = await api.get(`/residents/code/${scanCode}`);
       const resident = res.data;
-      setSelectedResident(resident); 
 
-      // 2. Build Payload
+      const targetType = payoutTemplate.type_of_assistance;
+      const targetProcessed = payoutTemplate.date_processed; // YYYY-MM-DD
+      const targetClaimed = payoutTemplate.status === 'Claimed' ? payoutTemplate.date_claimed : null;
+
+      const isDuplicate = resident.assistances?.some(record => {
+          const recordProcessed = record.date_processed ? record.date_processed.split('T')[0] : null;
+          const recordClaimed = record.date_claimed ? record.date_claimed.split('T')[0] : null;
+
+          return (
+              record.type_of_assistance === targetType &&
+              recordProcessed === targetProcessed &&
+              recordClaimed === targetClaimed
+          );
+      });
+
+      if (isDuplicate) {
+          setScanError(`ALREADY CLAIMED: ${resident.last_name} already received this today.`);
+          setSelectedResident(resident);
+          setScanCode(""); 
+          setLoading(false);
+          return;
+      }
+
       const payload = {
         type_of_assistance: payoutTemplate.type_of_assistance,
         date_processed: payoutTemplate.date_processed || null,
@@ -315,30 +335,16 @@ export default function AssistanceFlow({ userRole }) {
         implementing_office: payoutTemplate.implementing_office || null
       };
       
-      // 3. Save to Database
       await api.post(`/residents/${resident.id}/assistance`, payload);
       
-      // 4. Success Toast
-      const actionText = payoutTemplate.status === 'Claimed' ? 'Claimed by' : 'Recorded as Unclaimed for';
-      toast.success(`${actionText} ${resident.first_name}!`);
-      
-      if (expandedData && expandedData.id === resident.id) {
-         try {
-            const expandedRes = await api.get(`/residents/code/${resident.resident_code}`);
-            setExpandedData(expandedRes.data);
-         } catch (err) {}
-      }
-
-      // 5. Reset input for immediate next scan
+      toast.success(`Success! Claimed by ${resident.first_name}.`);
+      setSelectedResident(resident);
       setScanCode("");
       setRefreshTrigger(prev => prev + 1); 
       
     } catch (err) {
-      if (err.response?.status === 404) {
-         setScanError("No resident found matching this ID.");
-      } else {
-         setScanError(err.response?.data?.detail || "Failed to save assistance.");
-      }
+      const errorMsg = err.response?.data?.detail || "Error saving record.";
+      setScanError(errorMsg);
       setSelectedResident(null);
     } finally {
       setLoading(false);
@@ -559,7 +565,7 @@ export default function AssistanceFlow({ userRole }) {
       />,
       document.body
     )}
-    
+
       {/* --- HEADER --- */}
       <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-5">
         <div>
@@ -928,7 +934,7 @@ export default function AssistanceFlow({ userRole }) {
                   {/* SAVED TEMPLATE BANNER */}
                   <div className="mb-6 p-4 bg-stone-50 border border-stone-200 rounded-xl flex items-center justify-between">
                      <div>
-                        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Active Global Template</p>
+                        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Payout Template</p>
                         <p className="text-sm font-medium text-stone-800 uppercase">
                            {payoutTemplate.type_of_assistance} {payoutTemplate.amount ? `(₱${payoutTemplate.amount})` : ''}
                         </p>
