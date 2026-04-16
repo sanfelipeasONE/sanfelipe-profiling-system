@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import { 
   Search, Loader2, UserSquare2, ScanLine, 
-  HeartHandshake, Plus, ShieldAlert, 
+  HeartHandshake, Plus, ShieldAlert, Calendar,
   ChevronDown, X, Filter, FileText, CheckCircle2, 
   ChevronUp, Edit, Trash2, ChevronLeft, ChevronRight, Settings2, CheckCircle
 } from 'lucide-react';
@@ -44,7 +44,6 @@ export default function AssistanceFlow({ userRole }) {
     implementing_office: ''
   });
   
-  // Stores fetched presets for the dropdown
   const [savedTemplatesList, setSavedTemplatesList] = useState([]);
   const [selectedPresetId, setSelectedPresetId] = useState("");
 
@@ -72,12 +71,6 @@ export default function AssistanceFlow({ userRole }) {
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
-  const wasUpdated = (r) => {
-    const created = r?.created_at ? new Date(r.created_at) : null;
-    const updated = r?.updated_at ? new Date(r.updated_at) : null;
-    return created && updated && Math.abs(updated.getTime() - created.getTime()) > 1000;
   };
 
   const formatSectors = (summary, details) => {
@@ -115,12 +108,9 @@ export default function AssistanceFlow({ userRole }) {
         });
         
         let data = res.data || [];
-        
-        // HIDE "NO RECORD" IF A SPECIFIC PROGRAM IS SELECTED 
         if (filters.program_type !== 'All Programs' && filters.status !== 'all' && filters.status !== 'unclaimed') {
             data = data.filter(item => item.status !== "No Record");
         }
-
         if (filters.search) {
           const l = filters.search.toLowerCase();
           data = data.filter(r => r.full_name.toLowerCase().includes(l) || r.resident_code.toLowerCase().includes(l));
@@ -128,8 +118,6 @@ export default function AssistanceFlow({ userRole }) {
         if (filters.barangay) {
           data = data.filter(r => r.barangay?.toUpperCase() === filters.barangay.toUpperCase());
         }
-
-        // DEDUPLICATE RESIDENTS
         const uniqueMap = new Map();
         data.forEach(item => {
           if (filters.program_type !== 'All Programs' && filters.status !== 'all' && filters.status !== 'unclaimed' && item.status === "No Record") {
@@ -140,21 +128,22 @@ export default function AssistanceFlow({ userRole }) {
               uniqueMap.set(item.resident_code, item);
           }
         });
-        
         setTrackingList(Array.from(uniqueMap.values()));
         setCurrentPage(1);
-      } catch (err) {
-        setTrackingList([]);
-      } finally {
-        setTableLoading(false);
-      }
+      } catch (err) { setTrackingList([]); } finally { setTableLoading(false); }
     };
     const debounce = setTimeout(fetchTrackingList, 300);
     return () => clearTimeout(debounce);
   }, [filters, refreshTrigger]);
 
   const handleFilterChange = (e) => setFilters({ ...filters, [e.target.name]: e.target.value });
-  const handleTemplateInputChange = (e) => setPayoutTemplate({ ...payoutTemplate, [e.target.name]: e.target.value });
+  
+  // FIX: Instantly deselect the dropdown if the user manually modifies the form
+  const handleTemplateInputChange = (e) => {
+      setPayoutTemplate({ ...payoutTemplate, [e.target.name]: e.target.value });
+      setSelectedPresetId(""); 
+  };
+  
   const handleEditInputChange = (e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
 
   const toggleRow = async (rowKey, resident_code) => {
@@ -169,17 +158,19 @@ export default function AssistanceFlow({ userRole }) {
     try {
       const res = await api.get(`/residents/code/${resident_code}`);
       setExpandedData(res.data);
-    } catch (err) {
-      toast.error("Failed to load details.");
-      setExpandedRow(null);
-    } finally {
-      setRowLoading(false);
-    }
+    } catch (err) { toast.error("Failed to load details."); setExpandedRow(null); } finally { setRowLoading(false); }
   };
 
   // ==========================================
   // PAYOUT LOGIC
   // ==========================================
+
+  const fetchPresetsList = async () => {
+    try {
+        const resAll = await api.get('/payout-events/all');
+        setSavedTemplatesList(resAll.data || []);
+    } catch (err) {}
+  };
 
   const handleStartPayoutMode = async () => {
     setLoading(true);
@@ -194,24 +185,18 @@ export default function AssistanceFlow({ userRole }) {
         if (err.response?.status === 404) {
             toast.error("No active template found. Please configure one first.");
             handleConfigureAssistance(); 
-        } else {
-            toast.error("Failed to connect to database.");
-        }
-    } finally {
-        setLoading(false);
-    }
+        } else { toast.error("Failed to connect to database."); }
+    } finally { setLoading(false); }
   };
 
   const handleConfigureAssistance = async () => {
+      setSelectedPresetId(""); // Clear any old selections
       try {
           const resActive = await api.get('/payout-events/active');
           if (resActive.data) setPayoutTemplate(resActive.data);
       } catch (err) {}
       
-      try {
-          const resAll = await api.get('/payout-events/all');
-          setSavedTemplatesList(resAll.data || []);
-      } catch (err) {}
+      await fetchPresetsList();
       
       setIsScanningMode(false);
       setIsAddModalOpen(true);
@@ -219,8 +204,7 @@ export default function AssistanceFlow({ userRole }) {
 
   const handleLoadPreset = (e) => {
     const selectedId = e.target.value;
-    setSelectedPresetId(selectedId); // <-- Track the selected ID
-    
+    setSelectedPresetId(selectedId);
     if (!selectedId) return;
     
     const selectedTemplate = savedTemplatesList.find(t => t.id.toString() === selectedId);
@@ -237,18 +221,39 @@ export default function AssistanceFlow({ userRole }) {
     }
   };
 
+  const handleAddNewPreset = async () => {
+      setLoading(true);
+      try {
+          const payload = {
+              type_of_assistance: payoutTemplate.type_of_assistance,
+              status: payoutTemplate.status,
+              date_processed: payoutTemplate.date_processed || null,
+              date_claimed: payoutTemplate.status === 'Claimed' ? (payoutTemplate.date_claimed || null) : null,
+              amount: payoutTemplate.amount ? parseFloat(payoutTemplate.amount) : null,
+              implementing_office: payoutTemplate.implementing_office || null,
+              is_active: false // Save to list, but do NOT make it the active global template
+          };
+
+          const res = await api.post('/payout-events/', payload);
+          toast.success("Saved to presets list.");
+          await fetchPresetsList(); 
+          if (res.data && res.data.id) {
+              setSelectedPresetId(res.data.id.toString()); // Auto-select the new preset
+          }
+      } catch (err) {
+          toast.error("Failed to save preset.");
+      } finally {
+          setLoading(false);
+      }
+  };
+
   const handleDeletePreset = async () => {
     if (!selectedPresetId) return;
-    
     setLoading(true);
     try {
       await api.delete(`/payout-events/${selectedPresetId}`);
       toast.success("Preset deleted successfully.");
-      
-      // Remove it from the dropdown list immediately
       setSavedTemplatesList(prev => prev.filter(t => t.id.toString() !== selectedPresetId));
-      
-      // Clear the current selection and reset the form
       setSelectedPresetId("");
       setPayoutTemplate({
         type_of_assistance: 'Medical Assistance',
@@ -258,15 +263,8 @@ export default function AssistanceFlow({ userRole }) {
         amount: '',
         implementing_office: ''
       });
-      
-      // Close the new modal
       setDeletePresetModalOpen(false);
-      
-    } catch (err) {
-      toast.error("Failed to delete preset.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { toast.error("Failed to delete preset."); } finally { setLoading(false); }
   };
 
   const handleSaveGlobalTemplate = async () => {
@@ -278,18 +276,15 @@ export default function AssistanceFlow({ userRole }) {
               date_processed: payoutTemplate.date_processed || null,
               date_claimed: payoutTemplate.status === 'Claimed' ? (payoutTemplate.date_claimed || null) : null,
               amount: payoutTemplate.amount ? parseFloat(payoutTemplate.amount) : null,
-              implementing_office: payoutTemplate.implementing_office || null
+              implementing_office: payoutTemplate.implementing_office || null,
+              is_active: true // This sets it as the actual template being used by everyone
           };
 
           const res = await api.post('/payout-events/', payload);
           setPayoutTemplate(res.data); 
-          toast.success("Global Template saved successfully.");
+          toast.success("Payout saved and Activated.");
           setIsScanningMode(true); 
-      } catch (err) {
-          toast.error("Failed to save global template.");
-      } finally {
-          setLoading(false);
-      }
+      } catch (err) { toast.error("Failed to save global template."); } finally { setLoading(false); }
   };
 
   // --- AUTOMATED SCANNER & RECORDING LOGIC ---
@@ -305,7 +300,7 @@ export default function AssistanceFlow({ userRole }) {
       const resident = res.data;
 
       const targetType = payoutTemplate.type_of_assistance;
-      const targetProcessed = payoutTemplate.date_processed; // YYYY-MM-DD
+      const targetProcessed = payoutTemplate.date_processed;
       const targetClaimed = payoutTemplate.status === 'Claimed' ? payoutTemplate.date_claimed : null;
 
       const isDuplicate = resident.assistances?.some(record => {
@@ -539,32 +534,31 @@ export default function AssistanceFlow({ userRole }) {
 
   return (
     <div className="font-sans text-stone-900 animate-in fade-in duration-300 px-2 sm:px-4 md:px-0 pb-12 pt-2">
-
       {createPortal(
-      <Toaster
-        position="top-right"
-        containerStyle={{
-          zIndex: 999999,
-          filter: 'none',
-          isolation: 'isolate',
-        }}
-        toastOptions={{
-          style: {
-            background: '#1c1917',
-            color: '#fff',
-            borderRadius: '12px',
-            fontSize: '14px',
-            fontWeight: '500',
-            WebkitFontSmoothing: 'antialiased',
-            MozOsxFontSmoothing: 'grayscale',
-            transform: 'translateZ(0)',
-            backfaceVisibility: 'hidden',
+        <Toaster
+          position="top-right"
+          containerStyle={{
+            zIndex: 999999,
             filter: 'none',
-          },
-        }}
-      />,
-      document.body
-    )}
+            isolation: 'isolate',
+          }}
+          toastOptions={{
+            style: {
+              background: '#1c1917',
+              color: '#fff',
+              borderRadius: '12px',
+              fontSize: '14px',
+              fontWeight: '500',
+              WebkitFontSmoothing: 'antialiased',
+              MozOsxFontSmoothing: 'grayscale',
+              transform: 'translateZ(0)',
+              backfaceVisibility: 'hidden',
+              filter: 'none',
+            },
+          }}
+        />,
+        document.body
+      )}
 
       {/* --- HEADER --- */}
       <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-5">
@@ -818,7 +812,7 @@ export default function AssistanceFlow({ userRole }) {
                    {isScanningMode ? "Scanning Mode" : "Payout Configuration"}
                 </h2>
                 <p className="text-[11px] font-normal text-stone-500 tracking-wide mt-1">
-                   {isScanningMode ? "Scan beneficiaries to distribute the saved assistance." : "Step 1: Set the Global Template for all devices."}
+                   {isScanningMode ? "Scan beneficiaries to distribute the saved assistance." : "Step 1: Set the Payout Template for all."}
                 </p>
               </div>
               <button onClick={handleCloseModal} className="text-stone-400 hover:text-stone-600 p-1 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors">
@@ -833,11 +827,11 @@ export default function AssistanceFlow({ userRole }) {
                 {/* LOAD PRESET DROPDOWN */}
                 <div className="flex items-center gap-3 bg-stone-50 p-3 rounded-xl border border-stone-200 mb-4">
                   <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Load Saved Preset</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Load Saved Payouts</label>
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <select value={selectedPresetId} onChange={handleLoadPreset} className="w-full appearance-none pl-3 pr-10 py-2 bg-white border border-stone-300 rounded-lg text-sm font-medium text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-50 transition-all cursor-pointer shadow-sm">
-                          <option value="">-- Select a Previous Configuration --</option>
+                          <option value="">-- Select a Previous Payouts --</option>
                           {savedTemplatesList.map(template => (
                             <option key={template.id} value={template.id}>
                               {template.type_of_assistance} {template.amount ? `(₱${template.amount})` : ''} - {template.implementing_office || 'No Office'}
@@ -847,6 +841,15 @@ export default function AssistanceFlow({ userRole }) {
                         <ChevronDown className="absolute right-3 top-2.5 text-stone-400 pointer-events-none" size={16} />
                       </div>
                       
+                      <button 
+                        onClick={handleAddNewPreset} 
+                        disabled={loading}
+                        className="p-2 text-stone-600 bg-white hover:bg-stone-100 hover:text-stone-800 rounded-lg transition-colors border border-stone-300 shadow-sm"
+                        title="Save current form as a new preset"
+                      >
+                        <Plus size={18} />
+                      </button>
+
                       {selectedPresetId && (
                         <button 
                           onClick={() => setDeletePresetModalOpen(true)} 
@@ -922,7 +925,7 @@ export default function AssistanceFlow({ userRole }) {
                 
                 <div className="flex justify-end">
                    <button onClick={handleSaveGlobalTemplate} disabled={loading} className="w-full px-8 py-3 bg-[#ce5a6b] text-white text-sm font-medium rounded-xl hover:bg-rose-700 transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50">
-                     {loading ? <Loader2 size={16} className="animate-spin" /> : "Save Global Template & Scan"} <ChevronRight size={18}/>
+                     {loading ? <Loader2 size={16} className="animate-spin" /> : "Save Payout Template & Scan"} <ChevronRight size={18}/>
                    </button>
                 </div>
               </div>
@@ -931,22 +934,40 @@ export default function AssistanceFlow({ userRole }) {
             {/* PHASE 2: CONTINUOUS SCANNING MODE */}
             {isScanningMode && (
                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                  {/* SAVED TEMPLATE BANNER */}
-                  <div className="mb-6 p-4 bg-stone-50 border border-stone-200 rounded-xl flex items-center justify-between">
-                     <div>
-                        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Payout Template</p>
-                        <p className="text-sm font-medium text-stone-800 uppercase">
-                           {payoutTemplate.type_of_assistance} {payoutTemplate.amount ? `(₱${payoutTemplate.amount})` : ''}
-                        </p>
-                        <span className={`inline-flex items-center px-2 py-0.5 mt-1 rounded text-[9px] font-bold border uppercase tracking-wider ${
-                           payoutTemplate.status === 'Claimed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
-                           Auto-Record as {payoutTemplate.status}
-                        </span>
+                  {/* --- UPDATED ACTIVE TEMPLATE BANNER WITH DATES --- */}
+                  <div className="mb-6 p-5 bg-stone-50 border border-stone-200 rounded-2xl shadow-sm">
+                     <div className="flex items-center justify-between mb-4 border-b border-stone-200 pb-3">
+                        <div>
+                           <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Active Global Template</p>
+                           <p className="text-base font-bold text-stone-900 uppercase">
+                              {payoutTemplate.type_of_assistance} {payoutTemplate.amount ? `(₱${payoutTemplate.amount})` : ''}
+                           </p>
+                        </div>
+                        <button onClick={handleConfigureAssistance} className="text-[11px] font-bold text-rose-600 bg-white hover:bg-rose-50 px-3 py-1.5 rounded-lg uppercase tracking-wider border border-stone-200 transition-colors flex items-center gap-1.5 shadow-sm">
+                           <Settings2 size={14} /> Edit
+                        </button>
                      </div>
-                     <button onClick={handleConfigureAssistance} className="text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg uppercase tracking-wider border border-rose-200 transition-colors flex items-center gap-1">
-                        <Settings2 size={14} /> Edit
-                     </button>
+
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-start gap-2">
+                           <div className="p-1.5 bg-stone-200 rounded text-stone-600 mt-0.5"><Calendar size={12} /></div>
+                           <div>
+                              <p className="text-[9px] font-bold text-stone-400 uppercase tracking-tighter">Processed</p>
+                              <p className="text-[11px] font-medium text-stone-700 uppercase">{formatDate(payoutTemplate.date_processed)}</p>
+                           </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                           <div className={`p-1.5 rounded mt-0.5 ${payoutTemplate.status === 'Claimed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                              {payoutTemplate.status === 'Claimed' ? <CheckCircle size={12} /> : <Calendar size={12} />}
+                           </div>
+                           <div>
+                              <p className="text-[9px] font-bold text-stone-400 uppercase tracking-tighter">Claim Status</p>
+                              <p className={`text-[11px] font-bold uppercase ${payoutTemplate.status === 'Claimed' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                 {payoutTemplate.status === 'Claimed' ? formatDate(payoutTemplate.date_claimed) : 'Unclaimed'}
+                              </p>
+                           </div>
+                        </div>
+                     </div>
                   </div>
 
                   {/* SCANNER INPUT (AUTO-SAVES) */}
@@ -971,15 +992,15 @@ export default function AssistanceFlow({ userRole }) {
                     </form>
 
                     {scanError && (
-                      <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 shadow-sm">
+                      <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 shadow-sm animate-in shake duration-300">
                         <ShieldAlert size={18} />
-                        <p className="text-sm font-normal">{scanError}</p>
+                        <p className="text-sm font-bold uppercase tracking-tight">{scanError}</p>
                       </div>
                     )}
                   </div>
 
                   {/* PREVIEW LAST SCANNED RESIDENT */}
-                  {selectedResident && (
+                  {selectedResident && !scanError && (
                     <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 mb-6 shadow-sm animate-in fade-in duration-300">
                       <div className="flex items-center gap-2 text-emerald-700 mb-3 border-b border-emerald-200 pb-2">
                          <CheckCircle size={16} />
@@ -1084,7 +1105,7 @@ export default function AssistanceFlow({ userRole }) {
               </div>
 
               <div>
-                <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Amount (Optional)</label>
+                <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Amount</label>
                 <input type="number" name="amount" placeholder="0.00" value={editFormData.amount} onChange={handleEditInputChange} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
               </div>
 
@@ -1145,44 +1166,27 @@ export default function AssistanceFlow({ userRole }) {
         </div>,
         document.body
       )}
-    
-    {/* =========================================
+
+      {/* =========================================
           MODAL: DELETE PRESET CONFIRMATION
           ========================================= */}
       {deletePresetModalOpen && createPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setDeletePresetModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-[420px] rounded-2xl shadow-2xl border border-stone-200 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 md:p-8">
-              <div className="w-14 h-14 md:w-16 md:h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-5 border-4 border-red-50">
-                <ShieldAlert size={28} className="md:w-8 md:h-8" />
-              </div>
-              <h3 className="text-lg md:text-xl font-medium text-stone-900 tracking-tight mb-2">Delete Preset</h3>
-              <p className="text-xs md:text-sm font-normal text-stone-600 leading-relaxed mb-6 md:mb-8">
-                You are about to permanently remove this configuration template. <span className="font-medium text-stone-900">This action cannot be undone.</span>
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button 
-                  onClick={() => setDeletePresetModalOpen(false)} 
-                  className="flex-1 px-4 py-3 border-2 border-stone-200 text-stone-600 text-sm font-medium rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-colors"
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleDeletePreset} 
-                  className="flex-1 px-4 py-3 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors shadow-md flex items-center justify-center gap-2" 
-                  disabled={loading}
-                >
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : "Delete Preset"}
+          <div className="relative bg-white w-full max-w-[420px] rounded-2xl shadow-2xl border border-stone-200 overflow-hidden animate-in zoom-in-95 duration-200 p-6 md:p-8">
+              <div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-5 border-4 border-red-50"><ShieldAlert size={28} /></div>
+              <h3 className="text-lg font-medium text-stone-900 tracking-tight mb-2">Delete Preset</h3>
+              <p className="text-xs text-stone-600 leading-relaxed mb-8">Permanently remove this configuration? This cannot be undone.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setDeletePresetModalOpen(false)} className="flex-1 px-4 py-3 border-2 border-stone-200 text-stone-600 text-sm font-medium rounded-xl hover:bg-stone-50 transition-colors">Cancel</button>
+                <button onClick={handleDeletePreset} className="flex-1 px-4 py-3 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors shadow-md flex items-center justify-center gap-2">
+                   {loading ? <Loader2 size={18} className="animate-spin" /> : "Delete"}
                 </button>
               </div>
-            </div>
           </div>
         </div>,
         document.body
       )}
-
     </div>
   );
 }
