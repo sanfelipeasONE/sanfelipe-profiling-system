@@ -9,6 +9,16 @@ import api from '../../api/api';
 import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from "react-dom";
 
+// Standard assistance types to check against for the "Others" logic
+const PREDEFINED_ASSISTANCE_TYPES = [
+  "Medical Assistance", 
+  "Burial Assistance", 
+  "Educational Assistance", 
+  "Financial Assistance", 
+  "Gas Subsidy", 
+  "Food Assistance"
+];
+
 export default function AssistanceFlow({ userRole }) {
   const [loading, setLoading] = useState(false);
   const [tableLoading, setTableLoading] = useState(false);
@@ -37,6 +47,7 @@ export default function AssistanceFlow({ userRole }) {
   // Form States - Global Template
   const [payoutTemplate, setPayoutTemplate] = useState({
     type_of_assistance: 'Medical Assistance',
+    custom_assistance: '', // <-- NEW STATE FOR "OTHERS"
     status: 'Claimed', 
     date_processed: new Date().toISOString().split('T')[0],
     date_claimed: new Date().toISOString().split('T')[0],
@@ -44,11 +55,12 @@ export default function AssistanceFlow({ userRole }) {
     implementing_office: ''
   });
   
+  // Stores fetched presets for the dropdown
   const [savedTemplatesList, setSavedTemplatesList] = useState([]);
   const [selectedPresetId, setSelectedPresetId] = useState("");
 
   const [editFormData, setEditFormData] = useState({
-    type_of_assistance: '', status: 'Claimed', date_processed: '', date_claimed: '', amount: '', implementing_office: ''
+    type_of_assistance: '', custom_assistance: '', status: 'Claimed', date_processed: '', date_claimed: '', amount: '', implementing_office: ''
   });
 
   // Scanner State
@@ -138,7 +150,6 @@ export default function AssistanceFlow({ userRole }) {
 
   const handleFilterChange = (e) => setFilters({ ...filters, [e.target.name]: e.target.value });
   
-  // FIX: Instantly deselect the dropdown if the user manually modifies the form
   const handleTemplateInputChange = (e) => {
       setPayoutTemplate({ ...payoutTemplate, [e.target.name]: e.target.value });
       setSelectedPresetId(""); 
@@ -177,7 +188,12 @@ export default function AssistanceFlow({ userRole }) {
     try {
         const res = await api.get('/payout-events/active');
         if (res.data) {
-            setPayoutTemplate(res.data);
+            const isCustom = !PREDEFINED_ASSISTANCE_TYPES.includes(res.data.type_of_assistance);
+            setPayoutTemplate({
+               ...res.data,
+               type_of_assistance: isCustom ? 'Others' : res.data.type_of_assistance,
+               custom_assistance: isCustom ? res.data.type_of_assistance : '',
+            });
             setIsScanningMode(true);
             setIsAddModalOpen(true);
         }
@@ -190,14 +206,20 @@ export default function AssistanceFlow({ userRole }) {
   };
 
   const handleConfigureAssistance = async () => {
-      setSelectedPresetId(""); // Clear any old selections
+      setSelectedPresetId(""); 
       try {
           const resActive = await api.get('/payout-events/active');
-          if (resActive.data) setPayoutTemplate(resActive.data);
+          if (resActive.data) {
+             const isCustom = !PREDEFINED_ASSISTANCE_TYPES.includes(resActive.data.type_of_assistance);
+             setPayoutTemplate({
+                ...resActive.data,
+                type_of_assistance: isCustom ? 'Others' : resActive.data.type_of_assistance,
+                custom_assistance: isCustom ? resActive.data.type_of_assistance : '',
+             });
+          }
       } catch (err) {}
       
       await fetchPresetsList();
-      
       setIsScanningMode(false);
       setIsAddModalOpen(true);
   };
@@ -209,36 +231,51 @@ export default function AssistanceFlow({ userRole }) {
     
     const selectedTemplate = savedTemplatesList.find(t => t.id.toString() === selectedId);
     if (selectedTemplate) {
+      const isCustom = !PREDEFINED_ASSISTANCE_TYPES.includes(selectedTemplate.type_of_assistance);
       setPayoutTemplate({
-        type_of_assistance: selectedTemplate.type_of_assistance,
+        type_of_assistance: isCustom ? 'Others' : selectedTemplate.type_of_assistance,
+        custom_assistance: isCustom ? selectedTemplate.type_of_assistance : '',
         status: selectedTemplate.status,
         date_processed: selectedTemplate.date_processed ? selectedTemplate.date_processed.split('T')[0] : '',
         date_claimed: selectedTemplate.date_claimed ? selectedTemplate.date_claimed.split('T')[0] : '',
         amount: selectedTemplate.amount || '',
         implementing_office: selectedTemplate.implementing_office || ''
       });
-      toast.success("Preset loaded!");
+      toast.success("Payout template loaded!");
     }
   };
 
+  const getFinalTypeOfAssistance = (template) => {
+      if (template.type_of_assistance === 'Others') {
+          return template.custom_assistance?.trim() || 'Others';
+      }
+      return template.type_of_assistance;
+  };
+
   const handleAddNewPreset = async () => {
+      if (payoutTemplate.type_of_assistance === 'Others' && !payoutTemplate.custom_assistance?.trim()) {
+          toast.error("Please specify the assistance type.");
+          return;
+      }
+
       setLoading(true);
       try {
+          const finalType = getFinalTypeOfAssistance(payoutTemplate);
           const payload = {
-              type_of_assistance: payoutTemplate.type_of_assistance,
+              type_of_assistance: finalType,
               status: payoutTemplate.status,
               date_processed: payoutTemplate.date_processed || null,
               date_claimed: payoutTemplate.status === 'Claimed' ? (payoutTemplate.date_claimed || null) : null,
               amount: payoutTemplate.amount ? parseFloat(payoutTemplate.amount) : null,
               implementing_office: payoutTemplate.implementing_office || null,
-              is_active: false // Save to list, but do NOT make it the active global template
+              is_active: false
           };
 
           const res = await api.post('/payout-events/', payload);
           toast.success("Saved to presets list.");
           await fetchPresetsList(); 
           if (res.data && res.data.id) {
-              setSelectedPresetId(res.data.id.toString()); // Auto-select the new preset
+              setSelectedPresetId(res.data.id.toString()); 
           }
       } catch (err) {
           toast.error("Failed to save preset.");
@@ -252,36 +289,46 @@ export default function AssistanceFlow({ userRole }) {
     setLoading(true);
     try {
       await api.delete(`/payout-events/${selectedPresetId}`);
-      toast.success("Preset deleted successfully.");
+      toast.success("Payout deleted successfully.");
       setSavedTemplatesList(prev => prev.filter(t => t.id.toString() !== selectedPresetId));
       setSelectedPresetId("");
       setPayoutTemplate({
-        type_of_assistance: 'Medical Assistance',
-        status: 'Claimed', 
-        date_processed: new Date().toISOString().split('T')[0],
-        date_claimed: new Date().toISOString().split('T')[0],
-        amount: '',
-        implementing_office: ''
+        type_of_assistance: 'Medical Assistance', custom_assistance: '',
+        status: 'Claimed', date_processed: new Date().toISOString().split('T')[0],
+        date_claimed: new Date().toISOString().split('T')[0], amount: '', implementing_office: ''
       });
       setDeletePresetModalOpen(false);
     } catch (err) { toast.error("Failed to delete preset."); } finally { setLoading(false); }
   };
 
   const handleSaveGlobalTemplate = async () => {
+      if (payoutTemplate.type_of_assistance === 'Others' && !payoutTemplate.custom_assistance?.trim()) {
+          toast.error("Please specify the assistance type.");
+          return;
+      }
+
       setLoading(true);
       try {
+          const finalType = getFinalTypeOfAssistance(payoutTemplate);
           const payload = {
-              type_of_assistance: payoutTemplate.type_of_assistance,
+              type_of_assistance: finalType,
               status: payoutTemplate.status,
               date_processed: payoutTemplate.date_processed || null,
               date_claimed: payoutTemplate.status === 'Claimed' ? (payoutTemplate.date_claimed || null) : null,
               amount: payoutTemplate.amount ? parseFloat(payoutTemplate.amount) : null,
               implementing_office: payoutTemplate.implementing_office || null,
-              is_active: true // This sets it as the actual template being used by everyone
+              is_active: true
           };
 
           const res = await api.post('/payout-events/', payload);
-          setPayoutTemplate(res.data); 
+          
+          const isCustom = !PREDEFINED_ASSISTANCE_TYPES.includes(res.data.type_of_assistance);
+          setPayoutTemplate({
+             ...res.data,
+             type_of_assistance: isCustom ? 'Others' : res.data.type_of_assistance,
+             custom_assistance: isCustom ? res.data.type_of_assistance : ''
+          }); 
+
           toast.success("Payout saved and Activated.");
           setIsScanningMode(true); 
       } catch (err) { toast.error("Failed to save global template."); } finally { setLoading(false); }
@@ -299,8 +346,8 @@ export default function AssistanceFlow({ userRole }) {
       const res = await api.get(`/residents/code/${scanCode}`);
       const resident = res.data;
 
-      const targetType = payoutTemplate.type_of_assistance;
-      const targetProcessed = payoutTemplate.date_processed;
+      const targetType = getFinalTypeOfAssistance(payoutTemplate);
+      const targetProcessed = payoutTemplate.date_processed; 
       const targetClaimed = payoutTemplate.status === 'Claimed' ? payoutTemplate.date_claimed : null;
 
       const isDuplicate = resident.assistances?.some(record => {
@@ -323,7 +370,7 @@ export default function AssistanceFlow({ userRole }) {
       }
 
       const payload = {
-        type_of_assistance: payoutTemplate.type_of_assistance,
+        type_of_assistance: targetType,
         date_processed: payoutTemplate.date_processed || null,
         date_claimed: payoutTemplate.status === 'Claimed' ? (payoutTemplate.date_claimed || null) : null,
         amount: payoutTemplate.amount ? parseFloat(payoutTemplate.amount) : null,
@@ -349,8 +396,10 @@ export default function AssistanceFlow({ userRole }) {
   // --- EDIT & DELETE ASSISTANCE ---
   useEffect(() => {
     if (editModal.isOpen && editModal.assistance) {
+      const isCustom = !PREDEFINED_ASSISTANCE_TYPES.includes(editModal.assistance.type_of_assistance);
       setEditFormData({
-        type_of_assistance: editModal.assistance.type_of_assistance || 'Medical Assistance',
+        type_of_assistance: isCustom ? 'Others' : (editModal.assistance.type_of_assistance || 'Medical Assistance'),
+        custom_assistance: isCustom ? editModal.assistance.type_of_assistance : '',
         status: editModal.assistance.date_claimed ? 'Claimed' : 'Unclaimed',
         date_processed: editModal.assistance.date_processed ? new Date(editModal.assistance.date_processed).toISOString().split('T')[0] : '',
         date_claimed: editModal.assistance.date_claimed ? new Date(editModal.assistance.date_claimed).toISOString().split('T')[0] : '',
@@ -361,10 +410,16 @@ export default function AssistanceFlow({ userRole }) {
   }, [editModal.isOpen, editModal.assistance]);
 
   const handleEditSave = async () => {
+    if (editFormData.type_of_assistance === 'Others' && !editFormData.custom_assistance?.trim()) {
+        toast.error("Please specify the assistance type.");
+        return;
+    }
+
     setLoading(true);
     try {
+      const finalType = editFormData.type_of_assistance === 'Others' ? editFormData.custom_assistance.trim() : editFormData.type_of_assistance;
       const payload = {
-        type_of_assistance: editFormData.type_of_assistance,
+        type_of_assistance: finalType,
         date_processed: editFormData.date_processed || null,
         date_claimed: editFormData.status === 'Claimed' ? (editFormData.date_claimed || null) : null,
         amount: editFormData.amount ? parseFloat(editFormData.amount) : null,
@@ -537,27 +592,11 @@ export default function AssistanceFlow({ userRole }) {
       {createPortal(
         <Toaster
           position="top-right"
-          containerStyle={{
-            zIndex: 999999,
-            filter: 'none',
-            isolation: 'isolate',
-          }}
+          containerStyle={{ zIndex: 999999, filter: 'none', isolation: 'isolate' }}
           toastOptions={{
-            style: {
-              background: '#1c1917',
-              color: '#fff',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: '500',
-              WebkitFontSmoothing: 'antialiased',
-              MozOsxFontSmoothing: 'grayscale',
-              transform: 'translateZ(0)',
-              backfaceVisibility: 'hidden',
-              filter: 'none',
-            },
+            style: { background: '#1c1917', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: '500', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale', transform: 'translateZ(0)', backfaceVisibility: 'hidden', filter: 'none' },
           }}
-        />,
-        document.body
+        />, document.body
       )}
 
       {/* --- HEADER --- */}
@@ -571,34 +610,22 @@ export default function AssistanceFlow({ userRole }) {
         </div>
         <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
            <button onClick={handleConfigureAssistance} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-stone-100 border border-stone-300 hover:bg-stone-200 text-stone-700 font-medium rounded-xl transition-all flex items-center gap-2 text-sm">
-             <Settings2 size={16} />
-             Configure Assistance
+             <Settings2 size={16} /> Configure Assistance
            </button>
            <button onClick={handleStartPayoutMode} disabled={loading} className="flex-1 md:flex-none justify-center px-6 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-medium rounded-xl shadow-md transition-all flex items-center gap-2">
-             {loading ? <Loader2 size={18} className="animate-spin" /> : <ScanLine size={18} />}
-             Start Scanning
+             {loading ? <Loader2 size={18} className="animate-spin" /> : <ScanLine size={18} />} Start Scanning
            </button>
         </div>
       </div>
 
       {/* --- TOOLBAR --- */}
       <div className="bg-stone-50 border border-stone-200 rounded-t-2xl p-4 md:p-5 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between shadow-sm">
-         
          <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto flex-wrap flex-1">
             <div className="relative w-full sm:w-72 shrink-0 group">
-               <div className="absolute left-3 md:left-4 top-3.5 text-stone-400 group-focus-within:text-rose-600 transition-colors">
-                  <Search size={18} strokeWidth={2} />
-               </div>
-               <input 
-                  type="text" 
-                  placeholder="SEARCH NAME OR ID..." 
-                  value={filters.search} onChange={handleFilterChange} name="search"
-                  className="w-full pl-10 md:pl-11 pr-10 py-2.5 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all shadow-sm uppercase"
-               />
+               <div className="absolute left-3 md:left-4 top-3.5 text-stone-400 group-focus-within:text-rose-600 transition-colors"><Search size={18} strokeWidth={2} /></div>
+               <input type="text" placeholder="SEARCH NAME OR ID..." value={filters.search} onChange={handleFilterChange} name="search" className="w-full pl-10 md:pl-11 pr-10 py-2.5 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all shadow-sm uppercase" />
                {filters.search && (
-                 <button onClick={() => setFilters({ ...filters, search: '' })} className="absolute right-3 top-3 text-stone-400 hover:text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg p-1 transition-colors">
-                   <X size={16} strokeWidth={2} />
-                 </button>
+                 <button onClick={() => setFilters({ ...filters, search: '' })} className="absolute right-3 top-3 text-stone-400 hover:text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg p-1 transition-colors"><X size={16} strokeWidth={2} /></button>
                )}
             </div>
 
@@ -611,6 +638,8 @@ export default function AssistanceFlow({ userRole }) {
                   <option value="Financial Assistance">FINANCIAL ASSISTANCE</option>
                   <option value="Gas Subsidy">GAS SUBSIDY</option>
                   <option value="Food Assistance">FOOD ASSISTANCE</option>
+                  {/* ADDED OTHERS FILTER TO TABLE VIEW */}
+                  <option value="Others">OTHERS (SPECIFY)</option>
               </select>
               <ChevronDown className="absolute right-3 top-3 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
             </div>
@@ -741,7 +770,6 @@ export default function AssistanceFlow({ userRole }) {
                         </td>
                       </tr>
                       
-                      {/* EXPANDED ROW DETAILS */}
                       {expandedRow === rowKey && (
                         <tr>
                           <td colSpan="5" className="p-0">
@@ -757,7 +785,6 @@ export default function AssistanceFlow({ userRole }) {
           </table>
         </div>
         
-        {/* --- PAGINATION CONTROLS --- */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 bg-stone-50 border-t border-stone-200 sm:px-6">
             <div className="flex justify-between flex-1 sm:hidden">
@@ -875,6 +902,8 @@ export default function AssistanceFlow({ userRole }) {
                         <option value="Financial Assistance">Financial Assistance</option>
                         <option value="Gas Subsidy">Gas Subsidy</option>
                         <option value="Food Assistance">Food Assistance</option>
+                        {/* ADDED OTHERS OPTION */}
+                        <option value="Others">Others (Specify)</option>
                       </select>
                       <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={16} strokeWidth={2} />
                     </div>
@@ -890,6 +919,21 @@ export default function AssistanceFlow({ userRole }) {
                     </div>
                   </div>
                 </div>
+
+                {/* CONDITIONAL RENDER: TEXT INPUT FOR "OTHERS" */}
+                {payoutTemplate.type_of_assistance === 'Others' && (
+                  <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Specify Assistance Type</label>
+                    <input 
+                      type="text" 
+                      name="custom_assistance" 
+                      placeholder="Specify the type of assistance..." 
+                      value={payoutTemplate.custom_assistance} 
+                      onChange={handleTemplateInputChange} 
+                      className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm text-stone-800" 
+                    />
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -917,7 +961,7 @@ export default function AssistanceFlow({ userRole }) {
 
                   <div>
                     <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Implementing Office</label>
-                    <input type="text" name="implementing_office" placeholder="E.G. MSWDO" value={payoutTemplate.implementing_office} onChange={handleTemplateInputChange} className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800 uppercase" />
+                    <input type="text" name="implementing_office" placeholder="E.G. MSWDO" value={payoutTemplate.implementing_office} onChange={handleTemplateInputChange} className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
                   </div>
                 </div>
 
@@ -940,7 +984,9 @@ export default function AssistanceFlow({ userRole }) {
                         <div>
                            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Active Global Template</p>
                            <p className="text-base font-bold text-stone-900 uppercase">
-                              {payoutTemplate.type_of_assistance} {payoutTemplate.amount ? `(₱${payoutTemplate.amount})` : ''}
+                              {/* Display Custom Text if 'Others' is selected */}
+                              {payoutTemplate.type_of_assistance === 'Others' ? payoutTemplate.custom_assistance : payoutTemplate.type_of_assistance} 
+                              {payoutTemplate.amount ? ` (₱${payoutTemplate.amount})` : ''}
                            </p>
                         </div>
                         <button onClick={handleConfigureAssistance} className="text-[11px] font-bold text-rose-600 bg-white hover:bg-rose-50 px-3 py-1.5 rounded-lg uppercase tracking-wider border border-stone-200 transition-colors flex items-center gap-1.5 shadow-sm">
@@ -1069,6 +1115,7 @@ export default function AssistanceFlow({ userRole }) {
                       <option value="Financial Assistance">Financial Assistance</option>
                       <option value="Gas Subsidy">Gas Subsidy</option>
                       <option value="Food Assistance">Food Assistance</option>
+                      <option value="Others">Others (Specify)</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-3.5 md:top-4 text-stone-400 pointer-events-none" size={16} strokeWidth={2} />
                   </div>
@@ -1085,6 +1132,21 @@ export default function AssistanceFlow({ userRole }) {
                   </div>
                 </div>
               </div>
+
+              {/* CONDITIONAL RENDER FOR EDIT MODAL */}
+              {editFormData.type_of_assistance === 'Others' && (
+                  <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Specify Assistance Type</label>
+                    <input 
+                      type="text" 
+                      name="custom_assistance" 
+                      placeholder="e.g. Wheelchair..." 
+                      value={editFormData.custom_assistance} 
+                      onChange={handleEditInputChange} 
+                      className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm text-stone-800 uppercase" 
+                    />
+                  </div>
+              )}
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1105,7 +1167,7 @@ export default function AssistanceFlow({ userRole }) {
               </div>
 
               <div>
-                <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Amount</label>
+                <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Amount (Optional)</label>
                 <input type="number" name="amount" placeholder="0.00" value={editFormData.amount} onChange={handleEditInputChange} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
               </div>
 

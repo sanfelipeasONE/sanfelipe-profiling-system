@@ -1,4 +1,4 @@
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, Fragment, useRef } from 'react';
 import api from '../../api/api';
 import {
   Trash2, Edit, Search, ChevronDown, ChevronUp,
@@ -43,6 +43,22 @@ export default function ResidentList({ userRole, onEdit }) {
   const isAdminLike = isAdmin || isSuperAdmin || isAdminLimited;
   const [sectorList, setSectorList] = useState([]);
 
+  // --- CUSTOM DROPDOWN STATE ---
+  const [isSectorDropdownOpen, setIsSectorDropdownOpen] = useState(false);
+  const [sectorSearchTerm, setSectorSearchTerm] = useState("");
+  const sectorDropdownRef = useRef(null);
+
+  // Close sector dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (sectorDropdownRef.current && !sectorDropdownRef.current.contains(event.target)) {
+        setIsSectorDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // --- HELPERS ---
   const calculateAge = (dob) => {
     if (!dob) return null;
@@ -81,14 +97,10 @@ export default function ResidentList({ userRole, onEdit }) {
       text = summary.replace(/Others/i, details);
     }
 
-    // NEW: Filter out restricted sectors for non-superadmin users
     if (!isSuperAdmin) {
       const restricted = ["HC", "C", "M"];
       let parts = text.split(",").map(s => s.trim());
-      
-      // Keep only sectors that are NOT in the restricted list
       parts = parts.filter(p => !restricted.includes(p.toUpperCase()));
-      
       text = parts.length > 0 ? parts.join(", ") : "None";
     }
 
@@ -229,7 +241,6 @@ export default function ResidentList({ userRole, onEdit }) {
   // --- HANDLERS ---
   const handleSearchChange = (e) => { setSearchTerm(e.target.value); setCurrentPage(1); };
   const handleBarangayFilter = (e) => { setSelectedBarangay(e.target.value); setCurrentPage(1); };
-  const handleSectorFilter = (e) => { setSelectedSector(e.target.value); setCurrentPage(1); };
   const handleLimitChange = (e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); };
   const toggleRow = (id) => { setExpandedRow(expandedRow === id ? null : id); };
 
@@ -299,8 +310,6 @@ export default function ResidentList({ userRole, onEdit }) {
           <div className="p-2 bg-rose-700 text-white rounded-lg shadow-sm"><FileText size={18} /></div>
           <h3 className="text-lg font-medium text-stone-900 tracking-tight">Information Background</h3>
         </div>
-
-        
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Left Column */}
@@ -506,140 +515,8 @@ export default function ResidentList({ userRole, onEdit }) {
 
   return (
     <div className="font-sans text-stone-900 animate-in fade-in duration-300 px-2 sm:px-4 md:px-0">
-      <Toaster position="top-right" toastOptions={{ style: { background: '#1c1917', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: '500' } }} />
-
-      {/* ASSISTANCE MODAL */}
-      {assistanceModal.isOpen && createPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setAssistanceModal({ isOpen: false, resident: null })} />
-          <div className="relative bg-white w-full max-w-[480px] rounded-2xl border border-stone-200 shadow-2xl p-5 md:p-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg md:text-xl font-medium tracking-tight text-stone-900 mb-5 md:mb-6 border-b border-stone-200 pb-4">
-              {assistanceModal.assistance ? "Edit Assistance" : "Add Assistance"}
-              <span className="block text-xs md:text-sm font-normal text-stone-500 mt-1 uppercase tracking-widest">For {assistanceModal.resident?.last_name}, {assistanceModal.resident?.first_name}</span>
-            </h3>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target);
-              const payload = {
-                type_of_assistance: formData.get("type"),
-                date_processed: formData.get("processed") || null,
-                date_claimed: formData.get("claimed") || null,
-                amount: formData.get("amount") || null,
-                implementing_office: formData.get("office") || null,
-              };
-              try {
-                if (assistanceModal.assistance) {
-                  await api.put(`/assistances/${assistanceModal.assistance.id}`, payload);
-                  toast.success("Assistance updated.");
-                } else {
-                  await api.post(`/residents/${assistanceModal.resident.id}/assistance`, payload);
-                  toast.success("Assistance recorded.");
-                }
-                setAssistanceModal({ isOpen: false, resident: null, assistance: null });
-                fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
-              } catch {
-                toast.error("Operation failed.");
-              }
-            }}>
-              <div className="space-y-4 md:space-y-5">
-                <div>
-                  <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Assistance Type</label>
-                  <select name="type" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all cursor-pointer" defaultValue={assistanceModal.assistance?.type_of_assistance}>
-                    <option>Burial Assistance</option>
-                    <option>Financial</option>
-                    <option>Educational</option>
-                    <option>Medical</option>
-                    <option>Gas Subsidy</option>
-                    <option>Food Assistance</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Date Processed</label>
-                    <input type="date" name="processed" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.date_processed} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Date Claimed</label>
-                    <input type="date" name="claimed" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.date_claimed} />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Amount (Optional)</label>
-                  <input type="number" name="amount" placeholder="0.00" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all" defaultValue={assistanceModal.assistance?.amount} />
-                </div>
-                <div>
-                  <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Implementing Office</label>
-                  <input type="text" name="office" placeholder="e.g. MSWDO" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.implementing_office} />
-                </div>
-              </div>
-
-              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 md:mt-8 pt-5 border-t border-stone-200">
-                <button type="button" onClick={() => setAssistanceModal({ isOpen: false, resident: null })} className="w-full sm:w-auto px-6 py-3 text-sm font-medium text-stone-700 bg-stone-100 border border-stone-300 hover:bg-stone-200 rounded-xl transition-colors shadow-sm">
-                  Cancel
-                </button>
-                <button type="submit" className="w-full sm:w-auto px-6 py-3 bg-rose-700 text-white text-sm font-medium rounded-xl hover:bg-rose-800 transition-colors shadow-md">
-                  Save Assistance
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* DELETE ASSISTANCE & RECORD MODALS */}
-      {(deleteModal.isOpen || deleteAssistanceModal.isOpen) && createPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => { setDeleteModal({ isOpen: false }); setDeleteAssistanceModal({ isOpen: false }); }} />
-          <div className="relative bg-white w-full max-w-[420px] rounded-2xl shadow-2xl border border-stone-200 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 md:p-8">
-              <div className="w-14 h-14 md:w-16 md:h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-5 border-4 border-red-50">
-                <ShieldAlert size={28} className="md:w-8 md:h-8" />
-              </div>
-              <h3 className="text-lg md:text-xl font-medium text-stone-900 tracking-tight mb-2">Confirm Deletion</h3>
-              <p className="text-xs md:text-sm font-normal text-stone-600 leading-relaxed mb-6 md:mb-8">
-                You are about to permanently remove {deleteModal.isOpen ? `the record for ${deleteModal.name}` : 'this assistance record'}. <span className="font-medium text-stone-900">This action cannot be undone.</span>
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button onClick={() => { setDeleteModal({ isOpen: false }); setDeleteAssistanceModal({ isOpen: false }); }} className="flex-1 px-4 py-3 border-2 border-stone-200 text-stone-600 text-sm font-medium rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-colors">
-                  Cancel
-                </button>
-                <button onClick={() => deleteModal.isOpen ? confirmDelete() : handleDeleteAssistance(deleteAssistanceModal.assistance.id)} className="flex-1 px-4 py-3 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors shadow-md flex items-center justify-center gap-2" disabled={isDeleting}>
-                  {isDeleting ? <Loader2 size={18} className="animate-spin" /> : "Delete Permanently"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* PROMOTION MODAL */}
-      {promotionModal.isOpen && createPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" })} />
-          <div className="relative z-10 bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-[420px] p-6 md:p-8 animate-in zoom-in-95 duration-200">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 border-b border-stone-200 pb-4">
-               <div className="p-3 bg-rose-100 text-rose-800 rounded-xl"><Users size={24} /></div>
-               <h3 className="text-lg md:text-xl font-medium text-stone-900 tracking-tight">Update Head of Family</h3>
-            </div>
-            <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-2">Reason for Replacement</label>
-            <select className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all mb-6 md:mb-8 cursor-pointer" value={promotionModal.reason} onChange={(e) => setPromotionModal({ ...promotionModal, reason: e.target.value })}>
-              <option value="Deceased">Principal Deceased</option>
-              <option value="Transferred">Transferred Residence</option>
-              <option value="Inactive">Status Inactive</option>
-            </select>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button onClick={() => setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" })} className="flex-1 px-4 py-3 border-2 border-stone-200 text-stone-600 text-sm font-medium rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-colors">
-                Cancel
-              </button>
-              <button onClick={() => handlePromote(promotionModal.memberId, promotionModal.reason)} className="flex-1 px-4 py-3 bg-rose-700 text-white text-sm font-medium rounded-xl hover:bg-rose-800 transition-colors shadow-md">
-                Confirm Update
-              </button>
-            </div>
-          </div>
-        </div>,
+      {createPortal(
+        <Toaster position="top-right" containerStyle={{ zIndex: 999999, filter: 'none', isolation: 'isolate' }} toastOptions={{ style: { background: '#1c1917', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: '500' } }} />,
         document.body
       )}
 
@@ -684,26 +561,86 @@ export default function ResidentList({ userRole, onEdit }) {
 
             {/* Filters Row on Mobile */}
             <div className="flex gap-3 w-full sm:w-auto">
-              {/* Sector Filter */}
-              <div className="relative w-full sm:w-48">
-                 <select
-                  value={selectedSector}
-                  onChange={handleSectorFilter}
-                  className="w-full appearance-none pl-3 md:pl-4 pr-9 md:pr-10 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase truncate"
-                >
-                  <option value="">ALL SECTORS</option>
-                  {sectorList.map((sector) => (
-                    <option key={sector.id} value={sector.name}>
-                      {sector.name}
-                    </option>
-                  ))}
-                </select>
-                 <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
+              
+              {/* CUSTOM SEARCHABLE SECTOR DROPDOWN WITH DYNAMIC CREATION */}
+              <div className="relative w-full sm:w-56" ref={sectorDropdownRef}>
+                 <button
+                   onClick={() => setIsSectorDropdownOpen(!isSectorDropdownOpen)}
+                   className="w-full flex items-center justify-between pl-3 md:pl-4 pr-3 md:pr-4 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all shadow-sm uppercase truncate"
+                 >
+                   <span className="truncate">{selectedSector || "ALL SECTORS"}</span>
+                   <ChevronDown className="text-stone-400 shrink-0" size={18} strokeWidth={2} />
+                 </button>
+
+                 {isSectorDropdownOpen && (
+                   <div className="absolute z-50 w-full mt-1 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden flex flex-col">
+                     <div className="p-2 border-b border-stone-100 bg-stone-50">
+                       <div className="relative">
+                         <Search className="absolute left-2.5 top-2.5 text-stone-400" size={14} />
+                         <input
+                           type="text"
+                           placeholder="Search sector..."
+                           value={sectorSearchTerm}
+                           onChange={(e) => setSectorSearchTerm(e.target.value)}
+                           className="w-full pl-8 pr-3 py-2 bg-white border border-stone-200 rounded-lg text-xs outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-50 uppercase"
+                           autoFocus
+                         />
+                       </div>
+                     </div>
+                     <div className="max-h-60 overflow-y-auto py-1">
+                       <div
+                         onClick={() => { 
+                           setSelectedSector(""); 
+                           setCurrentPage(1); 
+                           setIsSectorDropdownOpen(false); 
+                           setSectorSearchTerm(''); 
+                         }}
+                         className={`px-4 py-2 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors ${selectedSector === "" ? "bg-rose-50 text-rose-700 font-medium" : "text-stone-700"}`}
+                       >
+                         ALL SECTORS
+                       </div>
+                       
+                       {/* Standard list matching filter */}
+                       {sectorList
+                         .filter(s => s.name.toLowerCase().includes(sectorSearchTerm.toLowerCase()))
+                         .map(sector => (
+                           <div
+                             key={sector.id}
+                             onClick={() => { 
+                               setSelectedSector(sector.name); 
+                               setCurrentPage(1); 
+                               setIsSectorDropdownOpen(false); 
+                               setSectorSearchTerm(''); 
+                             }}
+                             className={`px-4 py-2 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors ${selectedSector === sector.name ? "bg-rose-50 text-rose-700 font-medium" : "text-stone-700"}`}
+                           >
+                             {sector.name}
+                           </div>
+                         ))
+                       }
+                       
+                       {/* If they type something NOT in the predefined list, give them the option to search for it as a custom filter */}
+                       {sectorSearchTerm.trim().length > 0 && !sectorList.some(s => s.name.toLowerCase() === sectorSearchTerm.toLowerCase()) && (
+                         <div
+                           onClick={() => { 
+                             setSelectedSector(sectorSearchTerm.toUpperCase()); 
+                             setCurrentPage(1); 
+                             setIsSectorDropdownOpen(false); 
+                             setSectorSearchTerm(''); 
+                           }}
+                           className="px-4 py-2.5 mt-1 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors text-rose-600 border-t border-stone-100 bg-stone-50"
+                         >
+                           <span className="font-semibold text-stone-500 mr-1">Search Other:</span> {sectorSearchTerm}
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 )}
               </div>
 
               {/* Admin Filter */}
               {(isAdmin || isSuperAdmin) && (
-                <div className="relative w-full sm:w-48">
+                <div className="relative w-full sm:w-48 shrink-0">
                    <select value={selectedBarangay} onChange={handleBarangayFilter} className="w-full appearance-none pl-3 md:pl-4 pr-9 md:pr-10 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase truncate">
                      <option value="">ALL BARANGAYS</option>
                      {barangayList.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
@@ -915,6 +852,61 @@ export default function ResidentList({ userRole, onEdit }) {
             </button>
          </div>
       </div>
+
+      {/* DELETE MODALS */}
+      {(deleteModal.isOpen || deleteAssistanceModal.isOpen) && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => { setDeleteModal({ isOpen: false }); setDeleteAssistanceModal({ isOpen: false }); }} />
+          <div className="relative bg-white w-full max-w-[420px] rounded-2xl shadow-2xl border border-stone-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 md:p-8">
+              <div className="w-14 h-14 md:w-16 md:h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-5 border-4 border-red-50">
+                <ShieldAlert size={28} className="md:w-8 md:h-8" />
+              </div>
+              <h3 className="text-lg md:text-xl font-medium text-stone-900 tracking-tight mb-2">Confirm Deletion</h3>
+              <p className="text-xs md:text-sm font-normal text-stone-600 leading-relaxed mb-6 md:mb-8">
+                You are about to permanently remove {deleteModal.isOpen ? `the record for ${deleteModal.name}` : 'this assistance record'}. <span className="font-medium text-stone-900">This action cannot be undone.</span>
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button onClick={() => { setDeleteModal({ isOpen: false }); setDeleteAssistanceModal({ isOpen: false }); }} className="flex-1 px-4 py-3 border-2 border-stone-200 text-stone-600 text-sm font-medium rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-colors">
+                  Cancel
+                </button>
+                <button onClick={() => deleteModal.isOpen ? confirmDelete() : handleDeleteAssistance(deleteAssistanceModal.assistance.id)} className="flex-1 px-4 py-3 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors shadow-md flex items-center justify-center gap-2" disabled={isDeleting}>
+                  {isDeleting ? <Loader2 size={18} className="animate-spin" /> : "Delete Permanently"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* PROMOTION MODAL */}
+      {promotionModal.isOpen && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" })} />
+          <div className="relative z-10 bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-[420px] p-6 md:p-8 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 border-b border-stone-200 pb-4">
+               <div className="p-3 bg-rose-100 text-rose-800 rounded-xl"><Users size={24} /></div>
+               <h3 className="text-lg md:text-xl font-medium text-stone-900 tracking-tight">Update Head of Family</h3>
+            </div>
+            <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-2">Reason for Replacement</label>
+            <select className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all mb-6 md:mb-8 cursor-pointer" value={promotionModal.reason} onChange={(e) => setPromotionModal({ ...promotionModal, reason: e.target.value })}>
+              <option value="Deceased">Principal Deceased</option>
+              <option value="Transferred">Transferred Residence</option>
+              <option value="Inactive">Status Inactive</option>
+            </select>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button onClick={() => setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" })} className="flex-1 px-4 py-3 border-2 border-stone-200 text-stone-600 text-sm font-medium rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-colors">
+                Cancel
+              </button>
+              <button onClick={() => handlePromote(promotionModal.memberId, promotionModal.reason)} className="flex-1 px-4 py-3 bg-rose-700 text-white text-sm font-medium rounded-xl hover:bg-rose-800 transition-colors shadow-md">
+                Confirm Update
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
