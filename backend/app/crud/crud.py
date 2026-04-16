@@ -59,6 +59,7 @@ def apply_sector_filter(query, sector: str):
 
     normalized = normalize_sector_name(sector)
 
+    # This handles the generic "Show me everyone who checked 'Others'"
     if normalized == "OTHERS":
         return query.filter(
             or_(
@@ -80,10 +81,12 @@ def apply_sector_filter(query, sector: str):
 
     variants = [normalize_sector_name(v) for v in sector_variants.get(normalized, [normalized])]
 
+    # 1. Check the associated Sector table
     sector_table_match = models.ResidentProfile.sectors.any(
         func.upper(func.trim(models.Sector.name)).in_(variants)
     )
 
+    # 2. Check the sector_summary column
     normalized_summary = func.concat(
         ",",
         func.regexp_replace(
@@ -100,10 +103,17 @@ def apply_sector_filter(query, sector: str):
         for variant in variants
     ])
 
+    others_detail_match = or_(*[
+        func.upper(func.coalesce(models.ResidentProfile.other_sector_details, "")).like(f"%{variant}%")
+        for variant in variants
+    ])
+
+    # Return the query matching ANY of the three conditions
     return query.filter(
         or_(
             sector_table_match,
-            summary_match
+            summary_match,
+            others_detail_match
         )
     )
     
