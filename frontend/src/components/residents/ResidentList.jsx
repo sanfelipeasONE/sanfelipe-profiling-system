@@ -157,11 +157,14 @@ export default function ResidentList({ userRole, onEdit }) {
   return raw.toUpperCase();
 };
 
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+
   // --- DATA FETCHING ---
   const fetchResidents = async (
     search = searchTerm,
     barangay = selectedBarangay,
     sector = selectedSector,
+    status = selectedStatus,
     page = currentPage,
     limit = itemsPerPage,
     currentSortBy = sortBy,        
@@ -174,6 +177,7 @@ export default function ResidentList({ userRole, onEdit }) {
       if (search) params.append('search', search);
       if (isAdminLike && barangay) params.append("barangay", barangay);
       if (sector) params.append('sector', sector);
+      if (status && status !== 'ALL') params.append('filter_status', status.toLowerCase());
       params.append('skip', skip);
       params.append('limit', limit);
       params.append('sort_by', currentSortBy);      
@@ -234,8 +238,10 @@ export default function ResidentList({ userRole, onEdit }) {
 }, []);
 
   useEffect(() => {
-    fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
-  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, searchTerm, sortBy, sortOrder]);
+    fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, selectedStatus, searchTerm, sortBy, sortOrder]);
+
+  const handleStatusFilter = (e) => { setSelectedStatus(e.target.value); setCurrentPage(1); };
 
 
   // --- HANDLERS ---
@@ -247,14 +253,14 @@ export default function ResidentList({ userRole, onEdit }) {
   const handleImportSuccess = () => {
     setCurrentPage(1);
     setSearchTerm('');
-    fetchResidents('', selectedBarangay, selectedSector, 1, itemsPerPage, sortBy, sortOrder);
+    fetchResidents('', selectedBarangay, selectedSector, selectedStatus, 1, itemsPerPage, sortBy, sortOrder);
   };
 
   const handleArchive = async (id) => {
     try {
       await api.put(`/residents/${id}/archive`);
       toast.success("Record moved to archive.");
-      fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
+      fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch (err) {
       toast.error("Action failed.");
     }
@@ -266,7 +272,7 @@ export default function ResidentList({ userRole, onEdit }) {
       await api.delete(`/residents/${deleteModal.residentId}`);
       toast.success('Record permanently deleted.');
       setDeleteModal({ isOpen: false, residentId: null, name: '' });
-      fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
+      fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch (err) {
       toast.error('Error deleting record.');
     } finally {
@@ -281,7 +287,7 @@ export default function ResidentList({ userRole, onEdit }) {
       });
       toast.success("Head of family updated.");
       setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" });
-      fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
+      fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch {
       toast.error("Promotion failed.");
     }
@@ -292,7 +298,7 @@ export default function ResidentList({ userRole, onEdit }) {
       await api.delete(`/assistances/${id}`);
       toast.success("Assistance record deleted.");
       setDeleteAssistanceModal({ isOpen: false, assistance: null });
-      fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
+      fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch {
       toast.error("Failed to delete assistance.");
     }
@@ -561,6 +567,13 @@ export default function ResidentList({ userRole, onEdit }) {
 
             {/* Filters Row on Mobile */}
             <div className="flex gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-48 shrink-0">
+                 <select value={selectedStatus} onChange={handleStatusFilter} className="w-full appearance-none pl-3 md:pl-4 pr-9 md:pr-10 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase truncate">
+                   <option value="ALL">ALL RESIDENTS</option>
+                   <option value="UPDATED">UPDATED RESIDENTS</option>
+                 </select>
+                 <Filter className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
+              </div>
               
               {/* CUSTOM SEARCHABLE SECTOR DROPDOWN WITH DYNAMIC CREATION */}
               <div className="relative w-full sm:w-56" ref={sectorDropdownRef}>
@@ -637,6 +650,7 @@ export default function ResidentList({ userRole, onEdit }) {
                    </div>
                  )}
               </div>
+              
 
               {/* Admin Filter */}
               {(isAdmin || isSuperAdmin) && (
@@ -648,6 +662,7 @@ export default function ResidentList({ userRole, onEdit }) {
                    <Filter className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
                 </div>
               )}
+              
             </div>
          </div>
 
