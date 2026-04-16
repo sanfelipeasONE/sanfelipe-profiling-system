@@ -424,6 +424,19 @@ def get_resident(
 
 
 # =====================================================
+# Updated Residents Filter
+# =====================================================
+def apply_status_filter(query, filter_status: str):
+    if filter_status and filter_status.lower() == "updated":
+        query = query.filter(
+            models.ResidentProfile.updated_at != None,
+            models.ResidentProfile.created_at != None,
+            models.ResidentProfile.updated_at > models.ResidentProfile.created_at
+        )
+    return query
+
+
+# =====================================================
 # COUNT RESIDENTS
 # =====================================================
 def get_resident_count(
@@ -431,6 +444,7 @@ def get_resident_count(
     search: str = None,
     barangay: str = None,
     sector: str = None,
+    filter_status: str = "all",
     allowed_sector_names: list[str] | None = None
 ):
     query = db.query(models.ResidentProfile).filter(
@@ -440,6 +454,7 @@ def get_resident_count(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
+    query = apply_status_filter(query, filter_status)
     query = apply_allowed_sector_filter(query, allowed_sector_names)
 
     return query.count()
@@ -455,6 +470,7 @@ def get_residents(
     search: str = None,
     barangay: str = None,
     sector: str = None,
+    filter_status: str = "all",
     sort_by: str = "last_name",
     sort_order: str = "asc",
     allowed_sector_names: list[str] | None = None
@@ -468,6 +484,7 @@ def get_residents(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
+    query = apply_status_filter(query, filter_status)
     query = apply_allowed_sector_filter(query, allowed_sector_names)
 
     if sort_order.lower() == "desc":

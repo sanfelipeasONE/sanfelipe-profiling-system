@@ -893,6 +893,7 @@ def read_residents(skip: int = 0,
                    search: str = None,
                    barangay: str = Query(None),
                    sector: str = Query(None),
+                   filter_status: str = Query("all"),
                    sort_by: str = Query("last_name"),
                    sort_order: str = Query("asc"),
                    db: Session = Depends(get_db),
@@ -915,6 +916,7 @@ def read_residents(skip: int = 0,
         search=search,
         barangay=filter_barangay,
         sector=sector,
+        filter_status=filter_status,
         allowed_sector_names=allowed_sectors
     )
 
@@ -925,6 +927,7 @@ def read_residents(skip: int = 0,
         search=search,
         barangay=filter_barangay,
         sector=sector,
+        filter_status=filter_status,
         sort_by=sort_by,
         sort_order=sort_order,
         allowed_sector_names=allowed_sectors
