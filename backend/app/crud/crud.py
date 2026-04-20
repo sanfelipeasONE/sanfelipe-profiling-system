@@ -374,23 +374,21 @@ def archive_resident(db: Session, resident_id: int, user_id: int):
     resident.is_deleted = True
     resident.is_archived = True
 
-    # --- THE FIX: Break Unique Constraints Safely ---
-    # We truncate the original text and use the resident's ID 
-    # to guarantee it stays short and doesn't crash the database length limits!
-    
+    # --- Break Unique Constraints Safely ---
     if resident.resident_code:
-        # Keep first 10 characters, append _ARC and the ID
         resident.resident_code = f"{resident.resident_code[:10]}_ARC{resident.id}"
         
     if resident.contact_no:
-        # Keep first 8 characters, append _A and the ID (Total ~15 chars max)
         resident.contact_no = f"{resident.contact_no[:8]}_A{resident.id}"
         
     if resident.precinct_no:
         resident.precinct_no = f"{resident.precinct_no[:10]}_A{resident.id}"
-    # ------------------------------------------
+        
+    # --- NEW FIX: Break the Unique Name Constraint ---
+    if resident.last_name:
+        resident.last_name = f"{resident.last_name[:30]} (ARC{resident.id})"
+    # -----------------------------------------------
 
-    # Ensure log_action is called correctly based on your existing code
     log_action(db, user_id, "Archived resident", "resident", resident_id)
 
     db.commit()
