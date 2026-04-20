@@ -386,8 +386,11 @@ def archive_resident(db: Session, resident_id: int, user_id: int):
         resident.precinct_no = f"{resident.precinct_no[:10]}_A{resident.id}"
         
     # --- NEW FIX: Break the Unique Name Constraint ---
+    arc_tag = f"_ARC{resident.id}"
     if resident.last_name:
-        resident.last_name = f"{resident.last_name[:30]} (ARC{resident.id})"
+        resident.last_name = f"{resident.last_name[:30]}{arc_tag}"
+    if resident.first_name:
+        resident.first_name = f"{resident.first_name[:30]}{arc_tag}"
     # -----------------------------------------------
 
     log_action(db, user_id, "Archived resident", "resident", resident_id)
