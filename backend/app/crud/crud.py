@@ -7,7 +7,7 @@ from datetime import datetime
 from app.core.audit import log_action
 from sqlalchemy.exc import IntegrityError
 import re
-
+import time
 
 # =====================================================
 # SEARCH HELPER
@@ -373,6 +373,18 @@ def archive_resident(db: Session, resident_id: int, user_id: int):
 
     resident.is_deleted = True
     resident.is_archived = True
+
+    timestamp = int(time.time())
+    
+    if resident.resident_code:
+        resident.resident_code = f"{resident.resident_code}_ARC_{timestamp}"
+        
+    if resident.contact_no:
+        resident.contact_no = f"{resident.contact_no}_ARC_{timestamp}"
+        
+    if resident.precinct_no:
+        resident.precinct_no = f"{resident.precinct_no}_ARC_{timestamp}"
+    # ------------------------------------------
 
     log_action(db, user_id, "Archived resident", "resident", resident_id)
 
