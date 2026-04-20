@@ -11,12 +11,23 @@ import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 
+// Define the standard types so the system knows when to trigger "Others"
+const PREDEFINED_ASSISTANCE_TYPES = [
+  "Burial Assistance",
+  "Financial Assistance",
+  "Educational Assistance",
+  "Medical Assistance",
+  "Gas Subsidy",
+  "Food Assistance"
+];
+
 export default function ResidentList({ userRole, onEdit }) {
   const [residents, setResidents] = useState([]);
   const [barangayList, setBarangayList] = useState([]);
   const [selectedBarangay, setSelectedBarangay] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
 
@@ -48,6 +59,10 @@ export default function ResidentList({ userRole, onEdit }) {
   const [sectorSearchTerm, setSectorSearchTerm] = useState("");
   const sectorDropdownRef = useRef(null);
 
+  // --- FORM STATES FOR ASSISTANCE MODAL ---
+  const [assistanceFormType, setAssistanceFormType] = useState("Medical Assistance");
+  const [customAssistanceType, setCustomAssistanceType] = useState("");
+
   // Close sector dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -58,6 +73,25 @@ export default function ResidentList({ userRole, onEdit }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // When the Assistance Modal opens, check if we are editing an "Others" category
+  useEffect(() => {
+    if (assistanceModal.isOpen) {
+      const currentType = assistanceModal.assistance?.type_of_assistance;
+      if (currentType) {
+        if (PREDEFINED_ASSISTANCE_TYPES.includes(currentType)) {
+          setAssistanceFormType(currentType);
+          setCustomAssistanceType("");
+        } else {
+          setAssistanceFormType("Others");
+          setCustomAssistanceType(currentType);
+        }
+      } else {
+        setAssistanceFormType("Medical Assistance"); // Default
+        setCustomAssistanceType("");
+      }
+    }
+  }, [assistanceModal.isOpen, assistanceModal.assistance]);
 
   // --- HELPERS ---
   const calculateAge = (dob) => {
@@ -157,8 +191,6 @@ export default function ResidentList({ userRole, onEdit }) {
   return raw.toUpperCase();
 };
 
-  const [selectedStatus, setSelectedStatus] = useState('ALL');
-
   // --- DATA FETCHING ---
   const fetchResidents = async (
     search = searchTerm,
@@ -241,12 +273,11 @@ export default function ResidentList({ userRole, onEdit }) {
     fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
   }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, selectedStatus, searchTerm, sortBy, sortOrder]);
 
-  const handleStatusFilter = (e) => { setSelectedStatus(e.target.value); setCurrentPage(1); };
-
 
   // --- HANDLERS ---
   const handleSearchChange = (e) => { setSearchTerm(e.target.value); setCurrentPage(1); };
   const handleBarangayFilter = (e) => { setSelectedBarangay(e.target.value); setCurrentPage(1); };
+  const handleStatusFilter = (e) => { setSelectedStatus(e.target.value); setCurrentPage(1); };
   const handleLimitChange = (e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); };
   const toggleRow = (id) => { setExpandedRow(expandedRow === id ? null : id); };
 
@@ -520,7 +551,7 @@ export default function ResidentList({ userRole, onEdit }) {
   };
 
   return (
-    <div className="font-sans text-stone-900 animate-in fade-in duration-300 px-2 sm:px-4 md:px-0">
+    <div className="font-sans text-stone-900 animate-in fade-in duration-300 px-2 sm:px-4 md:px-0 pb-12">
       {createPortal(
         <Toaster position="top-right" containerStyle={{ zIndex: 999999, filter: 'none', isolation: 'isolate' }} toastOptions={{ style: { background: '#1c1917', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: '500' } }} />,
         document.body
@@ -566,17 +597,10 @@ export default function ResidentList({ userRole, onEdit }) {
             </div>
 
             {/* Filters Row on Mobile */}
-            <div className="flex gap-3 w-full sm:w-auto">
-              <div className="relative w-full sm:w-48 shrink-0">
-                 <select value={selectedStatus} onChange={handleStatusFilter} className="w-full appearance-none pl-3 md:pl-4 pr-9 md:pr-10 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase truncate">
-                   <option value="ALL">ALL RESIDENTS</option>
-                   <option value="UPDATED">UPDATED RESIDENTS</option>
-                 </select>
-                 <Filter className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
-              </div>
+            <div className="flex gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap">
               
               {/* CUSTOM SEARCHABLE SECTOR DROPDOWN WITH DYNAMIC CREATION */}
-              <div className="relative w-full sm:w-56" ref={sectorDropdownRef}>
+              <div className="relative w-full sm:w-56 shrink-0" ref={sectorDropdownRef}>
                  <button
                    onClick={() => setIsSectorDropdownOpen(!isSectorDropdownOpen)}
                    className="w-full flex items-center justify-between pl-3 md:pl-4 pr-3 md:pr-4 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all shadow-sm uppercase truncate"
@@ -650,7 +674,19 @@ export default function ResidentList({ userRole, onEdit }) {
                    </div>
                  )}
               </div>
-              
+
+              {/* Status Filter */}
+              <div className="relative w-full sm:w-40 shrink-0">
+                 <select
+                   value={selectedStatus}
+                   onChange={handleStatusFilter}
+                   className="w-full appearance-none pl-3 md:pl-4 pr-9 md:pr-10 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase truncate"
+                 >
+                   <option value="ALL">ALL RESIDENTS</option>
+                   <option value="UPDATED">UPDATED RESIDENTS</option>
+                 </select>
+                 <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
+              </div>
 
               {/* Admin Filter */}
               {(isAdmin || isSuperAdmin) && (
@@ -662,7 +698,6 @@ export default function ResidentList({ userRole, onEdit }) {
                    <Filter className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
                 </div>
               )}
-              
             </div>
          </div>
 
@@ -868,7 +903,126 @@ export default function ResidentList({ userRole, onEdit }) {
          </div>
       </div>
 
-      {/* DELETE MODALS */}
+      {/* ASSISTANCE MODAL (ADD & EDIT) */}
+      {assistanceModal.isOpen && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setAssistanceModal({ isOpen: false, resident: null })} />
+          <div className="relative bg-white w-full max-w-[480px] rounded-2xl border border-stone-200 shadow-2xl p-5 md:p-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg md:text-xl font-medium tracking-tight text-stone-900 mb-5 md:mb-6 border-b border-stone-200 pb-4">
+              {assistanceModal.assistance ? "Edit Assistance" : "Add Assistance"}
+              <span className="block text-xs md:text-sm font-normal text-stone-500 mt-1 uppercase tracking-widest">For {assistanceModal.resident?.last_name}, {assistanceModal.resident?.first_name}</span>
+            </h3>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              
+              // Handle custom assistance type
+              const baseType = assistanceFormType;
+              const customType = formData.get("custom_type")?.trim();
+              const finalType = baseType === 'Others' ? customType : baseType;
+
+              if (baseType === 'Others' && !customType) {
+                  toast.error("Please specify the custom assistance type.");
+                  return;
+              }
+
+              const payload = {
+                type_of_assistance: finalType,
+                date_processed: formData.get("processed") || null,
+                date_claimed: formData.get("claimed") || null,
+                amount: formData.get("amount") || null,
+                implementing_office: formData.get("office") || null,
+              };
+              
+              try {
+                if (assistanceModal.assistance) {
+                  await api.put(`/assistances/${assistanceModal.assistance.id}`, payload);
+                  toast.success("Assistance updated.");
+                } else {
+                  await api.post(`/residents/${assistanceModal.resident.id}/assistance`, payload);
+                  toast.success("Assistance recorded.");
+                }
+                setAssistanceModal({ isOpen: false, resident: null, assistance: null });
+                fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+              } catch (error) {
+                // NEW: Show the actual backend error message (e.g. "ALREADY CLAIMED")
+                const errorMsg = error.response?.data?.detail || "Operation failed.";
+                toast.error(errorMsg);
+              }
+            }}>
+              <div className="space-y-4 md:space-y-5">
+                <div>
+                  <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Assistance Type</label>
+                  <div className="relative">
+                    <select 
+                      name="type" 
+                      value={assistanceFormType}
+                      onChange={(e) => setAssistanceFormType(e.target.value)}
+                      className="w-full appearance-none border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all cursor-pointer"
+                    >
+                      <option>Medical Assistance</option>
+                      <option>Burial Assistance</option>
+                      <option>Educational Assistance</option>
+                      <option>Financial Assistance</option>
+                      <option>Gas Subsidy</option>
+                      <option>Food Assistance</option>
+                      <option value="Others">Others (Specify)</option>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-3 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
+                  </div>
+                </div>
+
+                {/* CONDITIONAL TEXT INPUT FOR OTHERS */}
+                {assistanceFormType === 'Others' && (
+                  <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Specify Type</label>
+                    <input 
+                      type="text" 
+                      name="custom_type" 
+                      value={customAssistanceType}
+                      onChange={(e) => setCustomAssistanceType(e.target.value)}
+                      placeholder="e.g. Wheelchair..." 
+                      className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" 
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Date Processed</label>
+                    <input type="date" name="processed" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.date_processed ? assistanceModal.assistance.date_processed.split('T')[0] : ''} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Date Claimed</label>
+                    <input type="date" name="claimed" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.date_claimed ? assistanceModal.assistance.date_claimed.split('T')[0] : ''} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Amount (Optional)</label>
+                  <input type="number" name="amount" placeholder="0.00" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all" defaultValue={assistanceModal.assistance?.amount} />
+                </div>
+                <div>
+                  <label className="block text-[10px] md:text-xs font-medium text-stone-600 uppercase tracking-wider mb-1 md:mb-2">Implementing Office</label>
+                  <input type="text" name="office" placeholder="e.g. MSWDO" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-2.5 md:p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.implementing_office} />
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 md:mt-8 pt-5 border-t border-stone-200">
+                <button type="button" onClick={() => setAssistanceModal({ isOpen: false, resident: null })} className="w-full sm:w-auto px-6 py-3 text-sm font-medium text-stone-700 bg-stone-100 border border-stone-300 hover:bg-stone-200 rounded-xl transition-colors shadow-sm">
+                  Cancel
+                </button>
+                <button type="submit" className="w-full sm:w-auto px-6 py-3 bg-rose-700 text-white text-sm font-medium rounded-xl hover:bg-rose-800 transition-colors shadow-md">
+                  Save Assistance
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* DELETE ASSISTANCE & RECORD MODALS */}
       {(deleteModal.isOpen || deleteAssistanceModal.isOpen) && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => { setDeleteModal({ isOpen: false }); setDeleteAssistanceModal({ isOpen: false }); }} />
