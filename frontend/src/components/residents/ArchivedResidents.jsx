@@ -12,6 +12,7 @@ export default function ArchivedResidents() {
   const itemsPerPage = 8; 
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, resident: null });
   const [deletingId, setDeletingId] = useState(null);
+  const cleanArchivedName = (name) => (name || "").replace(/_ARC\d+/g, "").trim();
 
   const fetchArchived = async () => {
     try {
@@ -90,7 +91,9 @@ export default function ArchivedResidents() {
             </div>
             <h3 className="text-lg font-medium text-slate-800 tracking-tight">Permanent Deletion</h3>
             <p className="text-sm text-slate-500 mt-2 mb-6 leading-relaxed font-normal">
-              You are about to permanently delete the archived record of <span className="font-medium text-slate-700 uppercase">{deleteModal.resident?.last_name}, {deleteModal.resident?.first_name}</span>. This action cannot be undone and will permanently remove all related records.
+              You are about to permanently delete the archived record of <span className="font-medium text-slate-700 uppercase">
+                {cleanArchivedName(deleteModal.resident?.last_name)}, {cleanArchivedName(deleteModal.resident?.first_name)}
+              </span>. This action cannot be undone and will permanently remove all related records.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setDeleteModal({ isOpen: false, resident: null })} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 text-sm font-normal rounded-xl hover:bg-slate-50 transition-colors">
@@ -161,7 +164,7 @@ export default function ArchivedResidents() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-medium text-slate-700 uppercase">
-                        {r.last_name}, {r.first_name} {r.middle_name || ''}
+                        {cleanArchivedName(r.last_name)}, {cleanArchivedName(r.first_name)} {r.middle_name || ''}
                       </span>
                     </td>
                     <td className="px-6 py-4">

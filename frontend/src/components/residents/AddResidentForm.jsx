@@ -587,13 +587,17 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
 
   const buildPayload = () => {
     const payload = { ...formData };
-    
-    // 1. Format Date and Numbers
-    payload.birthdate = displayDateToIso(formData.birthdate);
+    const uniqueFields = ["contact_no", "precinct_no", "emergency_contact_no"];
+    uniqueFields.forEach(field => {
+       if (typeof payload[field] === "string" && payload[field].trim() === "") {
+           payload[field] = null;
+       }
+    });
+
+    payload.birthdate = displayDateToIso(formData.birthdate) || null;
     payload.barangay_id = formData.barangay_id ? Number(formData.barangay_id) : null;
     payload.sector_ids = Array.isArray(formData.sector_ids) ? formData.sector_ids.map(Number) : [];
-    
-    // 2. Format Family Members
+  
     payload.family_members = (formData.family_members || [])
       .filter(m => m.first_name && m.first_name.trim() !== "")
       .map((m) => ({
@@ -603,22 +607,12 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         relationship: m.relationship || "",
       }));
 
-    // 3. Clear "Others" detail if not checked
     const isOtherSelected = sectorOptions.find(
       (s) => s.name.toLowerCase().includes("other") && formData.sector_ids.includes(s.id)
     );
     if (!isOtherSelected) {
       payload.other_sector_details = "";
     }
-
-    // 4. CRITICAL: Convert optional numbers/unique strings to NULL instead of "" 
-    // This stops the Database Constraint Error for unique columns.
-    const optionalFields = ["contact_no", "precinct_no", "emergency_contact_no"];
-    optionalFields.forEach(field => {
-       if (!payload[field] || String(payload[field]).trim() === "") {
-           payload[field] = null;
-       }
-    });
 
     return payload;
   };
