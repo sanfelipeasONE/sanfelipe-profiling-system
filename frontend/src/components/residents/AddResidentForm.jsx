@@ -90,14 +90,11 @@ function isoToDisplayDate(isoDate) {
 
 function displayDateToIso(displayDate) {
   const clean = String(displayDate || "").trim();
-  // Match full 4-digit year
   const match = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-
-  if (!match) return "";
-
+  
+  if (!match) return null; // <-- CHANGED: Return null instead of ""
+  
   const [, mm, dd, yyyy] = match;
-
-  // Use the full year directly
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -588,30 +585,68 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     });
   };
 
-  const buildPayload = () => ({
-    ...formData,
-    birthdate: displayDateToIso(formData.birthdate),
-    barangay_id: formData.barangay_id ? Number(formData.barangay_id) : null,
-    sector_ids: Array.isArray(formData.sector_ids) ? formData.sector_ids.map(Number) : [],
-    family_members: (formData.family_members || []).map((m) => ({
-      first_name: m.first_name || "",
-      middle_name: m.middle_name || "",
-      last_name: m.last_name || "",
-      relationship: m.relationship || "",
-    })),
-  });
+  const buildPayload = () => {
+    const payload = { ...formData };
+    
+    // 1. Format Date and Numbers
+    payload.birthdate = displayDateToIso(formData.birthdate);
+    payload.barangay_id = formData.barangay_id ? Number(formData.barangay_id) : null;
+    payload.sector_ids = Array.isArray(formData.sector_ids) ? formData.sector_ids.map(Number) : [];
+    
+    // 2. Format Family Members
+    payload.family_members = (formData.family_members || [])
+      .filter(m => m.first_name && m.first_name.trim() !== "")
+      .map((m) => ({
+        first_name: m.first_name || "",
+        middle_name: m.middle_name || "",
+        last_name: m.last_name || "",
+        relationship: m.relationship || "",
+      }));
+
+    // 3. Clear "Others" detail if not checked
+    const isOtherSelected = sectorOptions.find(
+      (s) => s.name.toLowerCase().includes("other") && formData.sector_ids.includes(s.id)
+    );
+    if (!isOtherSelected) {
+      payload.other_sector_details = "";
+    }
+
+    // 4. CRITICAL: Convert optional numbers/unique strings to NULL instead of "" 
+    // This stops the Database Constraint Error for unique columns.
+    const optionalFields = ["contact_no", "precinct_no", "emergency_contact_no"];
+    optionalFields.forEach(field => {
+       if (!payload[field] || String(payload[field]).trim() === "") {
+           payload[field] = null;
+       }
+    });
+
+    return payload;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      const payload = buildPayload();
+      console.log("PAYLOAD BEING SENT:", payload); // <-- Check your browser console if it fails!
+
+      // --- STRICT FRONTEND VALIDATION ---
+      // This stops the form from submitting if required Database fields are broken/missing
+      if (!payload.birthdate) {
+          toast.error("Please enter a complete and valid Date of Birth (MM/DD/YYYY).");
+          setLoading(false);
+          return;
+      }
+      if (!payload.barangay_id) {
+          toast.error("Barangay is required. Please ensure a Barangay is selected.");
+          setLoading(false);
+          return;
+      }
+
       let response;
 
       if (residentToEdit) {
-        const payload = buildPayload();
-        console.log("UPDATE PAYLOAD:", payload);
-
         response = await api.put(`/residents/${residentToEdit.id}`, payload);
 
         if (photoFile) {
@@ -625,9 +660,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         toast.success("Resident Record Updated.");
         setTimeout(onSuccess, 1000);
       } else {
-        const payload = buildPayload();
-        console.log("CREATE PAYLOAD:", payload);
-
         response = await api.post("/residents/", payload);
         const newResident = response.data;
 
@@ -653,9 +685,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       }
     } catch (err) {
       console.error("FULL ERROR:", err);
-      console.error("ERROR RESPONSE DATA:", err.response?.data);
-      console.error("ERROR RESPONSE DETAIL:", err.response?.data?.detail);
-
+      
       if (err.response?.data?.detail) {
         const detail = err.response.data.detail;
 
@@ -666,15 +696,15 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
               return `${field}: ${item.msg}`;
             })
             .join(" | ");
-
           toast.error(message || "Validation failed.");
         } else if (typeof detail === "string") {
-          toast.error(detail);
+          // If the backend still throws a DB error, show it clearly
+          toast.error(`Database Error: ${detail}`); 
         } else {
           toast.error("Validation failed.");
         }
       } else {
-        toast.error("Registration failed.");
+        toast.error("Registration failed. Please check your connection.");
       }
 
       setLoading(false);

@@ -147,11 +147,7 @@ export default function ResidentList({ userRole, onEdit }) {
     const created = r?.created_at ? new Date(r.created_at) : null;
     const updated = r?.updated_at ? new Date(r.updated_at) : null;
 
-    return (
-      created &&
-      updated &&
-      Math.abs(updated.getTime() - created.getTime()) > 1000
-    );
+    return created && updated && updated.getTime() >= created.getTime();
   };
 
   const sitioToPurok = {
