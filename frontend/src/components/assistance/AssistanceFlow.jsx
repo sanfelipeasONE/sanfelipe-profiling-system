@@ -47,12 +47,13 @@ export default function AssistanceFlow({ userRole }) {
   // Form States - Global Template
   const [payoutTemplate, setPayoutTemplate] = useState({
     type_of_assistance: 'Medical Assistance',
-    custom_assistance: '', // <-- NEW STATE FOR "OTHERS"
+    custom_assistance: '',
     status: 'Claimed', 
     date_processed: new Date().toISOString().split('T')[0],
     date_claimed: new Date().toISOString().split('T')[0],
     amount: '',
-    implementing_office: ''
+    implementing_office: '',
+    target_sector: 'All Sectors' // <-- NEW: Default is no restriction
   });
   
   // Stores fetched presets for the dropdown
@@ -193,6 +194,7 @@ export default function AssistanceFlow({ userRole }) {
                ...res.data,
                type_of_assistance: isCustom ? 'Others' : res.data.type_of_assistance,
                custom_assistance: isCustom ? res.data.type_of_assistance : '',
+               target_sector: res.data.target_sector || 'All Sectors' // Load sector restriction
             });
             setIsScanningMode(true);
             setIsAddModalOpen(true);
@@ -206,23 +208,24 @@ export default function AssistanceFlow({ userRole }) {
   };
 
   const handleConfigureAssistance = async () => {
-      setSelectedPresetId(""); 
-      try {
-          const resActive = await api.get('/payout-events/active');
-          if (resActive.data) {
-             const isCustom = !PREDEFINED_ASSISTANCE_TYPES.includes(resActive.data.type_of_assistance);
-             setPayoutTemplate({
-                ...resActive.data,
-                type_of_assistance: isCustom ? 'Others' : resActive.data.type_of_assistance,
-                custom_assistance: isCustom ? resActive.data.type_of_assistance : '',
-             });
-          }
-      } catch (err) {}
-      
-      await fetchPresetsList();
-      setIsScanningMode(false);
-      setIsAddModalOpen(true);
-  };
+    setSelectedPresetId(""); 
+    
+    // Always start with a clean/blank form — never pre-fill from active template
+    setPayoutTemplate({
+        type_of_assistance: 'Medical Assistance',
+        custom_assistance: '',
+        status: 'Claimed', 
+        date_processed: new Date().toISOString().split('T')[0],
+        date_claimed: new Date().toISOString().split('T')[0],
+        amount: '',
+        implementing_office: '',
+        target_sector: 'All Sectors'
+    });
+    
+    await fetchPresetsList();
+    setIsScanningMode(false);
+    setIsAddModalOpen(true);
+};
 
   const handleLoadPreset = (e) => {
     const selectedId = e.target.value;
@@ -238,12 +241,16 @@ export default function AssistanceFlow({ userRole }) {
         status: selectedTemplate.status,
         date_processed: selectedTemplate.date_processed ? selectedTemplate.date_processed.split('T')[0] : '',
         date_claimed: selectedTemplate.date_claimed ? selectedTemplate.date_claimed.split('T')[0] : '',
-        amount: selectedTemplate.amount || '',
-        implementing_office: selectedTemplate.implementing_office || ''
+        
+        // 🛡️ CRITICAL FIX: Convert database 'null' to an empty string so the box actually clears!
+        amount: selectedTemplate.amount === null ? '' : selectedTemplate.amount,
+        implementing_office: selectedTemplate.implementing_office === null ? '' : selectedTemplate.implementing_office,
+        
+        target_sector: selectedTemplate.target_sector || 'All Sectors'
       });
       toast.success("Payout template loaded!");
     }
-  };
+  }
 
   const getFinalTypeOfAssistance = (template) => {
       if (template.type_of_assistance === 'Others') {
@@ -268,6 +275,7 @@ export default function AssistanceFlow({ userRole }) {
               date_claimed: payoutTemplate.status === 'Claimed' ? (payoutTemplate.date_claimed || null) : null,
               amount: payoutTemplate.amount ? parseFloat(payoutTemplate.amount) : null,
               implementing_office: payoutTemplate.implementing_office || null,
+              target_sector: payoutTemplate.target_sector || 'All Sectors', // Save Sector
               is_active: false
           };
 
@@ -295,7 +303,7 @@ export default function AssistanceFlow({ userRole }) {
       setPayoutTemplate({
         type_of_assistance: 'Medical Assistance', custom_assistance: '',
         status: 'Claimed', date_processed: new Date().toISOString().split('T')[0],
-        date_claimed: new Date().toISOString().split('T')[0], amount: '', implementing_office: ''
+        date_claimed: new Date().toISOString().split('T')[0], amount: '', implementing_office: '', target_sector: 'All Sectors'
       });
       setDeletePresetModalOpen(false);
     } catch (err) { toast.error("Failed to delete preset."); } finally { setLoading(false); }
@@ -317,6 +325,7 @@ export default function AssistanceFlow({ userRole }) {
               date_claimed: payoutTemplate.status === 'Claimed' ? (payoutTemplate.date_claimed || null) : null,
               amount: payoutTemplate.amount ? parseFloat(payoutTemplate.amount) : null,
               implementing_office: payoutTemplate.implementing_office || null,
+              target_sector: payoutTemplate.target_sector || 'All Sectors', // Save sector
               is_active: true
           };
 
@@ -326,7 +335,8 @@ export default function AssistanceFlow({ userRole }) {
           setPayoutTemplate({
              ...res.data,
              type_of_assistance: isCustom ? 'Others' : res.data.type_of_assistance,
-             custom_assistance: isCustom ? res.data.type_of_assistance : ''
+             custom_assistance: isCustom ? res.data.type_of_assistance : '',
+             target_sector: res.data.target_sector || 'All Sectors'
           }); 
 
           toast.success("Payout saved and Activated.");
@@ -345,6 +355,22 @@ export default function AssistanceFlow({ userRole }) {
     try {
       const res = await api.get(`/residents/code/${scanCode}`);
       const resident = res.data;
+
+      // ==========================================
+      // NEW SECTOR RESTRICTION CHECK
+      // ==========================================
+      if (payoutTemplate.target_sector && payoutTemplate.target_sector !== 'All Sectors') {
+          const residentSectors = resident.sector_summary ? resident.sector_summary.toUpperCase() : "";
+          const requiredSector = payoutTemplate.target_sector.toUpperCase();
+          
+          if (!residentSectors.includes(requiredSector)) {
+              setScanError(`ACCESS DENIED: ${resident.first_name} is not registered as a ${payoutTemplate.target_sector}.`);
+              setSelectedResident(null);
+              setScanCode(""); 
+              setLoading(false);
+              return; // STOP EXECUTION
+          }
+      }
 
       const targetType = getFinalTypeOfAssistance(payoutTemplate);
       const targetProcessed = payoutTemplate.date_processed; 
@@ -385,7 +411,7 @@ export default function AssistanceFlow({ userRole }) {
       setRefreshTrigger(prev => prev + 1); 
       
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || "Error saving record.";
+      const errorMsg = err.response?.data?.detail || "Error saving record. Resident ID may be invalid.";
       setScanError(errorMsg);
       setSelectedResident(null);
     } finally {
@@ -468,6 +494,18 @@ export default function AssistanceFlow({ userRole }) {
     setSelectedResident(null);
     setScanCode("");
     setScanError("");
+    setSelectedPresetId("");
+
+    setPayoutTemplate({
+      type_of_assistance: 'Medical Assistance',
+      custom_assistance: '',
+      status: 'Claimed', 
+      date_processed: new Date().toISOString().split('T')[0],
+      date_claimed: new Date().toISOString().split('T')[0],
+      amount: '',
+      implementing_office: '',
+      target_sector: 'All Sectors'
+    });
   };
 
   // --- EXPANDED DETAILS UI ---
@@ -638,7 +676,6 @@ export default function AssistanceFlow({ userRole }) {
                   <option value="Financial Assistance">FINANCIAL ASSISTANCE</option>
                   <option value="Gas Subsidy">GAS SUBSIDY</option>
                   <option value="Food Assistance">FOOD ASSISTANCE</option>
-                  {/* ADDED OTHERS FILTER TO TABLE VIEW */}
                   <option value="Others">OTHERS (SPECIFY)</option>
               </select>
               <ChevronDown className="absolute right-3 top-3 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
@@ -902,7 +939,6 @@ export default function AssistanceFlow({ userRole }) {
                         <option value="Financial Assistance">Financial Assistance</option>
                         <option value="Gas Subsidy">Gas Subsidy</option>
                         <option value="Food Assistance">Food Assistance</option>
-                        {/* ADDED OTHERS OPTION */}
                         <option value="Others">Others (Specify)</option>
                       </select>
                       <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={16} strokeWidth={2} />
@@ -935,6 +971,18 @@ export default function AssistanceFlow({ userRole }) {
                   </div>
                 )}
                 
+                {/* NEW RESTRICTION DROPDOWN */}
+                <div className="grid grid-cols-1">
+                  <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Sector Restriction</label>
+                  <div className="relative">
+                    <select name="target_sector" value={payoutTemplate.target_sector} onChange={handleTemplateInputChange} className="w-full appearance-none pl-3 md:pl-4 pr-10 py-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium text-stone-800 hover:border-stone-300 focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all cursor-pointer shadow-sm uppercase">
+                      <option value="All Sectors">NO RESTRICTION (ALL SECTORS)</option>
+                      {sectors.map(s => <option key={s.id} value={s.name}>{s.name.toUpperCase()}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={16} strokeWidth={2} />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Date Processed</label>
@@ -956,12 +1004,12 @@ export default function AssistanceFlow({ userRole }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Amount (Optional)</label>
-                    <input type="number" name="amount" placeholder="0.00" value={payoutTemplate.amount} onChange={handleTemplateInputChange} className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
+                    <input type="number" name="amount" placeholder="0.00" value={payoutTemplate.amount ?? ''} onChange={handleTemplateInputChange} className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
                   </div>
 
                   <div>
                     <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Implementing Office</label>
-                    <input type="text" name="implementing_office" placeholder="E.G. MSWDO" value={payoutTemplate.implementing_office} onChange={handleTemplateInputChange} className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
+                    <input type="text" name="implementing_office" placeholder="e.g , Mayor's Office" value={payoutTemplate.implementing_office} onChange={handleTemplateInputChange} className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
                   </div>
                 </div>
 
@@ -978,104 +1026,109 @@ export default function AssistanceFlow({ userRole }) {
             {/* PHASE 2: CONTINUOUS SCANNING MODE */}
             {isScanningMode && (
                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                  {/* --- UPDATED ACTIVE TEMPLATE BANNER WITH DATES --- */}
-                  <div className="mb-6 p-5 bg-stone-50 border border-stone-200 rounded-2xl shadow-sm">
-                     <div className="flex items-center justify-between mb-4 border-b border-stone-200 pb-3">
-                        <div>
-                           <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Active Global Template</p>
-                           <p className="text-base font-bold text-stone-900 uppercase">
-                              {/* Display Custom Text if 'Others' is selected */}
-                              {payoutTemplate.type_of_assistance === 'Others' ? payoutTemplate.custom_assistance : payoutTemplate.type_of_assistance} 
-                              {payoutTemplate.amount ? ` (₱${payoutTemplate.amount})` : ''}
-                           </p>
-                        </div>
-                        <button onClick={handleConfigureAssistance} className="text-[11px] font-bold text-rose-600 bg-white hover:bg-rose-50 px-3 py-1.5 rounded-lg uppercase tracking-wider border border-stone-200 transition-colors flex items-center gap-1.5 shadow-sm">
-                           <Settings2 size={14} /> Edit
-                        </button>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-start gap-2">
-                           <div className="p-1.5 bg-stone-200 rounded text-stone-600 mt-0.5"><Calendar size={12} /></div>
-                           <div>
-                              <p className="text-[9px] font-bold text-stone-400 uppercase tracking-tighter">Processed</p>
-                              <p className="text-[11px] font-medium text-stone-700 uppercase">{formatDate(payoutTemplate.date_processed)}</p>
-                           </div>
-                        </div>
-                        <div className="flex items-start gap-2">
-                           <div className={`p-1.5 rounded mt-0.5 ${payoutTemplate.status === 'Claimed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                              {payoutTemplate.status === 'Claimed' ? <CheckCircle size={12} /> : <Calendar size={12} />}
-                           </div>
-                           <div>
-                              <p className="text-[9px] font-bold text-stone-400 uppercase tracking-tighter">Claim Status</p>
-                              <p className={`text-[11px] font-bold uppercase ${payoutTemplate.status === 'Claimed' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                                 {payoutTemplate.status === 'Claimed' ? formatDate(payoutTemplate.date_claimed) : 'Unclaimed'}
-                              </p>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-
-                  {/* SCANNER INPUT (AUTO-SAVES) */}
-                  <div className="mb-6">
-                    <form onSubmit={handleScanSubmit} className="flex gap-2">
-                      <div className="relative flex-1 group">
-                        <div className="absolute left-4 top-3.5 text-stone-400 group-focus-within:text-rose-500 transition-colors">
-                          <Search size={18} strokeWidth={2} />
-                        </div>
-                        <input
-                          type="text"
-                          value={scanCode}
-                          onChange={(e) => setScanCode(e.target.value)}
-                          placeholder="AWAITING QR SCAN..."
-                          className="w-full pl-11 pr-4 py-3 bg-white border border-rose-400 rounded-xl text-sm font-medium text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100 transition-all uppercase tracking-wide shadow-sm"
-                          autoFocus
-                        />
-                      </div>
-                      <button type="submit" disabled={loading || !scanCode} className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center min-w-[130px]">
-                        {loading ? <Loader2 size={18} className="animate-spin" /> : "Scan & Save"}
-                      </button>
-                    </form>
-
-                    {scanError && (
-                      <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 shadow-sm animate-in shake duration-300">
-                        <ShieldAlert size={18} />
-                        <p className="text-sm font-bold uppercase tracking-tight">{scanError}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* PREVIEW LAST SCANNED RESIDENT */}
-                  {selectedResident && !scanError && (
-                    <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 mb-6 shadow-sm animate-in fade-in duration-300">
-                      <div className="flex items-center gap-2 text-emerald-700 mb-3 border-b border-emerald-200 pb-2">
-                         <CheckCircle size={16} />
-                         <span className="text-xs font-bold uppercase tracking-wider">Successfully Recorded</span>
-                      </div>
-                      <div className="flex flex-col gap-1.5 text-[13px] text-emerald-900">
-                        <p className="flex justify-between items-center">
-                          <span className="font-semibold uppercase tracking-wider text-[10px] opacity-75">Resident Code</span> 
-                          <span className="font-mono font-bold text-emerald-700">{selectedResident.resident_code}</span>
-                        </p>
-                        <p className="flex justify-between items-center">
-                          <span className="font-semibold uppercase tracking-wider text-[10px] opacity-75">Resident Name</span> 
-                          <span className="font-bold uppercase text-right text-xs max-w-[200px] truncate">{selectedResident.last_name}, {selectedResident.first_name} {selectedResident.middle_name}</span>
-                        </p>
-                      </div>
+                 {/* --- ACTIVE TEMPLATE BANNER WITH DATES AND RESTRICTIONS --- */}
+                 <div className="mb-6 p-5 bg-stone-50 border border-stone-200 rounded-2xl shadow-sm">
+                    <div className="flex items-center justify-between mb-4 border-b border-stone-200 pb-3">
+                       <div>
+                          <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Active Global Template</p>
+                          <p className="text-base font-bold text-stone-900 uppercase">
+                             {payoutTemplate.type_of_assistance === 'Others' ? payoutTemplate.custom_assistance : payoutTemplate.type_of_assistance} 
+                             {payoutTemplate.amount ? ` (₱${payoutTemplate.amount})` : ''}
+                          </p>
+                          
+                          {payoutTemplate.target_sector !== 'All Sectors' && (
+                             <div className="mt-2 text-[10px] md:text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 uppercase tracking-wide">
+                                <ShieldAlert size={14} /> Restricted to: {payoutTemplate.target_sector}
+                             </div>
+                          )}
+                       </div>
+                       <button onClick={handleConfigureAssistance} className="text-[11px] font-bold text-rose-600 bg-white hover:bg-rose-50 px-3 py-1.5 rounded-lg uppercase tracking-wider border border-stone-200 transition-colors flex items-center gap-1.5 shadow-sm shrink-0">
+                          <Settings2 size={14} /> Edit
+                       </button>
                     </div>
-                  )}
 
-                  <hr className="border-stone-100 my-6" />
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="flex items-start gap-2">
+                          <div className="p-1.5 bg-stone-200 rounded text-stone-600 mt-0.5"><Calendar size={12} /></div>
+                          <div>
+                             <p className="text-[9px] font-bold text-stone-400 uppercase tracking-tighter">Processed</p>
+                             <p className="text-[11px] font-medium text-stone-700 uppercase">{formatDate(payoutTemplate.date_processed)}</p>
+                          </div>
+                       </div>
+                       <div className="flex items-start gap-2">
+                          <div className={`p-1.5 rounded mt-0.5 ${payoutTemplate.status === 'Claimed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                             {payoutTemplate.status === 'Claimed' ? <CheckCircle size={12} /> : <Calendar size={12} />}
+                          </div>
+                          <div>
+                             <p className="text-[9px] font-bold text-stone-400 uppercase tracking-tighter">Claim Status</p>
+                             <p className={`text-[11px] font-bold uppercase ${payoutTemplate.status === 'Claimed' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                {payoutTemplate.status === 'Claimed' ? formatDate(payoutTemplate.date_claimed) : 'Unclaimed'}
+                             </p>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
 
-                  <div className="flex justify-end">
-                     <button 
-                        onClick={handleCloseModal}
-                        className="px-8 py-2.5 text-sm font-medium text-stone-700 bg-stone-50 border border-stone-200 hover:bg-stone-100 rounded-xl transition-colors"
-                        disabled={loading}
-                     >
-                        Close
+                 {/* SCANNER INPUT (AUTO-SAVES) */}
+                 <div className="mb-6">
+                   <form onSubmit={handleScanSubmit} className="flex gap-2">
+                     <div className="relative flex-1 group">
+                       <div className="absolute left-4 top-3.5 text-stone-400 group-focus-within:text-rose-500 transition-colors">
+                         <Search size={18} strokeWidth={2} />
+                       </div>
+                       <input
+                         type="text"
+                         value={scanCode}
+                         onChange={(e) => setScanCode(e.target.value)}
+                         placeholder="AWAITING QR SCAN..."
+                         className="w-full pl-11 pr-4 py-3 bg-white border border-rose-400 rounded-xl text-sm font-medium text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100 transition-all uppercase tracking-wide shadow-sm"
+                         autoFocus
+                       />
+                     </div>
+                     <button type="submit" disabled={loading || !scanCode} className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center min-w-[130px]">
+                       {loading ? <Loader2 size={18} className="animate-spin" /> : "Scan & Save"}
                      </button>
-                  </div>
+                   </form>
+
+                   {scanError && (
+                     <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 shadow-sm animate-in shake duration-300">
+                       <ShieldAlert size={18} className="shrink-0" />
+                       <p className="text-sm font-bold uppercase tracking-tight">{scanError}</p>
+                     </div>
+                   )}
+                 </div>
+
+                 {/* PREVIEW LAST SCANNED RESIDENT */}
+                 {selectedResident && !scanError && (
+                   <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 mb-6 shadow-sm animate-in fade-in duration-300">
+                     <div className="flex items-center gap-2 text-emerald-700 mb-3 border-b border-emerald-200 pb-2">
+                        <CheckCircle size={16} />
+                        <span className="text-xs font-bold uppercase tracking-wider">Successfully Recorded</span>
+                     </div>
+                     <div className="flex flex-col gap-1.5 text-[13px] text-emerald-900">
+                       <p className="flex justify-between items-center">
+                         <span className="font-semibold uppercase tracking-wider text-[10px] opacity-75">Resident Code</span> 
+                         <span className="font-mono font-bold text-emerald-700">{selectedResident.resident_code}</span>
+                       </p>
+                       <p className="flex justify-between items-center">
+                         <span className="font-semibold uppercase tracking-wider text-[10px] opacity-75">Resident Name</span> 
+                         <span className="font-bold uppercase text-right text-xs max-w-[200px] truncate">{selectedResident.last_name}, {selectedResident.first_name} {selectedResident.middle_name}</span>
+                       </p>
+                     </div>
+                   </div>
+                 )}
+
+                 <hr className="border-stone-100 my-6" />
+
+                 <div className="flex justify-end">
+                    <button 
+                      onClick={handleCloseModal}
+                      className="px-8 py-2.5 text-sm font-medium text-stone-700 bg-stone-50 border border-stone-200 hover:bg-stone-100 rounded-xl transition-colors"
+                      disabled={loading}
+                    >
+                      Close
+                    </button>
+                 </div>
                </div>
             )}
           </div>
@@ -1168,12 +1221,12 @@ export default function AssistanceFlow({ userRole }) {
 
               <div>
                 <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Amount (Optional)</label>
-                <input type="number" name="amount" placeholder="0.00" value={editFormData.amount} onChange={handleEditInputChange} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
+                <input type="number" name="amount" placeholder="0.00" value={payoutTemplate.amount ?? ''} onChange={handleEditInputChange} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800" />
               </div>
 
               <div>
                 <label className="block text-[10px] md:text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 md:mb-2">Implementing Office</label>
-                <input type="text" name="implementing_office" placeholder="E.G. MSWDO" value={editFormData.implementing_office} onChange={handleEditInputChange} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800 uppercase" />
+                <input type="text" name="implementing_office" placeholder="e.g , Mayor's Office" value={editFormData.implementing_office} onChange={handleEditInputChange} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-white border border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-50 focus:border-rose-400 outline-none transition-all text-sm placeholder:text-stone-400 text-stone-800 uppercase" />
               </div>
             </div>
 
