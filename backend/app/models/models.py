@@ -185,6 +185,8 @@ class PayoutEvent(Base):
     date_claimed = Column(Date, nullable=True)
     amount = Column(Float, nullable=True)
     implementing_office = Column(String, nullable=True)
+    
+    target_sector = Column(String, default="All Sectors", nullable=True)
 
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)

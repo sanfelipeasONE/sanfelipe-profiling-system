@@ -310,6 +310,7 @@ class PayoutEventBase(BaseModel):
     date_claimed: Optional[date] = None
     amount: Optional[float] = None
     implementing_office: Optional[str] = None
+    target_sector: Optional[str] = "All Sectors"
 
 class PayoutEventCreate(PayoutEventBase):
     is_active: bool = False

@@ -1441,7 +1441,8 @@ def set_active_payout_event(
         date_claimed=event_data.date_claimed if event_data.status == "Claimed" else None,
         amount=event_data.amount,
         implementing_office=event_data.implementing_office,
-        is_active=event_data.is_active  # <-- Now it listens to the frontend!
+        target_sector=event_data.target_sector,
+        is_active=event_data.is_active
     )
     
     db.add(new_event)
