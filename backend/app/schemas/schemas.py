@@ -134,6 +134,7 @@ class PublicResident(BaseModel):
     emergency_contact_no: Optional[str] = None
     emergency_address: Optional[str] = None
 
+    sector_summary: Optional[str] = None
     class Config:
         from_attributes = True
 
