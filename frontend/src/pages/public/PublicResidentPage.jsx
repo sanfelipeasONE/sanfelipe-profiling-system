@@ -8,6 +8,32 @@ import jsPDF from "jspdf";
 // Canvas helpers
 // =========================
 
+const SECTOR_CODES = {
+  "4P'S": "1",
+  "ATV'S/UTV'S OWNER": "2",
+  "BANANA BOAT/DRAGON BOAT OWNER": "3",
+  "BANCA OWNER": "4",
+  "BRGY BNS/BHW": "5",
+  "BRGY. OFFICIAL/EMPLOYEE": "6",
+  "FAMILY HEADS": "7",
+  "FARMERS": "8",
+  "FISHERFOLK": "9",
+  "FISHERMAN": "10",
+  "GOVT EMPLOYEE": "11",
+  "INDIGENOUS PEOPLE": "12",
+  "LGU EMPLOYEE": "13",
+  "LIFEGUARD": "14",
+  "OFW": "15",
+  "PHILHEALTH MEMBER": "16",
+  "PWD": "17",
+  "SENIOR CITIZEN": "18",
+  "SFAO": "19",
+  "SOLO PARENT": "20",
+  "STUDENT": "21",
+  "TODA": "22",
+
+};
+
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     if (!src) return reject(new Error("Missing image src"));
@@ -431,6 +457,36 @@ async function drawBack(
   ctx.font = `${FONT_MEDIUM} ${FS(11)}px ${FONT_FAMILY}`;
   ctx.fillText("This QR Code contains verified resident data.", qx + qw / 2, captionY + FS(11));
   ctx.fillText("Scan using authorized LGU devices only.", qx + qw / 2, captionY + FS(11) + Y(14));
+
+  // ==========================================
+  // NEW: DRAW SECTOR CODES ON BOTTOM LEFT
+  // ==========================================
+  let sectorCodes = [];
+  
+  if (resident && resident.sector_summary && resident.sector_summary !== "None") {
+    // Split the comma-separated sectors
+    const sectors = resident.sector_summary.split(",").map(s => s.trim().toUpperCase());
+    
+    // Find the matching code for each sector
+    sectors.forEach(sector => {
+      if (SECTOR_CODES[sector]) {
+        sectorCodes.push(SECTOR_CODES[sector]);
+      }
+    });
+  }
+
+  if (sectorCodes.length > 0) {
+    const codesText = sectorCodes.join(", "); // e.g., "1, C, M"
+    
+    ctx.fillStyle = "#000";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.font = `${FONT_BLACK} ${FS(16)}px ${FONT_FAMILY}`; // Large bold font
+    
+    // Positioned inside the bottom-left border
+    ctx.fillText(codesText, X(25), Y(DOM_H - 20)); 
+  }
+  // ==========================================
 
   return canvas;
 }
