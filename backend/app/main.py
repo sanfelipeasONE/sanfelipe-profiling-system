@@ -266,7 +266,7 @@ def create_user(
     if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin only")
 
-    allowed_roles = {"barangay", "admin_limited", "admin", "super_admin, osca_admin"}
+    allowed_roles = {"barangay", "admin_limited", "admin", "super_admin", "osca_admin"}
     if user.role not in allowed_roles:
         raise HTTPException(status_code=400, detail=f"Invalid role. Allowed: {sorted(list(allowed_roles))}")
 
