@@ -322,3 +322,27 @@ class PayoutEventResponse(PayoutEventBase):
     
     class Config:
         from_attributes = True
+        
+# SENIOR CITIZEN SCHEMAS
+class SeniorCitizenBase(BaseModel):
+    osca_control_no: str
+    last_name: str
+    first_name: str
+    middle_name: Optional[str] = None
+    ext_name: Optional[str] = None
+    birthdate: date
+    date_issued: date
+    house_no: Optional[str] = None
+    purok: str
+    barangay: str
+
+class SeniorCitizenCreate(SeniorCitizenBase):
+    pass
+
+class SeniorCitizenResponse(SeniorCitizenBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

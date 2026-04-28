@@ -1498,3 +1498,31 @@ def delete_payout_event(
     db.commit()
     
     return {"message": "Preset deleted successfully"}
+
+# SENIOR CITIZEN REGISTRATION
+@app.post("/osca/seniors/", response_model=schemas.SeniorCitizenResponse)
+def register_senior_citizen(
+    senior: schemas.SeniorCitizenCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    # 1. Check if control number already exists using CRUD
+    existing = crud.get_senior_by_control_no(db, senior.osca_control_no)
+    if existing:
+        raise HTTPException(status_code=400, detail="OSCA Control Number already registered.")
+        
+    # 2. Save using CRUD
+    try:
+        return crud.create_senior_citizen(db, senior)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/osca/seniors/", response_model=list[schemas.SeniorCitizenResponse])
+def get_all_seniors(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    # Fetch using CRUD
+    return crud.get_senior_citizens(db, skip=skip, limit=limit)

@@ -190,3 +190,28 @@ class PayoutEvent(Base):
 
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+# SENIOR CITIZEN REGISTRATION
+class SeniorCitizen(Base):
+    __tablename__ = "senior_citizens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    osca_control_no = Column(String, unique=True, index=True, nullable=False)
+    
+    # Personal Info
+    last_name = Column(String, index=True)
+    first_name = Column(String, index=True)
+    middle_name = Column(String, nullable=True)
+    ext_name = Column(String, nullable=True)
+    
+    birthdate = Column(Date, nullable=False)
+    date_issued = Column(Date, nullable=False)
+    
+    # Address
+    house_no = Column(String, nullable=True)
+    purok = Column(String)
+    barangay = Column(String)
+    
+    # System Fields
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -763,3 +763,36 @@ def process_qr_claim(db: Session, request: schemas.QRClaimRequest):
         "message": "Claimed successfully", 
         "resident": f"{resident.first_name} {resident.last_name}"
     }  
+    
+# SENIOR CITIZEN CRUD
+
+def get_senior_by_control_no(db: Session, control_no: str):
+    return db.query(models.SeniorCitizen).filter(
+        models.SeniorCitizen.osca_control_no == control_no
+    ).first()
+
+def create_senior_citizen(db: Session, senior: schemas.SeniorCitizenCreate):
+    # Auto-capitalize text fields for clean data entry
+    db_senior = models.SeniorCitizen(
+        osca_control_no=senior.osca_control_no,
+        last_name=senior.last_name.strip().upper(),
+        first_name=senior.first_name.strip().upper(),
+        middle_name=senior.middle_name.strip().upper() if senior.middle_name else "",
+        ext_name=senior.ext_name.strip().upper() if senior.ext_name else "",
+        birthdate=senior.birthdate,
+        date_issued=senior.date_issued,
+        house_no=senior.house_no,
+        purok=senior.purok.strip().upper(),
+        barangay=senior.barangay.strip().upper()
+    )
+    
+    db.add(db_senior)
+    db.commit()
+    db.refresh(db_senior)
+    return db_senior
+
+def get_senior_citizens(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.SeniorCitizen).order_by(
+        models.SeniorCitizen.last_name.asc(),
+        models.SeniorCitizen.first_name.asc()
+    ).offset(skip).limit(limit).all()
