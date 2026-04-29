@@ -1601,3 +1601,34 @@ def permanent_delete_senior_endpoint(
     if not result:
         raise HTTPException(status_code=404, detail="Senior not found")
     return {"message": "Senior permanently deleted"}
+
+# Add to main.py
+@app.get("/osca/seniors/archived")
+def get_archived_seniors_endpoint(
+    skip: int = 0,
+    limit: int = 20,
+    search: str = Query(None),
+    barangay: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    total = crud.get_archived_senior_count(db, search=search, barangay=barangay)
+    seniors = crud.get_archived_seniors(db, skip=skip, limit=limit, search=search, barangay=barangay)
+    
+    return {
+        "items": seniors,
+        "total": total,
+        "page": (skip // limit) + 1,
+        "size": limit
+    }
+
+@app.put("/osca/seniors/{senior_id}/restore")
+def restore_senior_endpoint(
+    senior_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    result = crud.restore_senior(db, senior_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Senior not found")
+    return {"message": "Senior restored successfully"}

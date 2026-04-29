@@ -899,3 +899,33 @@ def permanently_delete_senior(db: Session, senior_id: int):
     db.delete(senior)
     db.commit()
     return True
+
+def get_archived_senior_count(db: Session, search: str = None, barangay: str = None):
+    query = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.is_active == False)
+    query = apply_senior_search_filter(query, search)
+    if barangay:
+        query = query.filter(func.upper(models.SeniorCitizen.barangay) == barangay.upper())
+    return query.count()
+
+def get_archived_seniors(db: Session, skip: int = 0, limit: int = 20, search: str = None, barangay: str = None):
+    query = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.is_active == False)
+    query = apply_senior_search_filter(query, search)
+    if barangay:
+        query = query.filter(func.upper(models.SeniorCitizen.barangay) == barangay.upper())
+        
+    return query.order_by(
+        models.SeniorCitizen.last_name.asc(),
+        models.SeniorCitizen.first_name.asc()
+    ).offset(skip).limit(limit).all()
+
+def restore_senior(db: Session, senior_id: int):
+    senior = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.id == senior_id).first()
+    if not senior:
+        return None
+    senior.is_active = True
+    # Strip the "_ARC" tag we added when archiving to fix their control number
+    if senior.osca_control_no and "_ARC" in senior.osca_control_no:
+        senior.osca_control_no = senior.osca_control_no.split("_ARC")[0]
+    db.commit()
+    db.refresh(senior)
+    return senior
