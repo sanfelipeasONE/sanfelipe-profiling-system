@@ -39,7 +39,7 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
 
   const allMenuItems = [
     // Standard LGU Routes
-    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, view: 'standard' },
+    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, view: 'admin' }, 
     { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, view: 'standard' },
     { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, view: 'standard' },
     { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, view: 'admin' },
@@ -48,9 +48,9 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
     
     // OSCA Isolated Routes
     { label: 'OSCA Overview', path: '/dashboard/overview', Icon: LayoutDashboard, view: 'osca' },
-    { label: 'Senior Citizens Database', path: '/dashboard/seniors', Icon: Users, view: 'osca' },
-    { label: 'Register a Senior Citizen', path: '/dashboard/create-senior', Icon: FileBadge, view: 'osca' },
-    { label: 'Archived Senior Citizens', path: '/dashboard/osca-archived', Icon: ArchiveRestore, view: 'osca' },
+    { label: 'Senior Database', path: '/dashboard/seniors', Icon: Users, view: 'osca' },
+    { label: 'Register Senior', path: '/dashboard/create-senior', Icon: FileBadge, view: 'osca' },
+    { label: 'Archived Seniors', path: '/dashboard/osca-archived', Icon: ArchiveRestore, view: 'osca' },
   ];
 
   const menuItems = allMenuItems.filter(item => {

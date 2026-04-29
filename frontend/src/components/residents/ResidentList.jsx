@@ -566,7 +566,12 @@ export default function ResidentList({ userRole, onEdit }) {
           {(isAdmin || isSuperAdmin) && (
            <ImportButton onSuccess={handleImportSuccess} className="flex-1 md:flex-none justify-center bg-white border-2 border-stone-300 text-stone-700 font-medium hover:bg-stone-100 rounded-xl shadow-sm transition-all" />
            )}
-           <ExportButton barangay={selectedBarangay} className="flex-1 md:flex-none justify-center bg-stone-900 text-white font-medium hover:bg-stone-800 rounded-xl shadow-md transition-all" />
+           <ExportButton 
+              barangay={selectedBarangay} 
+              sector={selectedSector}  // Pass the current sector state
+              status={selectedStatus}  // Pass the current status state
+              className="flex-1 md:flex-none justify-center bg-red-700 text-white font-medium hover:bg-red-800 rounded-xl shadow-md transition-all" 
+            />
         </div>
       </div>
 

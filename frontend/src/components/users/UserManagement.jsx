@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/api';
 import { 
-  UserPlus, Shield, User, Loader2, Key, Trash2, 
+  UserPlus, Shield, User, Users, Loader2, Key, Trash2, // <-- Added 'Users' icon here
   ShieldCheck, AlertCircle, Eye, EyeOff, Lock,
   ChevronLeft, ChevronRight, ChevronDown, X
 } from 'lucide-react';
@@ -151,7 +151,6 @@ export default function UserManagement() {
                 <input required value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 focus:bg-white outline-none transition-all font-normal text-slate-800" placeholder="Enter unique username" />
               </div>
               
-              {/* UPDATED PASSWORD FIELD */}
               <div>
                 <label className="block text-[11px] font-normal text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
                 <div className="relative">
@@ -185,6 +184,8 @@ export default function UserManagement() {
                     <option value="admin_limited">Admin (Limited)</option>
                     <option value="super_admin">Admin</option>
                     <option value="admin">System Admin</option>
+                    {/* ADDED OSCA ADMIN OPTION */}
+                    <option value="osca_admin">OSCA Admin</option> 
                   </select>
                   <ChevronDown className="absolute right-3.5 top-3.5 text-slate-400 pointer-events-none" size={16} />
                 </div>
@@ -236,6 +237,8 @@ export default function UserManagement() {
                               ? "bg-red-50 text-red-500 border-red-100"
                               : u.role === "admin_limited"
                               ? "bg-amber-50 text-amber-600 border-amber-100"
+                              : u.role === "osca_admin" // ADDED OSCA COLOR LOGIC
+                              ? "bg-blue-50 text-blue-600 border-blue-100" 
                               : "bg-slate-50 text-slate-400 border-slate-200"
                           }`}
                         >
@@ -245,6 +248,8 @@ export default function UserManagement() {
                             <Shield size={18} strokeWidth={2} />
                           ) : u.role === "admin_limited" ? (
                             <ShieldCheck size={18} strokeWidth={2} />
+                          ) : u.role === "osca_admin" ? ( // ADDED OSCA ICON LOGIC
+                            <Users size={18} strokeWidth={2} />
                           ) : (
                             <User size={18} strokeWidth={2} />
                           )}
@@ -261,6 +266,8 @@ export default function UserManagement() {
                             ? "bg-red-50 text-red-600 border-red-100/50"
                             : u.role === "admin_limited"
                             ? "bg-amber-50 text-amber-700 border-amber-100/60"
+                            : u.role === "osca_admin" // ADDED OSCA BADGE LOGIC
+                            ? "bg-blue-50 text-blue-700 border-blue-100/60"
                             : "bg-slate-100 text-slate-500 border-slate-200/50"
                         }`}
                       >
@@ -270,6 +277,8 @@ export default function UserManagement() {
                           ? "Administrator"
                           : u.role === "admin_limited"
                           ? "Admin (Limited)"
+                          : u.role === "osca_admin" // ADDED OSCA LABEL LOGIC
+                          ? "OSCA Admin"
                           : "Barangay Staff"}
                       </span>
                     </td>
