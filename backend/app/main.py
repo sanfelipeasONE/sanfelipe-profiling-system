@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File, Query
 from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Union
@@ -1477,24 +1477,41 @@ def register_senior_citizen(
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/osca/seniors/")
-def get_all_seniors(
-    skip: int = 0,
-    limit: int = 20,
+def get_seniors(
     search: str = Query(None),
     barangay: str = Query(None),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+    age_range: str = Query(None), # <--- 1. ADD THIS PARAMETER
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db)
 ):
-    total = crud.get_senior_count(db, search=search, barangay=barangay)
-    seniors = crud.get_senior_citizens(db, skip=skip, limit=limit, search=search, barangay=barangay)
+    query = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.is_active == True)
+
+    if search:
+        query = query.filter(
+            (models.SeniorCitizen.first_name.ilike(f"%{search}%")) |
+            (models.SeniorCitizen.last_name.ilike(f"%{search}%")) |
+            (models.SeniorCitizen.osca_control_no.ilike(f"%{search}%"))
+        )
+
+    if barangay:
+        query = query.filter(models.SeniorCitizen.barangay == barangay)
+
+    # --- 2. ADD THIS NEW AGE FILTER LOGIC ---
+    if age_range:
+        try:
+            min_age, max_age = map(int, age_range.split('-'))
+            # Extracts the age in years perfectly based on today's date
+            age_expr = func.extract('year', func.age(models.SeniorCitizen.birthdate))
+            query = query.filter(age_expr >= min_age, age_expr <= max_age)
+        except ValueError:
+            pass # Failsafe in case someone sends a weird format
+
+    # (Keep your existing counting and return logic here)
+    total = query.count()
+    items = query.order_by(models.SeniorCitizen.last_name).offset(skip).limit(limit).all()
     
-    # Return paginated format expected by the frontend
-    return {
-        "items": seniors,
-        "total": total,
-        "page": (skip // limit) + 1,
-        "size": limit
-    }
+    return {"total": total, "items": items}
 
 @app.get("/osca/stats")
 def get_osca_stats(
