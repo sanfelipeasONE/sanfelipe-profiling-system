@@ -86,15 +86,15 @@ def generate_household_excel(
     data_list = []
 
     for r in residents:
-        # Format Head Name
-        mi = f"{r.middle_name[0]}." if r.middle_name else ""
-        full_name = f"{r.last_name}, {r.first_name} {mi} {r.ext_name or ''}".strip()
+        # Format Head Name (FULL Middle Name)
+        raw_full_name = f"{r.last_name}, {r.first_name} {r.middle_name or ''} {r.ext_name or ''}".strip()
+        full_name = " ".join(raw_full_name.split()) # Cleans up any double spaces
 
-        # Format Spouse Name
+        # Format Spouse Name (FULL Middle Name)
         spouse_name = ""
         if r.spouse_first_name:
-            s_mi = f"{r.spouse_middle_name[0]}." if r.spouse_middle_name else ""
-            spouse_name = f"{r.spouse_last_name}, {r.spouse_first_name} {s_mi} {r.spouse_ext_name or ''}".strip()
+            raw_spouse_name = f"{r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name or ''} {r.spouse_ext_name or ''}".strip()
+            spouse_name = " ".join(raw_spouse_name.split()) # Cleans up any double spaces
 
         total_members = 1 + len(r.family_members)
 
