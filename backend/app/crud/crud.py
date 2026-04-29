@@ -876,6 +876,27 @@ def get_osca_dashboard_stats(db: Session):
         "barangay_data": barangay_stats
     }
 
+def update_senior_citizen(db: Session, senior_id: int, senior_data: schemas.SeniorCitizenCreate):
+    db_senior = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.id == senior_id).first()
+    if not db_senior:
+        return None
+    
+    db_senior.osca_control_no = senior_data.osca_control_no
+    db_senior.last_name = senior_data.last_name.strip().upper()
+    db_senior.first_name = senior_data.first_name.strip().upper()
+    db_senior.middle_name = senior_data.middle_name.strip().upper() if senior_data.middle_name else ""
+    db_senior.ext_name = senior_data.ext_name.strip().upper() if senior_data.ext_name else ""
+    db_senior.sex = senior_data.sex
+    db_senior.birthdate = senior_data.birthdate
+    db_senior.date_issued = senior_data.date_issued
+    db_senior.house_no = senior_data.house_no
+    db_senior.purok = senior_data.purok.strip().upper()
+    db_senior.barangay = senior_data.barangay.strip().upper()
+    
+    db.commit()
+    db.refresh(db_senior)
+    return db_senior
+
 def archive_senior(db: Session, senior_id: int):
     senior = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.id == senior_id).first()
     if not senior:
@@ -929,3 +950,4 @@ def restore_senior(db: Session, senior_id: int):
     db.commit()
     db.refresh(senior)
     return senior
+

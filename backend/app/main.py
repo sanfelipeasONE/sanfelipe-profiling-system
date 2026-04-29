@@ -1632,3 +1632,25 @@ def restore_senior_endpoint(
     if not result:
         raise HTTPException(status_code=404, detail="Senior not found")
     return {"message": "Senior restored successfully"}
+
+@app.put("/osca/seniors/{senior_id}", response_model=schemas.SeniorCitizenResponse)
+def edit_senior_citizen(
+    senior_id: int,
+    senior: schemas.SeniorCitizenCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    # Check if the admin is trying to use a control number that already belongs to SOMEONE ELSE
+    existing = db.query(models.SeniorCitizen).filter(
+        models.SeniorCitizen.osca_control_no == senior.osca_control_no,
+        models.SeniorCitizen.id != senior_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="OSCA Control Number already used by another record.")
+    
+    result = crud.update_senior_citizen(db, senior_id, senior)
+    if not result:
+        raise HTTPException(status_code=404, detail="Senior not found")
+        
+    return result
