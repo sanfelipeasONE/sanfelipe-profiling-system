@@ -1797,3 +1797,16 @@ async def import_seniors(
         db.rollback()
         print(f"FATAL IMPORT ERROR: {str(e)}") 
         raise HTTPException(status_code=500, detail=f"Import completely failed: {str(e)}")
+    
+@app.get("/osca/seniors/{senior_id}")
+def get_senior_by_id(
+    senior_id: int, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    senior = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.id == senior_id).first()
+    
+    if not senior:
+        raise HTTPException(status_code=404, detail="Senior record not found.")
+        
+    return senior
