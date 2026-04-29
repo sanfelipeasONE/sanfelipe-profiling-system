@@ -1517,16 +1517,6 @@ def register_senior_citizen(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/osca/seniors/", response_model=list[schemas.SeniorCitizenResponse])
-def get_all_seniors(
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
-):
-    # Fetch using CRUD
-    return crud.get_senior_citizens(db, skip=skip, limit=limit)
-
 @app.get("/osca/seniors/")
 def get_all_seniors(
     skip: int = 0,
