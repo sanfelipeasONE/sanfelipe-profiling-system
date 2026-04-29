@@ -3,17 +3,22 @@ import api from '../../api/api';
 import {
   Search, ChevronDown, ChevronUp,
   Loader2, Filter, FileBadge, Users,
-  ChevronLeft, ChevronRight, X, Archive, Edit, ShieldAlert
+  ChevronLeft, ChevronRight, X, Archive, Edit, ShieldAlert, IdCard
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from "react-dom";
 import ImportSeniorButton from './ImportSeniorButton';
+import { useNavigate } from 'react-router-dom';
 
 export default function SeniorList({ userRole, onEdit }) {
   const [seniors, setSeniors] = useState([]);
   const [barangayList, setBarangayList] = useState([]);
+  
+  // --- FILTERS STATE ---
   const [selectedBarangay, setSelectedBarangay] = useState('');
+  const [selectedAgeRange, setSelectedAgeRange] = useState(''); // NEW AGE FILTER
   const [searchTerm, setSearchTerm] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
 
@@ -29,6 +34,8 @@ export default function SeniorList({ userRole, onEdit }) {
   const isAdmin = role === "admin";
   const isSuperAdmin = role === "super_admin";
   const isOscaAdmin = role === "osca_admin";
+
+  const navigate = useNavigate();
 
   // --- HELPERS ---
   const calculateAge = (dob) => {
@@ -52,6 +59,7 @@ export default function SeniorList({ userRole, onEdit }) {
   const fetchSeniors = async (
     search = searchTerm,
     barangay = selectedBarangay,
+    ageRange = selectedAgeRange, // ADDED TO FETCH
     page = currentPage,
     limit = itemsPerPage
   ) => {
@@ -61,6 +69,7 @@ export default function SeniorList({ userRole, onEdit }) {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (barangay) params.append("barangay", barangay);
+      if (ageRange) params.append("age_range", ageRange); // SEND TO BACKEND
       params.append('skip', skip);
       params.append('limit', limit);
 
@@ -93,13 +102,15 @@ export default function SeniorList({ userRole, onEdit }) {
     fetchBarangays();
   }, []);
 
+  // ADDED selectedAgeRange to Dependency Array
   useEffect(() => {
-    fetchSeniors(searchTerm, selectedBarangay, currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, selectedBarangay, searchTerm]);
+    fetchSeniors(searchTerm, selectedBarangay, selectedAgeRange, currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage, selectedBarangay, selectedAgeRange, searchTerm]);
 
   // --- HANDLERS ---
   const handleSearchChange = (e) => { setSearchTerm(e.target.value); setCurrentPage(1); };
   const handleBarangayFilter = (e) => { setSelectedBarangay(e.target.value); setCurrentPage(1); };
+  const handleAgeFilter = (e) => { setSelectedAgeRange(e.target.value); setCurrentPage(1); }; // NEW HANDLER
   const handleLimitChange = (e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); };
   const toggleRow = (id) => { setExpandedRow(expandedRow === id ? null : id); };
 
@@ -110,7 +121,7 @@ export default function SeniorList({ userRole, onEdit }) {
       await api.put(`/osca/seniors/${archiveModal.id}/archive`);
       toast.success("Senior record archived successfully.");
       setArchiveModal({ isOpen: false, id: null, name: '' });
-      fetchSeniors(searchTerm, selectedBarangay, currentPage, itemsPerPage);
+      fetchSeniors(searchTerm, selectedBarangay, selectedAgeRange, currentPage, itemsPerPage);
     } catch (err) {
       toast.error("Failed to archive record.");
     } finally {
@@ -160,8 +171,6 @@ export default function SeniorList({ userRole, onEdit }) {
                 <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Date of Birth</p>
                 <p className="text-sm font-normal text-stone-800">{formatDate(r.birthdate)}</p>
               </div>
-              
-              {/* NEW FIELDS ADDED HERE */}
               <div>
                 <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Civil Status</p>
                 <p className="text-sm font-normal text-stone-800 uppercase">{r.civil_status || 'Unspecified'}</p>
@@ -170,7 +179,6 @@ export default function SeniorList({ userRole, onEdit }) {
                 <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Education</p>
                 <p className="text-sm font-normal text-stone-800 uppercase">{r.educational_attainment || 'Unspecified'}</p>
               </div>
-
             </div>
           </div>
 
@@ -224,6 +232,8 @@ export default function SeniorList({ userRole, onEdit }) {
       {/* --- TOOLBAR --- */}
       <div className="bg-stone-100 border border-stone-300 rounded-t-2xl p-4 md:p-5 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between shadow-sm">
          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full lg:flex-1">
+            
+            {/* SEARCH BAR */}
             <div className="relative w-full lg:max-w-md group">
                <div className="absolute left-3 md:left-4 top-3.5 text-stone-400 group-focus-within:text-red-600 transition-colors">
                   <Search size={18} strokeWidth={2} />
@@ -242,16 +252,34 @@ export default function SeniorList({ userRole, onEdit }) {
                )}
             </div>
 
-            <div className="relative w-full sm:w-48 shrink-0">
-               <select value={selectedBarangay} onChange={handleBarangayFilter} className="w-full appearance-none pl-3 md:pl-4 pr-9 md:pr-10 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-100 transition-all cursor-pointer shadow-sm uppercase truncate">
-                 <option value="">ALL BARANGAYS</option>
-                 {barangayList.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
-               </select>
-               <Filter className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
+            {/* FILTER ROW (Barangay + Age) */}
+            <div className="flex flex-row gap-3 w-full sm:w-auto">
+                {/* BARANGAY DROPDOWN */}
+                <div className="relative w-full sm:w-48 shrink-0 flex-1 sm:flex-none">
+                  <select value={selectedBarangay} onChange={handleBarangayFilter} className="w-full appearance-none pl-3 md:pl-4 pr-9 md:pr-10 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-100 transition-all cursor-pointer shadow-sm uppercase truncate">
+                    <option value="">ALL BARANGAYS</option>
+                    {barangayList.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
+                  </select>
+                  <Filter className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
+                </div>
+
+                {/* NEW AGE FILTER DROPDOWN */}
+                <div className="relative w-full sm:w-40 shrink-0 flex-1 sm:flex-none">
+                  <select value={selectedAgeRange} onChange={handleAgeFilter} className="w-full appearance-none pl-3 md:pl-4 pr-9 md:pr-10 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-100 transition-all cursor-pointer shadow-sm uppercase truncate">
+                    <option value="">ALL AGES</option>
+                    <option value="60-69">60-69 YEARS OLD</option>
+                    <option value="70-79">70-79 YEARS OLD</option>
+                    <option value="80-89">80-89 YEARS OLD</option>
+                    <option value="90-99">90-99 YEARS OLD</option>
+                    <option value="100-110">100-110 YEARS OLD</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
+                </div>
             </div>
          </div>
 
-         <div className="w-full lg:w-auto flex justify-end">
+         {/* LIMIT FILTER */}
+         <div className="w-full lg:w-auto flex justify-end mt-2 lg:mt-0">
            <div className="flex items-center gap-2 text-[11px] md:text-sm font-normal text-stone-600 bg-white px-3 md:px-4 py-2 rounded-xl border border-stone-300 shadow-sm">
                <span className="uppercase tracking-widest text-[10px]">Show:</span>
                <select value={itemsPerPage} onChange={handleLimitChange} className="bg-transparent font-medium text-stone-800 outline-none cursor-pointer hover:text-red-700 transition-colors">
@@ -272,7 +300,7 @@ export default function SeniorList({ userRole, onEdit }) {
                 <th className="py-3 md:py-4 px-3 md:px-5 w-10 md:w-12 text-center">#</th>
                 <th className="py-3 md:py-4 px-3 md:px-5">IDENTITY</th>
                 <th className="py-3 md:py-4 px-3 md:px-5">OSCA DETAILS</th>
-                <th className="py-3 md:py-4 px-3 md:px-5">LOCATION</th>
+                <th className="py-3 md:py-4 px-3 md:px-5">BARANGAY/PUROK</th>
                 <th className="py-3 md:py-4 px-3 md:px-5 text-right">ACTIONS</th>
               </tr>
             </thead>
@@ -348,10 +376,13 @@ export default function SeniorList({ userRole, onEdit }) {
                       {/* ACTIONS */}
                       <td className="py-3 md:py-4 px-3 md:px-5 text-right align-middle" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5 md:gap-2">
-                          <button onClick={() => onEdit(r)} className="p-2 md:p-2.5 bg-stone-100 text-stone-500 hover:bg-blue-600 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-blue-600 shrink-0" title="Edit Senior">
+                          <button onClick={() => onEdit(r)} className="p-2 md:p-2.5 bg-stone-100 text-stone-500 hover:bg-red-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-blue-600 shrink-0" title="Edit Senior">
                               <Edit size={14} className="md:w-4 md:h-4" strokeWidth={2} />
                           </button>
-                          <button onClick={() => setArchiveModal({ isOpen: true, id: r.id, name: `${r.first_name} ${r.last_name}` })} className="p-2 md:p-2.5 bg-stone-100 text-stone-500 hover:bg-orange-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-orange-700 shrink-0" title="Archive Senior">
+                          <button onClick={() => navigate(`/dashboard/seniors/${r.id}/card`)} className="p-2 md:p-2.5 bg-stone-100 text-stone-500 hover:bg-red-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-emerald-600 shrink-0" title="View ID Card">
+                              <IdCard size={14} className="md:w-4 md:h-4" strokeWidth={2} />
+                          </button>
+                          <button onClick={() => setArchiveModal({ isOpen: true, id: r.id, name: `${r.first_name} ${r.last_name}` })} className="p-2 md:p-2.5 bg-stone-100 text-stone-500 hover:bg-red-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-orange-700 shrink-0" title="Archive Senior">
                               <Archive size={14} className="md:w-4 md:h-4" strokeWidth={2} />
                           </button>
                         </div>
@@ -421,7 +452,6 @@ export default function SeniorList({ userRole, onEdit }) {
         </div>,
         document.body
       )}
-
     </div>
   );
 }

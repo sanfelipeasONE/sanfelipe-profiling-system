@@ -15,11 +15,12 @@ import PublicResidentPage from './pages/public/PublicResidentPage';
 import PublicLandingPage from './pages/public/PublicLandingPage';
 import AssistanceFlow from './components/assistance/AssistanceFlow';
 
-// NEW: Import the Senior Form
+// OSCA Components
 import AddSeniorForm from './components/seniors/AddSeniorForm';
 import SeniorList from './components/seniors/SeniorList';
 import OscaDashboard from './components/seniors/OscaDashboard';
 import ArchivedSeniors from './components/seniors/ArchivedSeniors';
+import SeniorIdCard from './components/seniors/SeniorIdCard'; // <-- ID Card Component
 
 const DashboardLayout = ({ userRole, onLogout, onResetView }) => {
   return (
@@ -107,7 +108,6 @@ export default function App() {
           )
         }
       >
-        {/* CORRECTED OVERVIEW ROUTE */}
         <Route
           path="overview"
           element={
@@ -175,6 +175,16 @@ export default function App() {
                     onCancel={handleFinishSeniorEditing}
                   />
                 )
+              : <Navigate to="/dashboard/overview" replace />
+          }
+        />
+
+        {/* ---> MISSING ID CARD ROUTE ADDED HERE <--- */}
+        <Route
+          path="seniors/:id/card"
+          element={
+            role === "osca_admin" || role === "super_admin"
+              ? <SeniorIdCard />
               : <Navigate to="/dashboard/overview" replace />
           }
         />
