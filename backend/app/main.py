@@ -1716,11 +1716,21 @@ async def import_seniors(
                     
                 # Clean Dates safely
                 def clean_date(val):
-                    if pd.isna(val) or str(val).lower() == 'nan': return None
+                    if pd.isna(val) or str(val).strip().lower() in ['nan', 'none', '', 'nat']: 
+                        return None
                     try:
                         return pd.to_datetime(val).strftime('%Y-%m-%d')
                     except:
                         return None
+
+                birthdate = clean_date(row.get('BIRTHDAY', None))
+                date_issued = clean_date(row.get('DATE ISSUED', None))
+
+                # --- 🚨 NEW STRICT DATE CHECK 🚨 ---
+                if not birthdate:
+                    print(f"⚠️ SKIPPED (NO BIRTHDAY): OSCA ID {osca_id} ({name_raw}) was skipped because their birthday is blank or invalid!")
+                    error_count += 1
+                    continue
 
                 birthdate = clean_date(row.get('BIRTHDAY', None))
                 date_issued = clean_date(row.get('DATE ISSUED', None))
@@ -1757,9 +1767,9 @@ async def import_seniors(
                 success_count += 1
                 
             except Exception as row_error:
-                # If a specific row fails, we rollback JUST that row and continue to the next
+                # If a specific row fails, we rollback JUST that row
                 db.rollback() 
-                print(f"Skipped Row {index} due to error: {str(row_error)}")
+                print(f"⚠️ DATABASE ERROR (Row {index}): {str(row_error)}")
                 error_count += 1
                 continue
             # ========================================================
