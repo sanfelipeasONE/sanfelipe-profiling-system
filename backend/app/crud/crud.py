@@ -779,6 +779,7 @@ def create_senior_citizen(db: Session, senior: schemas.SeniorCitizenCreate):
         first_name=senior.first_name.strip().upper(),
         middle_name=senior.middle_name.strip().upper() if senior.middle_name else "",
         ext_name=senior.ext_name.strip().upper() if senior.ext_name else "",
+        sex=senior.sex.strip().upper(),
         birthdate=senior.birthdate,
         date_issued=senior.date_issued,
         house_no=senior.house_no,
@@ -820,24 +821,6 @@ def get_senior_by_control_no(db: Session, control_no: str):
         models.SeniorCitizen.osca_control_no == control_no
     ).first()
 
-def create_senior_citizen(db: Session, senior: schemas.SeniorCitizenCreate):
-    db_senior = models.SeniorCitizen(
-        osca_control_no=senior.osca_control_no,
-        last_name=senior.last_name.strip().upper(),
-        first_name=senior.first_name.strip().upper(),
-        middle_name=senior.middle_name.strip().upper() if senior.middle_name else "",
-        ext_name=senior.ext_name.strip().upper() if senior.ext_name else "",
-        birthdate=senior.birthdate,
-        date_issued=senior.date_issued,
-        house_no=senior.house_no,
-        purok=senior.purok.strip().upper(),
-        barangay=senior.barangay.strip().upper()
-    )
-    db.add(db_senior)
-    db.commit()
-    db.refresh(db_senior)
-    return db_senior
-
 def get_senior_count(db: Session, search: str = None, barangay: str = None):
     query = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.is_active == True)
     query = apply_senior_search_filter(query, search)
@@ -855,3 +838,40 @@ def get_senior_citizens(db: Session, skip: int = 0, limit: int = 20, search: str
         models.SeniorCitizen.last_name.asc(),
         models.SeniorCitizen.first_name.asc()
     ).offset(skip).limit(limit).all()
+    
+def get_osca_dashboard_stats(db: Session):
+    # Total seniors
+    total_seniors = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.is_active == True).count()
+    
+    # Get counts grouped by barangay and sex
+    stats_query = db.query(
+        func.upper(func.trim(models.SeniorCitizen.barangay)).label("barangay"),
+        models.SeniorCitizen.sex,
+        func.count(models.SeniorCitizen.id).label("count")
+    ).filter(
+        models.SeniorCitizen.is_active == True
+    ).group_by(
+        func.upper(func.trim(models.SeniorCitizen.barangay)),
+        models.SeniorCitizen.sex
+    ).all()
+
+    # Format data into a dictionary for the frontend table
+    # Example format: { "FARAÑAL": { "Male": 10, "Female": 15, "Total": 25 } }
+    barangay_stats = {}
+    for barangay, sex, count in stats_query:
+        if not barangay:
+            continue
+            
+        if barangay not in barangay_stats:
+            barangay_stats[barangay] = {"Male": 0, "Female": 0, "Total": 0}
+            
+        # Normalize sex to Male/Female keys
+        sex_key = "Male" if sex and sex.upper() in ["M", "MALE"] else "Female"
+        
+        barangay_stats[barangay][sex_key] += count
+        barangay_stats[barangay]["Total"] += count
+
+    return {
+        "total_seniors": total_seniors,
+        "barangay_data": barangay_stats
+    }

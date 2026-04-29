@@ -1536,3 +1536,10 @@ def get_all_seniors(
         "page": (skip // limit) + 1,
         "size": limit
     }
+
+@app.get("/osca/stats")
+def get_osca_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    return crud.get_osca_dashboard_stats(db)

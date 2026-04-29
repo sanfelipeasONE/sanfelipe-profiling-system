@@ -330,6 +330,7 @@ class SeniorCitizenBase(BaseModel):
     first_name: str
     middle_name: Optional[str] = None
     ext_name: Optional[str] = None
+    sex: str
     birthdate: date
     date_issued: date
     house_no: Optional[str] = None

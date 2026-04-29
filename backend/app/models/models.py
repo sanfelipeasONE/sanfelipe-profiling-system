@@ -203,6 +203,7 @@ class SeniorCitizen(Base):
     first_name = Column(String, index=True)
     middle_name = Column(String, nullable=True)
     ext_name = Column(String, nullable=True)
+    sex = Column(String, nullable=False)
     
     birthdate = Column(Date, nullable=False)
     date_issued = Column(Date, nullable=False)
