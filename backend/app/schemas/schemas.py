@@ -336,6 +336,7 @@ class SeniorCitizenBase(BaseModel):
     house_no: Optional[str] = None
     purok: str
     barangay: str
+    photo_url: Optional[str] = None
 
 class SeniorCitizenCreate(SeniorCitizenBase):
     pass
@@ -344,6 +345,7 @@ class SeniorCitizenResponse(SeniorCitizenBase):
     id: int
     is_active: bool
     created_at: datetime
+    photo_url: Optional[str] = None
 
     class Config:
         from_attributes = True

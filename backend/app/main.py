@@ -1543,3 +1543,38 @@ def get_osca_stats(
     current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
 ):
     return crud.get_osca_dashboard_stats(db)
+
+@app.post("/osca/seniors/{senior_id}/upload-photo")
+async def upload_senior_photo(
+    senior_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    senior = db.query(models.SeniorCitizen).filter(
+        models.SeniorCitizen.id == senior_id,
+        models.SeniorCitizen.is_active == True
+    ).first()
+
+    if not senior:
+        raise HTTPException(status_code=404, detail="Senior Citizen not found")
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    try:
+        # Upload to Cloudinary (using a dedicated OSCA folder)
+        result = cloudinary.uploader.upload(
+            file.file,
+            folder="osca_seniors",
+            public_id=f"senior_{senior.id}",
+            overwrite=True
+        )
+
+        senior.photo_url = result["secure_url"]
+        db.commit()
+
+        return {"message": "Photo uploaded successfully", "photo_url": senior.photo_url}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

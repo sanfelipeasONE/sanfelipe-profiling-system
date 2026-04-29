@@ -213,6 +213,8 @@ class SeniorCitizen(Base):
     purok = Column(String)
     barangay = Column(String)
     
+    photo_url = Column(String, nullable=True)
+    
     # System Fields
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
