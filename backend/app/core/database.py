@@ -15,12 +15,13 @@ if not DATABASE_URL:
 
 print("Connecting to database...")
 
+# --- UPDATED CONNECTION POOL SETTINGS ---
 engine = create_engine(
     DATABASE_URL, 
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=1800
+    pool_size=20,        # Increased from 5 to 20 to handle large imports
+    max_overflow=10,     # Allow 10 extra connections during traffic spikes
+    pool_timeout=60,     # Wait 60 seconds instead of 30 before timing out
+    pool_recycle=1800    # Refresh connections every 30 minutes
 )
 
 SessionLocal = sessionmaker(
