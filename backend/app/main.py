@@ -11,6 +11,8 @@ import qrcode
 import json, zipfile
 import cloudinary.uploader
 from io import BytesIO
+import pandas as pd
+import math
 
 # Authentication
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -1654,3 +1656,139 @@ def edit_senior_citizen(
         raise HTTPException(status_code=404, detail="Senior not found")
         
     return result
+
+@app.post("/osca/seniors/import")
+async def import_seniors(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Only CSV or Excel files are allowed.")
+        
+    contents = await file.read()
+    
+    try:
+        # Read the file
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents), header=None, encoding='utf-8', on_bad_lines='skip')
+        else:
+            df = pd.read_excel(io.BytesIO(contents), header=None)
+            
+        # 1. Find the actual Header Row (look for the row containing "NAME" and "OSCA ID NO.")
+        header_idx = -1
+        for i, row in df.iterrows():
+            row_str = " ".join([str(val).upper() for val in row.dropna()]).upper()
+            if "NAME" in row_str and "OSCA ID" in row_str:
+                header_idx = i
+                break
+                
+        if header_idx == -1:
+            raise HTTPException(status_code=400, detail="Could not detect a valid table header containing 'NAME' and 'OSCA ID NO.'")
+            
+        # 2. Extract Gender from the title rows (e.g. "AGE: 60-69 MALE")
+        inferred_sex = "Unspecified"
+        for i in range(max(0, header_idx - 7), header_idx):
+            row_str = " ".join([str(val).upper() for val in df.iloc[i].dropna()]).upper()
+            if "MALE" in row_str and "FEMALE" not in row_str:
+                inferred_sex = "Male"
+            elif "FEMALE" in row_str:
+                inferred_sex = "Female"
+                
+        # Fallback to filename if not found in text
+        if inferred_sex == "Unspecified":
+            fname = file.filename.upper()
+            if "FEMALE" in fname: inferred_sex = "Female"
+            elif "MALE" in fname: inferred_sex = "Male"
+
+        # 3. Clean up the DataFrame
+        df.columns = df.iloc[header_idx]
+        df = df.iloc[header_idx + 1:].reset_index(drop=True)
+        df.columns = [str(c).strip().upper() for c in df.columns]
+        
+        success_count = 0
+        error_count = 0
+        
+        for _, row in df.iterrows():
+            name_raw = str(row.get('NAME', '')).strip()
+            if not name_raw or name_raw.lower() == 'nan':
+                continue
+                
+            osca_id = str(row.get('OSCA ID NO.', '')).strip()
+            if osca_id.lower() == 'nan' or not osca_id: 
+                continue # Skip rows without OSCA IDs
+            
+            # 4. Parse Name: "Lastname, Firstname M. Ext"
+            last_name = ""
+            first_name = ""
+            middle_name = ""
+            ext_name = ""
+            
+            if "," in name_raw:
+                parts = name_raw.split(",", 1)
+                last_name = parts[0].strip()
+                rest = parts[1].strip().split()
+                
+                # Extract Suffix (Jr, Sr, etc.)
+                if rest and rest[-1].upper() in ['JR', 'JR.', 'SR', 'SR.', 'II', 'III', 'IV']:
+                    ext_name = rest.pop().replace('.', '')
+                
+                # Extract Middle Initial
+                if rest and len(rest[-1]) <= 2 and rest[-1].upper() != 'MA':
+                    middle_name = rest.pop().replace('.', '')
+                    
+                first_name = " ".join(rest)
+            else:
+                last_name = name_raw
+                
+            # Date Cleaning
+            def clean_date(val):
+                if pd.isna(val) or str(val).lower() == 'nan': return None
+                try:
+                    return pd.to_datetime(val).strftime('%Y-%m-%d')
+                except:
+                    return None
+
+            birthdate = clean_date(row.get('BIRTHDAY', None))
+            date_issued = clean_date(row.get('DATE ISSUED', None))
+            
+            barangay = str(row.get('BARANGAY', '')).strip()
+            if barangay.lower() == 'nan': barangay = "Unspecified"
+            
+            civil_status = str(row.get('CIVIL STATUS', '')).strip()
+            if civil_status.lower() == 'nan': civil_status = "Unspecified"
+            
+            educ = str(row.get('EDUCATIONAL ATTAINMENT', '')).strip()
+            if educ.lower() == 'nan': educ = "Unspecified"
+
+            # 5. Check for duplicates
+            existing = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.osca_control_no == osca_id).first()
+            if existing:
+                error_count += 1
+                continue
+                
+            db_senior = models.SeniorCitizen(
+                osca_control_no=osca_id,
+                last_name=last_name.upper()[:50],
+                first_name=first_name.upper()[:50],
+                middle_name=middle_name.upper()[:50],
+                ext_name=ext_name.upper()[:10],
+                sex=inferred_sex,
+                birthdate=birthdate,
+                date_issued=date_issued,
+                barangay=barangay.upper(),
+                civil_status=civil_status.title(),
+                educational_attainment=educ.upper(),
+                purok="Unspecified",
+                house_no="",
+                is_active=True
+            )
+            db.add(db_senior)
+            success_count += 1
+            
+        db.commit()
+        return {"success_count": success_count, "error_count": error_count, "message": f"Successfully imported {success_count} seniors."}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
