@@ -15,6 +15,12 @@ import PublicResidentPage from './pages/public/PublicResidentPage';
 import PublicLandingPage from './pages/public/PublicLandingPage';
 import AssistanceFlow from './components/assistance/AssistanceFlow';
 
+// NEW: Import the Senior Form
+import AddSeniorForm from './components/seniors/AddSeniorForm';
+import SeniorList from './components/seniors/SeniorList';
+import OscaDashboard from './components/seniors/OscaDashboard';
+import ArchivedSeniors from './components/seniors/ArchivedSeniors';
+
 const DashboardLayout = ({ userRole, onLogout, onResetView }) => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -36,6 +42,9 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentResident, setCurrentResident] = useState(null);
 
+  const [isEditingSenior, setIsEditingSenior] = useState(false);
+  const [currentSenior, setCurrentSenior] = useState(null);
+
   const handleEditInitiated = (resident) => {
     setCurrentResident(resident);
     setIsEditing(true);
@@ -44,6 +53,16 @@ export default function App() {
   const handleFinishEditing = () => {
     setIsEditing(false);
     setCurrentResident(null);
+  };
+
+  const handleEditSeniorInitiated = (senior) => {
+    setCurrentSenior(senior);
+    setIsEditingSenior(true);
+  };
+
+  const handleFinishSeniorEditing = () => {
+    setIsEditingSenior(false);
+    setCurrentSenior(null);
   };
 
   const handleLogin = (newRole, username) => {
@@ -88,12 +107,17 @@ export default function App() {
           )
         }
       >
+        {/* CORRECTED OVERVIEW ROUTE */}
         <Route
           path="overview"
           element={
-            role === "admin" || role === "admin_limited" || role === "super_admin"
-              ? <DashboardStats userRole={role} />
-              : <Navigate to="/dashboard/residents" replace />
+            role === "osca_admin" ? (
+              <OscaDashboard />
+            ) : role === "admin" || role === "admin_limited" || role === "super_admin" ? (
+              <DashboardStats userRole={role} />
+            ) : (
+              <Navigate to="/dashboard/residents" replace />
+            )
           }
         />
 
@@ -125,6 +149,45 @@ export default function App() {
           path="create"
           element={<AddResidentForm onSuccess={handleFinishEditing} />}
         />
+
+        {/* ========================================= */}
+        {/* NEW OSCA ROUTES */}
+        {/* ========================================= */}
+        <Route
+          path="create-senior"
+          element={
+            role === "osca_admin" || role === "super_admin"
+              ? <AddSeniorForm onSuccess={handleFinishEditing} onCancel={handleFinishEditing} />
+              : <Navigate to="/dashboard/overview" replace />
+          }
+        />
+
+        <Route
+          path="seniors"
+          element={
+            role === "osca_admin" || role === "super_admin"
+              ? !isEditingSenior ? (
+                  <SeniorList userRole={role} onEdit={handleEditSeniorInitiated} />
+                ) : (
+                  <AddSeniorForm
+                    seniorToEdit={currentSenior}
+                    onSuccess={handleFinishSeniorEditing}
+                    onCancel={handleFinishSeniorEditing}
+                  />
+                )
+              : <Navigate to="/dashboard/overview" replace />
+          }
+        />
+
+        <Route
+          path="osca-archived"
+          element={
+            role === "osca_admin" || role === "super_admin"
+              ? <ArchivedSeniors userRole={role} />
+              : <Navigate to="/dashboard/overview" replace />
+          }
+        />
+        {/* ========================================= */}
 
         <Route path="users" element={<UserManagement />} />
         <Route path="archived" element={<ArchivedResidents />} />

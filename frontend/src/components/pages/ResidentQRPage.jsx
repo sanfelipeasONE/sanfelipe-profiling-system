@@ -865,8 +865,6 @@ export default function ResidentQRPage() {
           ))}
         </div>
 
-        {/* ── Canvas slider (mobile) / stacked (print + desktop) ── */}
-
         {/* Print-only: both canvases always visible and stacked */}
         <div
           id="qr-print-area"

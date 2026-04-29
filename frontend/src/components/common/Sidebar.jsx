@@ -10,7 +10,8 @@ import {
   Settings,
   QrCode,
   ArchiveRestore,
-  HeartHandshake
+  HeartHandshake,
+  FileBadge
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -26,27 +27,41 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   const isSuperAdmin = role === "super_admin";
   const isAdminLimited = role === "admin_limited";
   const isAdminLike = isAdmin || isSuperAdmin || isAdminLimited;
+  const isOscaAdmin = role === "osca_admin"; 
 
   const roleLabel =
-    role === "super_admin" ? "Admin" :
+    role === "super_admin" ? "Super Admin" :
     role === "admin" ? "Admin" :
     role === "admin_limited" ? "Admin" :
     role === "barangay" ? "Barangay" :
+    role === "osca_admin" ? "OSCA Admin" : 
     "User";
 
   const allMenuItems = [
-    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin_like' },
-    { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
-    { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
-    { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, role: 'admin_plus' },
-    { label: 'Assistance', path: '/dashboard/assistance', Icon: HeartHandshake, role: 'admin_plus' },
-    { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, role: 'admin_plus' },
+    // Standard LGU Routes
+    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, view: 'standard' },
+    { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, view: 'standard' },
+    { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, view: 'standard' },
+    { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, view: 'admin' },
+    { label: 'Assistance', path: '/dashboard/assistance', Icon: HeartHandshake, view: 'admin' },
+    { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, view: 'admin' },
+    
+    // OSCA Isolated Routes
+    { label: 'OSCA Overview', path: '/dashboard/overview', Icon: LayoutDashboard, view: 'osca' },
+    { label: 'Senior Citizens Database', path: '/dashboard/seniors', Icon: Users, view: 'osca' },
+    { label: 'Register a Senior Citizen', path: '/dashboard/create-senior', Icon: FileBadge, view: 'osca' },
+    { label: 'Archived Senior Citizens', path: '/dashboard/osca-archived', Icon: ArchiveRestore, view: 'osca' },
   ];
 
   const menuItems = allMenuItems.filter(item => {
-    if (item.role === 'all') return true;
-    if (item.role === 'admin_like' && isAdminLike) return true;
-    if (item.role === 'admin_plus' && (isAdmin || isSuperAdmin)) return true;
+    // 1. OSCA Admin only sees OSCA views
+    if (isOscaAdmin) return item.view === 'osca'; 
+    
+    // 2. Standard User / Admin Routing
+    if (item.view === 'osca') return false; 
+    if (item.view === 'standard') return true;
+    if (item.view === 'admin' && (isAdmin || isSuperAdmin || isAdminLimited)) return true;
+    
     return false;
   });
 
@@ -131,14 +146,16 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
-          <div className="mb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Main Menu</div>
+          <div className="mb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            {isOscaAdmin ? "OSCA Menu" : "Main Menu"}
+          </div>
           <div className="space-y-1">
-            {menuItems.map((item) => (
-              <NavItem key={item.path} label={item.label} path={item.path} Icon={item.Icon} />
+            {menuItems.map((item, idx) => (
+              <NavItem key={idx} label={item.label} path={item.path} Icon={item.Icon} />
             ))}
           </div>
 
-          {(isAdmin || isSuperAdmin) && (
+          {(isAdmin || isSuperAdmin) && !isOscaAdmin && (
             <div className="mt-8">
               <div className="mb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Administration</div>
               <NavItem label="User Management" path="/dashboard/users" Icon={Settings} />
@@ -152,7 +169,7 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
               {userRole?.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-800 capitalize truncate">{roleLabel} Account</p>
+              <p className="text-sm font-bold text-slate-800 capitalize truncate">{roleLabel}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
