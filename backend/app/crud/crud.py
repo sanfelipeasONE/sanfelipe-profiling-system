@@ -784,7 +784,9 @@ def create_senior_citizen(db: Session, senior: schemas.SeniorCitizenCreate):
         date_issued=senior.date_issued,
         house_no=senior.house_no,
         purok=senior.purok.strip().upper(),
-        barangay=senior.barangay.strip().upper()
+        barangay=senior.barangay.strip().upper(),
+        civil_status=senior.civil_status,
+        educational_attainment=senior.educational_attainment,
     )
     
     db.add(db_senior)
@@ -892,6 +894,10 @@ def update_senior_citizen(db: Session, senior_id: int, senior_data: schemas.Seni
     db_senior.house_no = senior_data.house_no
     db_senior.purok = senior_data.purok.strip().upper()
     db_senior.barangay = senior_data.barangay.strip().upper()
+    
+    # NEW FIELDS ADDED HERE
+    db_senior.civil_status = senior_data.civil_status
+    db_senior.educational_attainment = senior_data.educational_attainment
     
     db.commit()
     db.refresh(db_senior)

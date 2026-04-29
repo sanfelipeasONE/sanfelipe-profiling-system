@@ -337,6 +337,8 @@ class SeniorCitizenBase(BaseModel):
     purok: str
     barangay: str
     photo_url: Optional[str] = None
+    civil_status: Optional[str] = None
+    educational_attainment: Optional[str] = None
 
 class SeniorCitizenCreate(SeniorCitizenBase):
     pass

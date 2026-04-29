@@ -205,6 +205,9 @@ class SeniorCitizen(Base):
     ext_name = Column(String, nullable=True)
     sex = Column(String, nullable=False)
     
+    civil_status = Column(String, nullable=True)
+    educational_attainment = Column(String, nullable=True)
+    
     birthdate = Column(Date, nullable=False)
     date_issued = Column(Date, nullable=False)
     
