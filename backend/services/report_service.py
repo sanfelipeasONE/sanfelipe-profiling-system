@@ -74,9 +74,12 @@ def generate_household_excel(
         models.ResidentProfile.last_name
     ).all()
 
-    # 2️⃣ DETERMINE MAX ASSISTANCES FOR COLUMNS (Replaced Family Members)
+    # 2️⃣ DETERMINE MAX COUNTS FOR DYNAMIC COLUMNS
+    max_family_count = 0
     max_assistance_count = 0
+    
     for r in residents:
+        max_family_count = max(max_family_count, len(r.family_members))
         max_assistance_count = max(max_assistance_count, len(r.assistances))
 
     # 3️⃣ TRANSFORM DATA INTO LIST FOR PANDAS
@@ -93,6 +96,8 @@ def generate_household_excel(
             s_mi = f"{r.spouse_middle_name[0]}." if r.spouse_middle_name else ""
             spouse_name = f"{r.spouse_last_name}, {r.spouse_first_name} {s_mi} {r.spouse_ext_name or ''}".strip()
 
+        total_members = 1 + len(r.family_members)
+
         # Prepare base row
         row = {
             "Barangay": r.barangay.upper() if r.barangay else "",
@@ -108,10 +113,26 @@ def generate_household_excel(
             "Occupation": r.occupation or "",
             "Precinct No": r.precinct_no or "",
             "Contact": r.contact_no or "",
+            "Total Members": total_members,
             "Sectors": r.sector_summary or "NONE",
         }
 
-        # Add dynamic Assistance columns (Replaced Family Members)
+        # --- DYNAMIC FAMILY MEMBERS ---
+        for i in range(max_family_count):
+            prefix = f"Member {i+1}"
+            if i < len(r.family_members):
+                fm = r.family_members[i]
+                row[f"{prefix} Last Name"] = fm.last_name.upper() if fm.last_name else ""
+                row[f"{prefix} First Name"] = fm.first_name.upper() if fm.first_name else ""
+                row[f"{prefix} Middle Name"] = fm.middle_name.upper() if fm.middle_name else ""
+                row[f"{prefix} Relationship"] = fm.relationship.upper() if fm.relationship else ""
+            else:
+                row[f"{prefix} Last Name"] = ""
+                row[f"{prefix} First Name"] = ""
+                row[f"{prefix} Middle Name"] = ""
+                row[f"{prefix} Relationship"] = ""
+
+        # --- DYNAMIC ASSISTANCE RECORDS ---
         for i in range(max_assistance_count):
             prefix = f"Asst {i+1}"
             if i < len(r.assistances):
