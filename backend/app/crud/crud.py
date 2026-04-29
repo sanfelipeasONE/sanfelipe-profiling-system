@@ -875,3 +875,27 @@ def get_osca_dashboard_stats(db: Session):
         "total_seniors": total_seniors,
         "barangay_data": barangay_stats
     }
+
+def archive_senior(db: Session, senior_id: int):
+    senior = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.id == senior_id).first()
+    if not senior:
+        return None
+        
+    senior.is_active = False # Hides them from the main list
+    
+    # Break the unique constraint safely so the number can be reused if needed
+    if senior.osca_control_no:
+        senior.osca_control_no = f"{senior.osca_control_no}_ARC{senior.id}"
+        
+    db.commit()
+    db.refresh(senior)
+    return senior
+
+def permanently_delete_senior(db: Session, senior_id: int):
+    senior = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.id == senior_id).first()
+    if not senior:
+        return None
+        
+    db.delete(senior)
+    db.commit()
+    return True

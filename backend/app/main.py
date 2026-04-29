@@ -1578,3 +1578,26 @@ async def upload_senior_photo(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/osca/seniors/{senior_id}/archive")
+def archive_senior_endpoint(
+    senior_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    result = crud.archive_senior(db, senior_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Senior not found")
+    return {"message": "Senior archived successfully"}
+
+
+@app.delete("/osca/seniors/{senior_id}/permanent")
+def permanent_delete_senior_endpoint(
+    senior_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    result = crud.permanently_delete_senior(db, senior_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Senior not found")
+    return {"message": "Senior permanently deleted"}
