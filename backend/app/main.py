@@ -1526,3 +1526,23 @@ def get_all_seniors(
 ):
     # Fetch using CRUD
     return crud.get_senior_citizens(db, skip=skip, limit=limit)
+
+@app.get("/osca/seniors/")
+def get_all_seniors(
+    skip: int = 0,
+    limit: int = 20,
+    search: str = Query(None),
+    barangay: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_any_role(["osca_admin", "super_admin"]))
+):
+    total = crud.get_senior_count(db, search=search, barangay=barangay)
+    seniors = crud.get_senior_citizens(db, skip=skip, limit=limit, search=search, barangay=barangay)
+    
+    # Return paginated format expected by the frontend
+    return {
+        "items": seniors,
+        "total": total,
+        "page": (skip // limit) + 1,
+        "size": limit
+    }

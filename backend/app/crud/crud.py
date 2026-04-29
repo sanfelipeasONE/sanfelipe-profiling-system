@@ -796,3 +796,62 @@ def get_senior_citizens(db: Session, skip: int = 0, limit: int = 100):
         models.SeniorCitizen.last_name.asc(),
         models.SeniorCitizen.first_name.asc()
     ).offset(skip).limit(limit).all()
+    
+def apply_senior_search_filter(query, search: str):
+    if not search:
+        return query
+    cleaned = search.strip().upper()
+    word_fmt = f"%{cleaned}%"
+    
+    return query.filter(
+        or_(
+            models.SeniorCitizen.last_name.ilike(word_fmt),
+            models.SeniorCitizen.first_name.ilike(word_fmt),
+            models.SeniorCitizen.osca_control_no.ilike(word_fmt),
+            func.concat(
+                func.coalesce(models.SeniorCitizen.last_name, ""), " ",
+                func.coalesce(models.SeniorCitizen.first_name, "")
+            ).ilike(word_fmt),
+        )
+    )
+
+def get_senior_by_control_no(db: Session, control_no: str):
+    return db.query(models.SeniorCitizen).filter(
+        models.SeniorCitizen.osca_control_no == control_no
+    ).first()
+
+def create_senior_citizen(db: Session, senior: schemas.SeniorCitizenCreate):
+    db_senior = models.SeniorCitizen(
+        osca_control_no=senior.osca_control_no,
+        last_name=senior.last_name.strip().upper(),
+        first_name=senior.first_name.strip().upper(),
+        middle_name=senior.middle_name.strip().upper() if senior.middle_name else "",
+        ext_name=senior.ext_name.strip().upper() if senior.ext_name else "",
+        birthdate=senior.birthdate,
+        date_issued=senior.date_issued,
+        house_no=senior.house_no,
+        purok=senior.purok.strip().upper(),
+        barangay=senior.barangay.strip().upper()
+    )
+    db.add(db_senior)
+    db.commit()
+    db.refresh(db_senior)
+    return db_senior
+
+def get_senior_count(db: Session, search: str = None, barangay: str = None):
+    query = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.is_active == True)
+    query = apply_senior_search_filter(query, search)
+    if barangay:
+        query = query.filter(func.upper(models.SeniorCitizen.barangay) == barangay.upper())
+    return query.count()
+
+def get_senior_citizens(db: Session, skip: int = 0, limit: int = 20, search: str = None, barangay: str = None):
+    query = db.query(models.SeniorCitizen).filter(models.SeniorCitizen.is_active == True)
+    query = apply_senior_search_filter(query, search)
+    if barangay:
+        query = query.filter(func.upper(models.SeniorCitizen.barangay) == barangay.upper())
+        
+    return query.order_by(
+        models.SeniorCitizen.last_name.asc(),
+        models.SeniorCitizen.first_name.asc()
+    ).offset(skip).limit(limit).all()
