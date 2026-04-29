@@ -1171,79 +1171,36 @@ def get_stats(db: Session = Depends(get_db),
 @app.get("/export/excel")
 def export_residents_excel(
     barangay: str = Query(None),
+    sector: str = Query(None), # NEW
+    filter_status: str = Query(None), # NEW
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Restrict barangay automatically for non-admin
     target_barangay = barangay
-
     if current_user.role not in ["admin", "admin_limited", "super_admin"]:
         official_name = BARANGAY_MAPPING.get(current_user.username.lower())
-
-        if official_name:
-            target_barangay = official_name
-        else:
-            target_barangay = current_user.username.replace("_", " ").title()
+        target_barangay = official_name if official_name else current_user.username.replace("_", " ").title()
 
     try:
         excel_file = report_service.generate_household_excel(
             db,
-            barangay_name=target_barangay
+            barangay_name=target_barangay,
+            sector=sector,
+            filter_status=filter_status,
+            is_super_admin=(current_user.role == "super_admin")
         )
 
-        clean_name = (
-            target_barangay.replace(" ", "_")
-            if target_barangay else "All"
-        )
-
-        filename = f"SanFelipe_Households_{clean_name}.xlsx"
-
-        return StreamingResponse(
-            iter([excel_file.getvalue()]),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/export/excel")
-def export_residents_excel(
-    barangay: str = Query(None),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    # Restrict barangay automatically for non-admin
-    target_barangay = barangay
-
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
-        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
-
-        if official_name:
-            target_barangay = official_name
-        else:
-            target_barangay = current_user.username.replace("_", " ").title()
-
-    try:
-        excel_file = report_service.generate_household_excel(
-            db,
-            barangay_name=target_barangay
-        )
-
-        clean_name = (
-            target_barangay.replace(" ", "_")
-            if target_barangay else "All"
-        )
-
-        filename = f"SanFelipe_Residents_{clean_name}.xlsx"
+        # Create a descriptive filename
+        status_part = "Updated_" if filter_status == "updated" else ""
+        sector_part = f"{sector}_" if sector else ""
+        brgy_part = target_barangay.replace(" ", "_") if target_barangay else "All"
+        filename = f"SanFelipe_{status_part}{sector_part}{brgy_part}.xlsx"
 
         return StreamingResponse(
             excel_file,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            }
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
