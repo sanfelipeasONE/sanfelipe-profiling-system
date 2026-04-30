@@ -90,11 +90,11 @@ export default function SeniorIdCard() {
             minHeight: '2.125in',
             fontFamily: 'Arial, sans-serif',
             position: 'relative',
-            overflow: 'hidden', // CHANGED: Keeps diagonal bars strictly inside the card
+            overflow: 'visible',
             background: '#fff',
             boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
-            border: '4px solid #b91c1c', // CHANGED: Full border all around
-            borderRadius: '8px', // ADDED: Smooth PVC corners
+            borderLeft: '4px solid #b91c1c',
+            borderRight: '4px solid #b91c1c',
             display: 'flex',
             flexDirection: 'column',
           }}
@@ -329,8 +329,8 @@ export default function SeniorIdCard() {
             background: '#f5f5f5',
             backgroundImage: bgPattern,
             boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
-            border: '4px solid #b91c1c', // CHANGED: Full border all around
-            borderRadius: '8px', // ADDED: Smooth PVC corners
+            borderLeft: '4px solid #b91c1c',
+            borderRight: '4px solid #b91c1c',
             display: 'flex',
             flexDirection: 'column',
           }}
@@ -391,33 +391,54 @@ export default function SeniorIdCard() {
             display: 'flex',
             justifyContent: 'space-around',
             alignItems: 'flex-end',
-            padding: '6px 16px 6px 16px',
+            padding: '16px 16px 6px 16px', 
             borderTop: 'none',
           }}>
             {/* OSCA Head */}
-            <div style={{ textAlign: 'center', minWidth: '100px' }}>
-              {/* Signature placeholder line */}
-              <div style={{
-                borderBottom: '1.5px solid #111',
-                marginBottom: '2px',
-                height: '18px',
-              }} />
-              <div style={{ fontWeight: '900', fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+            <div style={{ textAlign: 'center', minWidth: '100px', position: 'relative' }}>
+              <img
+                src="/Sunny Rodin-Signature.png"
+                alt="Sunny A. Rodin Signature"
+                style={{
+                  position: 'absolute',
+                  bottom: '15px', // Increased to push signature UP
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  height: '42px', 
+                  objectFit: 'contain',
+                  zIndex: 10,
+                  pointerEvents: 'none'
+                }}
+              />
+              <div style={{ height: '16px' }}></div>
+              <div style={{ fontWeight: '900', fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.02em', position: 'relative', zIndex: 1 }}>
                 SUNNY A. RODIN
               </div>
+              <div style={{ borderBottom: '1.5px solid #111', margin: '2px 0' }} />
               <div style={{ fontSize: '6px', fontWeight: '600', color: '#333' }}>OSCA HEAD</div>
             </div>
 
             {/* Mayor */}
-            <div style={{ textAlign: 'center', minWidth: '120px' }}>
-              <div style={{
-                borderBottom: '1.5px solid #111',
-                marginBottom: '2px',
-                height: '18px',
-              }} />
-              <div style={{ fontWeight: '900', fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+            <div style={{ textAlign: 'center', minWidth: '120px', position: 'relative' }}>
+              <img
+                src="/Mayor-Signature.png"
+                alt="Mayor Signature"
+                style={{
+                  position: 'absolute',
+                  bottom: '6px', // Increased to push signature UP
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  height: '48px', 
+                  objectFit: 'contain',
+                  zIndex: 10,
+                  pointerEvents: 'none'
+                }}
+              />
+              <div style={{ height: '16px' }}></div> 
+              <div style={{ fontWeight: '900', fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.02em', position: 'relative', zIndex: 1 }}>
                 ENGR. REINHARD E. JERESANO
               </div>
+              <div style={{ borderBottom: '1.5px solid #111', margin: '2px 0' }} />
               <div style={{ fontSize: '6px', fontWeight: '600', color: '#333' }}>MUNICIPAL MAYOR</div>
             </div>
           </div>
