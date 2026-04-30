@@ -52,22 +52,19 @@ def generate_household_excel(
             models.ResidentProfile.barangay.ilike(f"%{barangay_name}%")
         )
 
-    # Filter by Sector (Matches summary or custom details)
+    # Filter by Sector
     if sector:
         query = query.filter(
             (models.ResidentProfile.sector_summary.ilike(f"%{sector}%")) |
             (models.ResidentProfile.other_sector_details.ilike(f"%{sector}%"))
         )
 
-    # Filter by "Updated" status (where updated_at is later than created_at)
+    # Filter by "Updated" status
     if filter_status == "updated":
         query = query.filter(models.ResidentProfile.updated_at > models.ResidentProfile.created_at)
 
-    # Security: Hide restricted sectors for non-super-admins
-    if not is_super_admin:
-        restricted = ["HC", "M", "C"]
-        for s in restricted:
-            query = query.filter(~models.ResidentProfile.sector_summary.ilike(f"%{s}%"))
+    # 🚨 REMOVED THE BUGGY ROW DELETER HERE 🚨
+    # We now fetch everyone, and just hide the letters later in the loop.
 
     residents = query.order_by(
         models.ResidentProfile.barangay,
@@ -86,17 +83,26 @@ def generate_household_excel(
     data_list = []
 
     for r in residents:
-        # Format Head Name (FULL Middle Name)
+        # Format Head Name
         raw_full_name = f"{r.last_name}, {r.first_name} {r.middle_name or ''} {r.ext_name or ''}".strip()
-        full_name = " ".join(raw_full_name.split()) # Cleans up any double spaces
+        full_name = " ".join(raw_full_name.split()) 
 
-        # Format Spouse Name (FULL Middle Name)
+        # Format Spouse Name
         spouse_name = ""
         if r.spouse_first_name:
             raw_spouse_name = f"{r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name or ''} {r.spouse_ext_name or ''}".strip()
-            spouse_name = " ".join(raw_spouse_name.split()) # Cleans up any double spaces
+            spouse_name = " ".join(raw_spouse_name.split()) 
 
         total_members = 1 + len(r.family_members)
+
+        # 🚨 NEW SECURITY LOGIC: Scrub the text, don't delete the row! 🚨
+        final_sectors = r.sector_summary or "NONE"
+        if not is_super_admin and final_sectors != "NONE":
+            restricted = ["HC", "C", "M"]
+            # Split by comma, strip spaces, and remove restricted matches perfectly
+            parts = [p.strip() for p in final_sectors.split(",")]
+            parts = [p for p in parts if p.upper() not in restricted]
+            final_sectors = ", ".join(parts) if parts else "NONE"
 
         # Prepare base row
         row = {
@@ -114,7 +120,7 @@ def generate_household_excel(
             "Precinct No": r.precinct_no or "",
             "Contact": r.contact_no or "",
             "Total Members": total_members,
-            "Sectors": r.sector_summary or "NONE",
+            "Sectors": final_sectors, # Uses the scrubbed text
         }
 
         # --- DYNAMIC FAMILY MEMBERS ---
