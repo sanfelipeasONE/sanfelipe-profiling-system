@@ -446,11 +446,24 @@ def get_resident(
 # Updated Residents Filter
 # =====================================================
 def apply_status_filter(query, filter_status: str):
-    if filter_status and filter_status.lower() == "updated":
+    if not filter_status:
+        return query
+
+    status = filter_status.lower()
+
+    if status == "updated":
         query = query.filter(
             models.ResidentProfile.updated_at != None,
             models.ResidentProfile.created_at != None,
             models.ResidentProfile.updated_at > models.ResidentProfile.created_at
+        )
+    elif status == "not_updated":
+        query = query.filter(
+            or_(
+                models.ResidentProfile.updated_at == None,
+                models.ResidentProfile.created_at == None,
+                models.ResidentProfile.updated_at <= models.ResidentProfile.created_at
+            )
         )
     return query
 
