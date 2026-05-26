@@ -687,6 +687,7 @@ export default function ResidentList({ userRole, onEdit }) {
                  >
                    <option value="ALL">ALL RESIDENTS</option>
                    <option value="UPDATED">UPDATED RESIDENTS</option>
+                   <option value="NOT_UPDATED">NOT UPDATED RESIDENTS</option>
                  </select>
                  <ChevronDown className="absolute right-3 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
               </div>
