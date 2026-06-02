@@ -438,7 +438,7 @@ export default function ResidentList({ userRole, onEdit }) {
               )}
             </div>
           
-            {r.assistances?.length > 0 && (
+            {(isAdmin || isSuperAdmin) && r.assistances?.length > 0 && (
               <div className="bg-white border border-stone-300 rounded-xl p-4 md:p-5 shadow-sm">
                 <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-100 pb-3">Assistance Records</h4>
                 <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
