@@ -254,7 +254,7 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
 
     update_data = resident_data.model_dump(
         exclude_unset=True,
-        exclude={"sector_ids", "family_members", "resident_code", "barangay_id"}
+        exclude={"sector_ids", "family_members", "resident_code",}
     )
 
     for key, value in update_data.items():
