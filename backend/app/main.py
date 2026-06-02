@@ -467,7 +467,8 @@ def update_resident(
         resident.barangay = official_name or current_user.username.replace("_", " ").title()
         resident.barangay_id = None
 
-    if resident.barangay_id and not resident.barangay:
+    # FIX: Always sync the text name if a barangay_id is provided in the payload
+    if resident.barangay_id:
         b = db.execute(
             text("SELECT name FROM barangays WHERE id = :id"),
             {"id": resident.barangay_id}
@@ -476,6 +477,7 @@ def update_resident(
         if not b:
             raise HTTPException(status_code=400, detail="Invalid barangay_id")
 
+        # Overwrite whatever string the frontend sent with the official DB name
         resident.barangay = b["name"]
 
     try:
