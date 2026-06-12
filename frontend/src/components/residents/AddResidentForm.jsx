@@ -587,7 +587,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
 
   const buildPayload = () => {
     const payload = { ...formData };
-    const uniqueFields = ["contact_no", "precinct_no", "emergency_contact_no"];
+    const uniqueFields = ["contact_no", "emergency_contact_no"];
     uniqueFields.forEach(field => {
        if (typeof payload[field] === "string" && payload[field].trim() === "") {
            payload[field] = null;
@@ -634,6 +634,11 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       }
       if (!payload.barangay_id) {
           toast.error("Barangay is required. Please ensure a Barangay is selected.");
+          setLoading(false);
+          return;
+      }
+      if (!payload.precinct_no || String(payload.precinct_no).trim() === "") {
+          toast.error("Precinct / Voter ID is required.");
           setLoading(false);
           return;
       }
@@ -942,7 +947,8 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                   name="precinct_no"
                   value={formData.precinct_no}
                   onChange={handleChange}
-                  placeholder="OPTIONAL"
+                  required
+                  placeholder="PRECINCT NO."
                 />
               </div>
 
