@@ -163,7 +163,7 @@ async function drawFront(resident, formattedBirthdate, bgUrl, logoUrl) {
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
   
-  ctx.font = `${FONT_BLACK} ${FS(55)}px ${FONT_FAMILY}`;
+  ctx.font = `${FONT_BLACK} ${FS(50)}px ${FONT_FAMILY}`;
   ctx.fillText("SAN FELIPENEAN", X(140), Y(40));
 
   ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`;
