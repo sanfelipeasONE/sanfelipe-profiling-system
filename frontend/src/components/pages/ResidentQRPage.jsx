@@ -163,10 +163,10 @@ async function drawFront(resident, formattedBirthdate, bgUrl, logoUrl) {
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
   
-  ctx.font = `${FONT_BLACK} ${FS(50)}px ${FONT_FAMILY}`;
+  ctx.font = `${FONT_BLACK} ${FS(55)}px ${FONT_FAMILY}`;
   ctx.fillText("SAN FELIPENEAN", X(140), Y(40));
 
-  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`;
+  ctx.font = `${FONT_BLACK} ${FS(23)}px ${FONT_FAMILY}`;
   ctx.fillText("IDENTIFICATION CARD", X(140), Y(75));
   ctx.restore();
 
@@ -466,8 +466,10 @@ export default function ResidentQRPage() {
   const [renderingPreview, setRenderingPreview] = useState(false);
   const [activeSide, setActiveSide] = useState("front"); 
 
-  const frontPreviewRef = useRef(null);
-  const backPreviewRef = useRef(null);
+  const frontScreenRef = useRef(null);
+  const backScreenRef = useRef(null);
+  const frontPrintRef = useRef(null);
+  const backPrintRef = useRef(null);
 
   const logoUrl = "/san_felipe_seal.png";
   const bgUrl = "/sanfe.jpg";
@@ -558,24 +560,46 @@ export default function ResidentQRPage() {
 
         if (cancelled) return;
 
-        const frontEl = frontPreviewRef.current;
-        const backEl = backPreviewRef.current;
+        // 1) Draw to Screen Canvases
+        const frontScreenEl = frontScreenRef.current;
+        const backScreenEl = backScreenRef.current;
 
-        if (frontEl) {
-          const fctx = frontEl.getContext("2d");
-          frontEl.width = CW;
-          frontEl.height = CH;
+        if (frontScreenEl) {
+          const fctx = frontScreenEl.getContext("2d");
+          frontScreenEl.width = CW;
+          frontScreenEl.height = CH;
           fctx.clearRect(0, 0, CW, CH);
           fctx.drawImage(frontCanvas, 0, 0);
         }
 
-        if (backEl) {
-          const bctx = backEl.getContext("2d");
-          backEl.width = CW;
-          backEl.height = CH;
+        if (backScreenEl) {
+          const bctx = backScreenEl.getContext("2d");
+          backScreenEl.width = CW;
+          backScreenEl.height = CH;
           bctx.clearRect(0, 0, CW, CH);
           bctx.drawImage(backCanvas, 0, 0);
         }
+
+        // 2) Draw to Print Canvases
+        const frontPrintEl = frontPrintRef.current;
+        const backPrintEl = backPrintRef.current;
+
+        if (frontPrintEl) {
+          const fpctx = frontPrintEl.getContext("2d");
+          frontPrintEl.width = CW;
+          frontPrintEl.height = CH;
+          fpctx.clearRect(0, 0, CW, CH);
+          fpctx.drawImage(frontCanvas, 0, 0);
+        }
+
+        if (backPrintEl) {
+          const bpctx = backPrintEl.getContext("2d");
+          backPrintEl.width = CW;
+          backPrintEl.height = CH;
+          bpctx.clearRect(0, 0, CW, CH);
+          bpctx.drawImage(backCanvas, 0, 0);
+        }
+
       } catch (err) {
         console.error("Preview render failed:", err);
       } finally {
@@ -705,8 +729,9 @@ export default function ResidentQRPage() {
           }
 
           @page {
-            size: 3.375in 2.125in;
-            margin: 0;
+            /* Set to standard auto size so it doesn't force a tiny page break */
+            size: auto; 
+            margin: 10mm;
           }
 
           body * { visibility: hidden !important; }
@@ -718,9 +743,11 @@ export default function ResidentQRPage() {
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
-            width: auto !important;
+            width: 100% !important;
             height: auto !important;
-            display: block !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
             margin: 0 !important;
             padding: 0 !important;
           }
@@ -728,23 +755,15 @@ export default function ResidentQRPage() {
           #qr-print-area > .print-canvas-wrap {
             width: 648px !important;
             height: 408px !important;
-            zoom: 0.5;
+            zoom: 0.5; /* keeps it card sized on the printed paper */
             margin: 0 !important;
             border: 0 !important;
             border-radius: 0 !important;
             box-shadow: none !important;
             overflow: hidden !important;
-            page-break-after: always !important;
-            break-after: page !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
             transform: none !important;
             background: white !important;
-          }
-
-          #qr-print-area > .print-canvas-wrap:last-child {
-            page-break-after: auto !important;
-            break-after: auto !important;
+            /* REMOVED page-break-after: always; */
           }
 
           .print-canvas {
@@ -796,15 +815,16 @@ export default function ResidentQRPage() {
         </div>
 
         {/* Print-only: both canvases always visible and stacked */}
+        {/* ADDED print:gap-8 to create space between the front and back on the printed page */}
         <div
           id="qr-print-area"
-          className="hidden print:flex print:flex-col print:gap-0 print:items-center"
+          className="hidden print:flex print:flex-col print:gap-8 print:items-center"
         >
           <div className="print-canvas-wrap">
-            <canvas ref={frontPreviewRef} className="print-canvas block w-[648px] h-[408px]" />
+            <canvas ref={frontPrintRef} className="print-canvas block w-[648px] h-[408px]" />
           </div>
           <div className="print-canvas-wrap">
-            <canvas ref={backPreviewRef} className="print-canvas block w-[648px] h-[408px]" />
+            <canvas ref={backPrintRef} className="print-canvas block w-[648px] h-[408px]" />
           </div>
         </div>
 
@@ -818,7 +838,7 @@ export default function ResidentQRPage() {
             <div className="w-1/2 px-0">
               <div className="rounded-2xl overflow-hidden shadow-xl border border-stone-300 bg-white">
                 <canvas
-                  ref={frontPreviewRef}
+                  ref={frontScreenRef}
                   className="block w-full h-auto"
                   style={{ aspectRatio: `${DOM_W} / ${DOM_H}` }}
                 />
@@ -829,7 +849,7 @@ export default function ResidentQRPage() {
             <div className="w-1/2 px-0">
               <div className="rounded-2xl overflow-hidden shadow-xl border border-stone-300 bg-white">
                 <canvas
-                  ref={backPreviewRef}
+                  ref={backScreenRef}
                   className="block w-full h-auto"
                   style={{ aspectRatio: `${DOM_W} / ${DOM_H}` }}
                 />
