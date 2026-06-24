@@ -163,10 +163,10 @@ async function drawFront(resident, formattedBirthdate, bgUrl, logoUrl) {
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
   
-  ctx.font = `${FONT_BLACK} ${FS(55)}px ${FONT_FAMILY}`;
+  ctx.font = `${FONT_BLACK} ${FS(45)}px ${FONT_FAMILY}`;
   ctx.fillText("SAN FELIPENEAN", X(140), Y(40));
 
-  ctx.font = `${FONT_BLACK} ${FS(23)}px ${FONT_FAMILY}`;
+  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`;
   ctx.fillText("IDENTIFICATION CARD", X(140), Y(75));
   ctx.restore();
 
@@ -351,12 +351,12 @@ async function drawBack(
     ctx.restore();
   } catch (_) {}
 
-  // Top Red Header Banner (Adjusted to be higher on the right so it doesn't overlap ID number)
+  // Top Red Header Banner
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(CW, 0);
-  ctx.lineTo(CW, Y(DOM_H * 0.10)); // Pulled up to leave room for the ID number
+  ctx.lineTo(CW, Y(DOM_H * 0.10)); 
   ctx.lineTo(0, Y(DOM_H * 0.28));  
   ctx.closePath();
   ctx.fillStyle = PRIMARY_RED;
@@ -725,13 +725,12 @@ export default function ResidentQRPage() {
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
-            overflow: visible !important;
+            width: 100% !important;
           }
 
           @page {
-            /* Set to standard auto size so it doesn't force a tiny page break */
             size: auto; 
-            margin: 10mm;
+            margin: 15mm 0mm; /* Top/bottom margin, 0 side margins to let flex handle centering */
           }
 
           body * { visibility: hidden !important; }
@@ -743,11 +742,10 @@ export default function ResidentQRPage() {
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
-            width: 100% !important;
-            height: auto !important;
+            width: 100vw !important; /* Force full width of the printed page */
             display: flex !important;
             flex-direction: column !important;
-            align-items: center !important;
+            align-items: center !important; /* Center horizontally */
             margin: 0 !important;
             padding: 0 !important;
           }
@@ -755,15 +753,12 @@ export default function ResidentQRPage() {
           #qr-print-area > .print-canvas-wrap {
             width: 648px !important;
             height: 408px !important;
-            zoom: 0.5; /* keeps it card sized on the printed paper */
-            margin: 0 !important;
+            zoom: 0.5;
+            margin: 0 auto !important; /* Ensure the block itself is centered */
             border: 0 !important;
             border-radius: 0 !important;
             box-shadow: none !important;
-            overflow: hidden !important;
-            transform: none !important;
             background: white !important;
-            /* REMOVED page-break-after: always; */
           }
 
           .print-canvas {
@@ -815,7 +810,6 @@ export default function ResidentQRPage() {
         </div>
 
         {/* Print-only: both canvases always visible and stacked */}
-        {/* ADDED print:gap-8 to create space between the front and back on the printed page */}
         <div
           id="qr-print-area"
           className="hidden print:flex print:flex-col print:gap-8 print:items-center"
