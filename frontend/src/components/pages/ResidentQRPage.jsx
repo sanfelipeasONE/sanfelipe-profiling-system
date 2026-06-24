@@ -31,7 +31,6 @@ const SECTOR_CODES = {
   "SOLO PARENT": "20",
   "STUDENT": "21",
   "TODA": "22",
-
 };
 
 function loadImage(src) {
@@ -87,11 +86,13 @@ const FONT_BLACK = "900";
 const FONT_BOLD = "700";
 const FONT_MEDIUM = "500";
 
+const PRIMARY_RED = "#cc1d1d"; // Matched red tone
+
 // =========================
 // FRONT canvas
 // =========================
 
-async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl) {
+async function drawFront(resident, formattedBirthdate, bgUrl, logoUrl) {
   const canvas = document.createElement("canvas");
   canvas.width = CW;
   canvas.height = CH;
@@ -123,15 +124,15 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
-  // Diagonal Red Header - SHIFTED DOWN & ALIGNED TO NAME
+  // Top Red Header Banner (Slants up towards right)
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(CW, 0);
-  ctx.lineTo(CW, Y(DOM_H * 0.26)); // Shifted to align the right side gap
-  ctx.lineTo(0, Y(DOM_H * 0.45));  // Shifted to drop the left side lower
+  ctx.lineTo(CW, Y(DOM_H * 0.18)); 
+  ctx.lineTo(0, Y(DOM_H * 0.32));  
   ctx.closePath();
-  ctx.fillStyle = "#e3311b"; // Vibrant orange-red matching picture
+  ctx.fillStyle = PRIMARY_RED;
   ctx.fill();
   ctx.restore();
 
@@ -143,8 +144,8 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   // Top Left Logo
   try {
     const logo = await loadImage(logoUrl);
-    const lx = X(30);
-    const ly = Y(25);
+    const lx = X(25);
+    const ly = Y(15);
     const lw = X(85);
     const lh = Y(85);
     ctx.save();
@@ -156,34 +157,29 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
-  // Header Text with Drop Shadow
+  // Header Text
   ctx.save();
-  ctx.textAlign = "center";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
   
-  ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
-  ctx.shadowBlur = X(4);
-  ctx.shadowOffsetX = X(2);
-  ctx.shadowOffsetY = X(2);
+  ctx.font = `${FONT_BLACK} ${FS(55)}px ${FONT_FAMILY}`;
+  ctx.fillText("SAN FELIPENEAN", X(140), Y(40));
 
-  ctx.font = `${FONT_BLACK} ${FS(42)}px ${FONT_FAMILY}`;
-  ctx.fillText("SAN FELIPE", X(360), Y(50));
-
-  ctx.font = `${FONT_BLACK} ${FS(38)}px ${FONT_FAMILY}`;
-  ctx.fillText("RESIDENT ID CARD", X(360), Y(95));
+  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`;
+  ctx.fillText("IDENTIFICATION CARD", X(140), Y(75));
   ctx.restore();
 
   // Photo Box
-  const px = X(45);
-  const py = Y(145);
-  const pw = X(150);
-  const ph = X(150);
+  const px = X(30);
+  const py = Y(120);
+  const pw = X(160);
+  const ph = X(160);
 
   ctx.fillStyle = "#efefef";
   ctx.fillRect(px, py, pw, ph);
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = X(2);
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = X(1);
   ctx.strokeRect(px, py, pw, ph);
 
   if (resident.photo_url) {
@@ -212,105 +208,104 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.fillText("NO PHOTO", px + pw / 2, py + ph / 2);
   }
 
-  // Resident Text
-  ctx.fillStyle = "#000";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.font = `${FONT_BLACK} ${FS(22)}px ${FONT_FAMILY}`;
-  ctx.fillText("RESIDENT", px + pw / 2, py + ph + Y(15));
+  // Fields starting position
+  const textX = X(220);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 
-  // Information Fields Setup
-  const fx = X(220); // Left alignment anchor for text fields
-
-  function drawDomField({ label, value, x, y, w, valueFs = 16, labelFs = 12 }) {
-    const safeValue = String(value || "").trim() || " ";
-    ctx.save();
-    ctx.textAlign = "center"; // Changed to center
-    ctx.textBaseline = "top";
-
-    // Value (Top - Bold)
-    ctx.fillStyle = "#000";
-    ctx.font = `${FONT_BOLD} ${FS(valueFs)}px ${FONT_FAMILY}`;
-    const lines = wrapText(ctx, safeValue, w);
-    lines.forEach((line, i) => {
-      ctx.fillText(line, x, y + i * Y(18));
-    });
-
-    // Label (Bottom - Medium)
-    // Shifted down based on number of lines in the value
-    ctx.fillStyle = "#333";
-    ctx.font = `${FONT_MEDIUM} ${FS(labelFs)}px ${FONT_FAMILY}`;
-    ctx.fillText(label, x, y + (lines.length * Y(18)));
-
-    ctx.restore();
-  }
-
-  const row2Y = Y(235);
-  const row3Y = Y(305);
-
-  // Row 1: Name & Label (FULLY CENTERED)
-  ctx.save();
-  
-  // Define the horizontal center point for this column
-  // Based on your image, it's roughly the middle of the right side area
-  const columnCenter = fx + X(180); 
-  const row1Y = Y(155);
-
-  // 1. Draw the Name (Top, Large, Centered)
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = "#000";
-  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`; // Made it slightly thicker
-  
-  const safeName = String(fullName || "").trim() || " ";
-  const nameLines = wrapText(ctx, safeName, X(380));
-  
-  nameLines.forEach((line, i) => {
-    ctx.fillText(line, columnCenter, row1Y + i * Y(22));
-  });
-
-  // 2. Draw the Label (Bottom, Small, Centered)
-  // Position it relative to how many lines the name took
-  const labelY = row1Y + (nameLines.length * Y(22)) - Y(2);
-  ctx.fillStyle = "#333";
+  // Last Name
+  ctx.fillStyle = "#444";
   ctx.font = `${FONT_MEDIUM} ${FS(11)}px ${FONT_FAMILY}`;
-  ctx.fillText("Last Name, First Name, M.I., Suffix", columnCenter, labelY);
+  ctx.fillText("LAST NAME", textX, Y(135));
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BLACK} ${FS(22)}px ${FONT_FAMILY}`;
+  ctx.fillText((resident.last_name || "").toUpperCase(), textX, Y(160));
 
-  ctx.restore();
+  // First Name
+  ctx.fillStyle = "#444";
+  ctx.font = `${FONT_MEDIUM} ${FS(11)}px ${FONT_FAMILY}`;
+  ctx.fillText("FIRST NAME", textX, Y(185));
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BLACK} ${FS(22)}px ${FONT_FAMILY}`;
+  ctx.fillText((resident.first_name || "").toUpperCase(), textX, Y(210));
 
-  // Row 2: Sex, DOB, Civil Status
-  drawDomField({
-    label: "Sex",
-    value: resident.sex || "",
-    x: fx + X(40),
-    y: row2Y,
-    w: X(80),
-  });
+  // Middle Name / Suffix
+  ctx.fillStyle = "#444";
+  ctx.font = `${FONT_MEDIUM} ${FS(11)}px ${FONT_FAMILY}`;
+  ctx.fillText("MIDDLE NAME / Suffix", textX, Y(235));
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BLACK} ${FS(22)}px ${FONT_FAMILY}`;
+  const midSuffix = `${resident.middle_name || ""} ${resident.ext_name || ""}`.trim().toUpperCase();
+  ctx.fillText(midSuffix, textX, Y(260));
 
-  drawDomField({
-    label: "Date of Birth",
-    value: formattedBirthdate || "",
-    x: fx + X(165),
-    y: row2Y,
-    w: X(150),
-  });
+  // Address Bar (Red Pill)
+  const pillX = X(215);
+  const pillY = Y(275);
+  const pillW = X(DOM_W - 240);
+  const pillH = Y(22);
+  const radius = X(10);
+  
+  ctx.fillStyle = PRIMARY_RED;
+  ctx.beginPath();
+  ctx.moveTo(pillX + radius, pillY);
+  ctx.lineTo(pillX + pillW - radius, pillY);
+  ctx.quadraticCurveTo(pillX + pillW, pillY, pillX + pillW, pillY + radius);
+  ctx.lineTo(pillX + pillW, pillY + pillH - radius);
+  ctx.quadraticCurveTo(pillX + pillW, pillY + pillH, pillX + pillW - radius, pillY + pillH);
+  ctx.lineTo(pillX + radius, pillY + pillH);
+  ctx.quadraticCurveTo(pillX, pillY + pillH, pillX, pillY + pillH - radius);
+  ctx.lineTo(pillX, pillY + radius);
+  ctx.quadraticCurveTo(pillX, pillY, pillX + radius, pillY);
+  ctx.fill();
 
-  drawDomField({
-    label: "Civil Status",
-    value: (resident.civil_status || "").replace("Live-in Partner", "Live-in Partner"),
-    x: fx + X(320),
-    y: row2Y,
-    w: X(160),
-  });
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.font = `${FONT_BOLD} ${FS(15)}px ${FONT_FAMILY}`;
+  const fullAddr = `BARANGAY ${resident.barangay || ""}, SAN FELIPE, ZAMBALES`.toUpperCase();
+  ctx.fillText(fullAddr, pillX + pillW / 2, pillY + Y(15)); // Vertically centered
 
-  // Row 3: Contact No
-  drawDomField({
-    label: "Contact No.",
-    value: resident.contact_no || "",
-    x: fx + X(165),
-    y: row3Y,
-    w: X(200),
-  });
+  // Bottom Stats Row (Sex, DOB, Civil Status)
+  const statYVal = Y(335);
+  const statYLbl = Y(355);
+
+  ctx.textAlign = "center";
+
+  // Sex
+  const sexX = X(260);
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`;
+  ctx.fillText((resident.sex || "").toUpperCase(), sexX, statYVal);
+  ctx.fillStyle = "#444";
+  ctx.font = `${FONT_MEDIUM} ${FS(12)}px ${FONT_FAMILY}`;
+  ctx.fillText("Sex", sexX, statYLbl);
+
+  // Date of Birth
+  const dobX = X(390);
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`;
+  ctx.fillText(formattedBirthdate || "", dobX, statYVal);
+  ctx.fillStyle = "#444";
+  ctx.font = `${FONT_MEDIUM} ${FS(12)}px ${FONT_FAMILY}`;
+  ctx.fillText("Date of Birth", dobX, statYLbl);
+
+  // Civil Status
+  const civX = X(530);
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`;
+  ctx.fillText((resident.civil_status || "").toUpperCase(), civX, statYVal);
+  ctx.fillStyle = "#444";
+  ctx.font = `${FONT_MEDIUM} ${FS(12)}px ${FONT_FAMILY}`;
+  ctx.fillText("Civil Status", civX, statYLbl);
+
+  // Contact No.
+  const contactYVal = Y(380);
+  const contactYLbl = Y(395);
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BLACK} ${FS(20)}px ${FONT_FAMILY}`;
+  ctx.fillText(resident.contact_no || "", dobX, contactYVal);
+  ctx.fillStyle = "#444";
+  ctx.font = `${FONT_MEDIUM} ${FS(12)}px ${FONT_FAMILY}`;
+  ctx.fillText("Contact number", dobX, contactYLbl);
 
   return canvas;
 }
@@ -356,15 +351,15 @@ async function drawBack(
     ctx.restore();
   } catch (_) {}
 
-  // Matching Diagonal Red Header for the back side - SHIFTED DOWN & ALIGNED TO NAME
+  // Top Red Header Banner (Adjusted to be higher on the right so it doesn't overlap ID number)
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(CW, 0);
-  ctx.lineTo(CW, Y(DOM_H * 0.26)); 
-  ctx.lineTo(0, Y(DOM_H * 0.45));  
+  ctx.lineTo(CW, Y(DOM_H * 0.10)); // Pulled up to leave room for the ID number
+  ctx.lineTo(0, Y(DOM_H * 0.28));  
   ctx.closePath();
-  ctx.fillStyle = "#e3311b";
+  ctx.fillStyle = PRIMARY_RED;
   ctx.fill();
   ctx.restore();
 
@@ -372,76 +367,51 @@ async function drawBack(
   ctx.lineWidth = X(1);
   ctx.strokeRect(X(10), Y(10), X(DOM_W - 20), Y(DOM_H - 20));
 
-  try {
-    const logo = await loadImage(logoUrl);
-    const lx = X(30);
-    const ly = Y(25);
-    const lw = X(85);
-    const lh = Y(85);
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(logo, lx, ly, lw, lh);
-    ctx.restore();
-  } catch (_) {}
+  // --- Left Column: Emergency Information ---
+  const leftCenterX = X(180);
+  let topY = Y(145);
 
-  const leftX = X(90);
-  let topY = Y(190);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
 
   ctx.fillStyle = "#000";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `${FONT_MEDIUM} ${FS(16)}px ${FONT_FAMILY}`;
-  ctx.fillText("In Case of Emergency", leftX, topY + FS(16));
-  topY += FS(16) + Y(12);
+  ctx.font = `${FONT_BLACK} ${FS(18)}px ${FONT_FAMILY}`;
+  ctx.fillText("IN CASE OF EMERGENCY", leftCenterX, topY);
+  topY += Y(40);
 
-  const maxEmW = X(235);
+  ctx.font = `${FONT_BLACK} ${FS(18)}px ${FONT_FAMILY}`;
+  const emNameLines = wrapText(ctx, (emergencyName || "").toUpperCase(), X(320));
+  emNameLines.forEach(line => {
+    ctx.fillText(line, leftCenterX, topY);
+    topY += Y(22);
+  });
+  topY += Y(5);
 
-  function drawEmergencyLine(value, fontSize, mb = 12) {
-    const val = String(value || " ").toUpperCase();
-    ctx.fillStyle = "#000";
-    ctx.font = `${FONT_BOLD} ${FS(fontSize)}px ${FONT_FAMILY}`;
-    ctx.textAlign = "left";
-    const lines = wrapText(ctx, val, maxEmW);
-    const lh = FS(fontSize) + Y(3);
+  ctx.fillText(emergencyContactNo || "", leftCenterX, topY);
+  topY += Y(25);
 
-    lines.forEach((line, i) => {
-      ctx.fillText(line, leftX, topY + i * lh + FS(fontSize));
-    });
+  const emAddrLines = wrapText(ctx, (emergencyAddress || "").toUpperCase(), X(320));
+  emAddrLines.forEach(line => {
+    ctx.fillText(line, leftCenterX, topY);
+    topY += Y(22);
+  });
 
-    topY += lines.length * lh + Y(mb);
-  }
+  // --- Right Column: QR Code and ID ---
+  const rightCenterX = X(470);
+  
+  ctx.fillStyle = "#000";
+  ctx.font = `${FONT_BLACK} ${FS(22)}px ${FONT_FAMILY}`;
+  ctx.fillText(`ID NUMBER: ${resident.resident_code || "—"}`, rightCenterX, Y(95));
 
-  drawEmergencyLine(emergencyName, 14, 12);
-  drawEmergencyLine(emergencyContactNo, 14, 12);
-  drawEmergencyLine(emergencyAddress, 13, 0);
-
-  const rx = X(DOM_W - 34 - 285);
-  const ry = Y(60);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `${FONT_BLACK} ${FS(24)}px ${FONT_FAMILY}`;
-
-  const idLabel = "ID NUMBER:";
-  const idLabelW = ctx.measureText(idLabel).width;
-  const idY = ry + FS(24);
-
-  ctx.fillText(idLabel, rx, idY);
-  ctx.fillText(resident.resident_code || "—", rx + idLabelW + X(8), idY);
-
-  const qx = X(DOM_W - 34 - 245);
-  const qy = Y(60) + FS(24) + Y(12);
-  const qw = X(245);
-  const qh = Y(205);
+  const qw = X(190);
+  const qh = Y(190);
+  const qx = rightCenterX - qw / 2;
+  const qy = Y(120);
 
   ctx.fillStyle = "#efefef";
   ctx.fillRect(qx, qy, qw, qh);
   ctx.strokeStyle = "#000";
-  ctx.lineWidth = X(3);
+  ctx.lineWidth = X(2);
   ctx.strokeRect(qx, qy, qw, qh);
 
   if (qrSrc) {
@@ -452,23 +422,16 @@ async function drawBack(
     } catch (_) {}
   }
 
-  const captionY = qy + qh + Y(12);
-  ctx.textAlign = "center";
+  const captionY = qy + qh + Y(25);
   ctx.fillStyle = "#000";
-  ctx.font = `${FONT_MEDIUM} ${FS(11)}px ${FONT_FAMILY}`;
-  ctx.fillText("This QR Code contains verified resident data.", qx + qw / 2, captionY + FS(11));
-  ctx.fillText("Scan using authorized LGU devices only.", qx + qw / 2, captionY + FS(11) + Y(14));
+  ctx.font = `${FONT_MEDIUM} ${FS(10)}px ${FONT_FAMILY}`;
+  ctx.fillText("THIS QR CODE CONTAINS VERIFIED RESIDENT DATA.", rightCenterX, captionY);
+  ctx.fillText("SCAN USING AUTHORIZED LGU DEVICE ONLY.", rightCenterX, captionY + Y(15));
 
-  // ==========================================
-  // NEW: DRAW SECTOR CODES ON BOTTOM LEFT
-  // ==========================================
+  // --- Bottom Left: SECTOR CODES ---
   let sectorCodes = [];
-  
   if (resident && resident.sector_summary && resident.sector_summary !== "None") {
-    // Split the comma-separated sectors
     const sectors = resident.sector_summary.split(",").map(s => s.trim().toUpperCase());
-    
-    // Find the matching code for each sector
     sectors.forEach(sector => {
       if (SECTOR_CODES[sector]) {
         sectorCodes.push(SECTOR_CODES[sector]);
@@ -477,17 +440,13 @@ async function drawBack(
   }
 
   if (sectorCodes.length > 0) {
-    const codesText = sectorCodes.join(", "); // e.g., "1, C, M"
-    
+    const codesText = sectorCodes.join(", "); 
     ctx.fillStyle = "#000";
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
-    ctx.font = `${FONT_BLACK} ${FS(16)}px ${FONT_FAMILY}`; // Large bold font
-    
-    // Positioned inside the bottom-left border
-    ctx.fillText(codesText, X(25), Y(DOM_H - 20)); 
+    ctx.font = `${FONT_BLACK} ${FS(16)}px ${FONT_FAMILY}`; 
+    ctx.fillText(codesText, X(25), Y(DOM_H - 15)); 
   }
-  // ==========================================
 
   return canvas;
 }
@@ -556,34 +515,6 @@ export default function ResidentQRPage() {
     });
   }, [resident]);
 
-  const fullName = useMemo(() => {
-    if (!resident) return "";
-
-    const rawLastName = (resident.last_name || "").trim().toUpperCase();
-    const rawFirstName = (resident.first_name || "").trim().toUpperCase();
-    const rawMiddleName = (resident.middle_name || "").trim().toUpperCase();
-    const rawSuffix = (resident.ext_name || "").trim().toUpperCase();
-
-    let cleanFirstName = rawFirstName;
-    let extName = rawSuffix;
-
-    // Handle cases where suffix might be attached to the first name by a comma
-    if (!extName && rawFirstName.includes(",")) {
-      const parts = rawFirstName.split(",").map((p) => p.trim()).filter(Boolean);
-      cleanFirstName = parts[0] || "";
-      extName = parts.slice(1).join(" ");
-    }
-
-    const middleInitial = rawMiddleName ? `${rawMiddleName.charAt(0)}.` : "";
-
-    // CHANGED: Fixed the ReferenceError by replacing "suffix" with "extName"
-    return [rawLastName ? `${rawLastName},` : "", cleanFirstName, middleInitial, extName]
-      .filter(Boolean)
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }, [resident]);
-
   const emergencyName = useMemo(() => resident?.emergency_name || " ", [resident]);
   const emergencyContactNo = useMemo(() => resident?.emergency_contact_no || " ", [resident]);
   const emergencyAddress = useMemo(() => resident?.emergency_address || " ", [resident]);
@@ -605,7 +536,7 @@ export default function ResidentQRPage() {
           await document.fonts.load("500 13px Barlow");
           await document.fonts.load("500 16px Barlow");
           await document.fonts.load("500 11px Barlow");
-          await document.fonts.load("900 42px Barlow");
+          await document.fonts.load("900 40px Barlow");
           await document.fonts.load("900 38px Barlow");
           await document.fonts.load("900 28px Barlow");
           await document.fonts.load("900 24px Barlow");
@@ -613,7 +544,7 @@ export default function ResidentQRPage() {
         }
 
         const [frontCanvas, backCanvas] = await Promise.all([
-          drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl),
+          drawFront(resident, formattedBirthdate, bgUrl, logoUrl),
           drawBack(
             resident,
             emergencyName,
@@ -661,7 +592,6 @@ export default function ResidentQRPage() {
     resident,
     qrImage,
     formattedBirthdate,
-    fullName,
     emergencyName,
     emergencyContactNo,
     emergencyAddress,
@@ -679,7 +609,7 @@ export default function ResidentQRPage() {
       }
 
       const [frontCanvas, backCanvas] = await Promise.all([
-        drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl),
+        drawFront(resident, formattedBirthdate, bgUrl, logoUrl),
         drawBack(
           resident,
           emergencyName,
