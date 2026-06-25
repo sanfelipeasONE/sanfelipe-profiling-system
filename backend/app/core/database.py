@@ -21,7 +21,8 @@ engine = create_engine(
     pool_size=20,        # Increased from 5 to 20 to handle large imports
     max_overflow=10,     # Allow 10 extra connections during traffic spikes
     pool_timeout=60,     # Wait 60 seconds instead of 30 before timing out
-    pool_recycle=1800    # Refresh connections every 30 minutes
+    pool_recycle=1800,
+    pool_pre_ping=True
 )
 
 SessionLocal = sessionmaker(
