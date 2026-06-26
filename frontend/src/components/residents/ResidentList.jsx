@@ -59,6 +59,20 @@ export default function ResidentList({ userRole, onEdit }) {
   const [sectorSearchTerm, setSectorSearchTerm] = useState("");
   const sectorDropdownRef = useRef(null);
 
+  const SECTOR_CODE_MAP = {
+  "C": "C",
+  "HC": "HC",
+  "M": "M",
+};
+
+const handleSectorSelect = (value) => {
+  const expanded = SECTOR_CODE_MAP[value.trim().toUpperCase()] || value;
+  setSelectedSector(expanded);
+  setCurrentPage(1);
+  setIsSectorDropdownOpen(false);
+  setSectorSearchTerm('');
+};
+
   // --- FORM STATES FOR ASSISTANCE MODAL ---
   const [assistanceFormType, setAssistanceFormType] = useState("Medical Assistance");
   const [customAssistanceType, setCustomAssistanceType] = useState("");
@@ -629,12 +643,7 @@ export default function ResidentList({ userRole, onEdit }) {
                      </div>
                      <div className="max-h-60 overflow-y-auto py-1">
                        <div
-                         onClick={() => { 
-                           setSelectedSector(""); 
-                           setCurrentPage(1); 
-                           setIsSectorDropdownOpen(false); 
-                           setSectorSearchTerm(''); 
-                         }}
+                         onClick={() => handleSectorSelect(sector.name)}
                          className={`px-4 py-2 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors ${selectedSector === "" ? "bg-rose-50 text-rose-700 font-medium" : "text-stone-700"}`}
                        >
                          ALL SECTORS
@@ -646,12 +655,7 @@ export default function ResidentList({ userRole, onEdit }) {
                          .map(sector => (
                            <div
                              key={sector.id}
-                             onClick={() => { 
-                               setSelectedSector(sector.name); 
-                               setCurrentPage(1); 
-                               setIsSectorDropdownOpen(false); 
-                               setSectorSearchTerm(''); 
-                             }}
+                             onClick={() => handleSectorSelect(sector.name)}
                              className={`px-4 py-2 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors ${selectedSector === sector.name ? "bg-rose-50 text-rose-700 font-medium" : "text-stone-700"}`}
                            >
                              {sector.name}
@@ -662,12 +666,7 @@ export default function ResidentList({ userRole, onEdit }) {
                        {/* If they type something NOT in the predefined list, give them the option to search for it as a custom filter */}
                        {sectorSearchTerm.trim().length > 0 && !sectorList.some(s => s.name.toLowerCase() === sectorSearchTerm.toLowerCase()) && (
                          <div
-                           onClick={() => { 
-                             setSelectedSector(sectorSearchTerm.toUpperCase()); 
-                             setCurrentPage(1); 
-                             setIsSectorDropdownOpen(false); 
-                             setSectorSearchTerm(''); 
-                           }}
+                           onClick={() => handleSectorSelect(sectorSearchTerm.toUpperCase())}
                            className="px-4 py-2.5 mt-1 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors text-rose-600 border-t border-stone-100 bg-stone-50"
                          >
                            <span className="font-semibold text-stone-500 mr-1">Search Other:</span> {sectorSearchTerm}
