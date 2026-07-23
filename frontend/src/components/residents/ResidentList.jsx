@@ -26,6 +26,7 @@ export default function ResidentList({ userRole, onEdit }) {
   const [barangayList, setBarangayList] = useState([]);
   const [selectedBarangay, setSelectedBarangay] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [loading, setLoading] = useState(false);
@@ -286,12 +287,26 @@ const handleSectorSelect = (value) => {
 }, []);
 
   useEffect(() => {
-    fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
-  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, selectedStatus, searchTerm, sortBy, sortOrder]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Actual fetch — now triggered by debouncedSearch instead of searchTerm
+  useEffect(() => {
+    fetchResidents(debouncedSearch, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, selectedStatus, debouncedSearch, sortBy, sortOrder]);
 
 
   // --- HANDLERS ---
-  const handleSearchChange = (e) => { setSearchTerm(e.target.value); setCurrentPage(1); };
+  const handleSearchChange = (e) => {
+  const value = e.target.value;
+  setSearchTerm(value); // update the input immediately for responsiveness
+};
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const handleBarangayFilter = (e) => { setSelectedBarangay(e.target.value); setCurrentPage(1); };
   const handleStatusFilter = (e) => { setSelectedStatus(e.target.value); setCurrentPage(1); };
   const handleLimitChange = (e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); };
