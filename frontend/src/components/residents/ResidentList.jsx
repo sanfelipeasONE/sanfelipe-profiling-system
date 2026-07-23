@@ -123,6 +123,12 @@ const handleSectorSelect = (value) => {
     });
   };
 
+  const displayCivilStatus = (status) => {
+  if (!status) return "-";
+  if (status === "Live-in Partner") return "Single";
+  return status;
+};
+
   const formatDateTime = (dateString) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleString("en-US", {
@@ -378,7 +384,7 @@ const handleSectorSelect = (value) => {
                   <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
                     Civil Status
                   </p>
-                  <p className="text-sm font-normal text-stone-800">{r.civil_status || '-'}</p>
+                  <p className="text-sm font-normal text-stone-800">{displayCivilStatus(r.civil_status)}</p>
                 </div>
 
                 <div>
