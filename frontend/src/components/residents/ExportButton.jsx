@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 // Update this URL to match your production backend
 const API_URL = "https://sanfelipe-profiling-system-production-13e4.up.railway.app";
 
-export default function ExportButton({ barangay, sector, status, className = "" }) {
+export default function ExportButton({ barangay, sectors = [], status, className = "" }) {
   const [loading, setLoading] = useState(false);
 
   const handleExport = async () => {
@@ -26,9 +26,7 @@ export default function ExportButton({ barangay, sector, status, className = "" 
         params.append('barangay', barangay);
       }
       
-      if (sector) {
-        params.append('sector', sector);
-      }
+      sectors.forEach((sector) => params.append('sectors', sector));
       
       if (status && status !== 'ALL') {
         params.append('filter_status', status.toLowerCase());
@@ -59,7 +57,7 @@ export default function ExportButton({ barangay, sector, status, className = "" 
         filename = disposition.split('filename=')[1].replace(/["']/g, "").trim();
       } else {
         const statusPart = status && status !== 'ALL' ? `${status}_` : "";
-        const sectorPart = sector ? `${sector.replace(/\s+/g, '_')}_` : "";
+        const sectorPart = sectors.length ? `${sectors.join('_').replace(/\s+/g, '_')}_` : "";
         const brgyPart = barangay ? barangay.replace(/\s+/g, '_') : 'All';
         filename = `SanFelipe_${statusPart}${sectorPart}${brgyPart}.xlsx`;
       }

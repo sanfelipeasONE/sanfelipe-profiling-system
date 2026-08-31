@@ -27,7 +27,7 @@ export default function ResidentList({ userRole, onEdit }) {
   const [selectedBarangay, setSelectedBarangay] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedSector, setSelectedSector] = useState('');
+  const [selectedSectors, setSelectedSectors] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
@@ -66,13 +66,22 @@ export default function ResidentList({ userRole, onEdit }) {
   "M": "M",
 };
 
-const handleSectorSelect = (value) => {
+  const handleSectorSelect = (value) => {
   const expanded = SECTOR_CODE_MAP[value.trim().toUpperCase()] || value;
-  setSelectedSector(expanded);
+  setSelectedSectors((current) =>
+    current.includes(expanded)
+      ? current.filter((sector) => sector !== expanded)
+      : [...current, expanded]
+  );
   setCurrentPage(1);
-  setIsSectorDropdownOpen(false);
-  setSectorSearchTerm('');
-};
+  };
+
+  const clearSectorFilters = () => {
+    setSelectedSectors([]);
+    setCurrentPage(1);
+    setIsSectorDropdownOpen(false);
+    setSectorSearchTerm('');
+  };
 
   // --- FORM STATES FOR ASSISTANCE MODAL ---
   const [assistanceFormType, setAssistanceFormType] = useState("Medical Assistance");
@@ -212,7 +221,7 @@ const handleSectorSelect = (value) => {
   const fetchResidents = async (
     search = searchTerm,
     barangay = selectedBarangay,
-    sector = selectedSector,
+    sectors = selectedSectors,
     status = selectedStatus,
     page = currentPage,
     limit = itemsPerPage,
@@ -225,7 +234,7 @@ const handleSectorSelect = (value) => {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (isAdminLike && barangay) params.append("barangay", barangay);
-      if (sector) params.append('sector', sector);
+      sectors.forEach((sector) => params.append('sectors', sector));
       if (status && status !== 'ALL') params.append('filter_status', status.toLowerCase());
       params.append('skip', skip);
       params.append('limit', limit);
@@ -297,8 +306,8 @@ const handleSectorSelect = (value) => {
 
   // Actual fetch — now triggered by debouncedSearch instead of searchTerm
   useEffect(() => {
-    fetchResidents(debouncedSearch, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
-  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, selectedStatus, debouncedSearch, sortBy, sortOrder]);
+    fetchResidents(debouncedSearch, selectedBarangay, selectedSectors, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSectors, selectedStatus, debouncedSearch, sortBy, sortOrder]);
 
 
   // --- HANDLERS ---
@@ -306,7 +315,6 @@ const handleSectorSelect = (value) => {
   const value = e.target.value;
   setSearchTerm(value); // update the input immediately for responsiveness
 };
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const handleBarangayFilter = (e) => { setSelectedBarangay(e.target.value); setCurrentPage(1); };
   const handleStatusFilter = (e) => { setSelectedStatus(e.target.value); setCurrentPage(1); };
   const handleLimitChange = (e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); };
@@ -315,14 +323,14 @@ const handleSectorSelect = (value) => {
   const handleImportSuccess = () => {
     setCurrentPage(1);
     setSearchTerm('');
-    fetchResidents('', selectedBarangay, selectedSector, selectedStatus, 1, itemsPerPage, sortBy, sortOrder);
+    fetchResidents('', selectedBarangay, selectedSectors, selectedStatus, 1, itemsPerPage, sortBy, sortOrder);
   };
 
   const handleArchive = async (id) => {
     try {
       await api.put(`/residents/${id}/archive`);
       toast.success("Record moved to archive.");
-      fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+      fetchResidents(searchTerm, selectedBarangay, selectedSectors, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch (err) {
       toast.error("Action failed.");
     }
@@ -334,7 +342,7 @@ const handleSectorSelect = (value) => {
       await api.delete(`/residents/${deleteModal.residentId}`);
       toast.success('Record permanently deleted.');
       setDeleteModal({ isOpen: false, residentId: null, name: '' });
-      fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+      fetchResidents(searchTerm, selectedBarangay, selectedSectors, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch (err) {
       toast.error('Error deleting record.');
     } finally {
@@ -349,7 +357,7 @@ const handleSectorSelect = (value) => {
       });
       toast.success("Head of family updated.");
       setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" });
-      fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+      fetchResidents(searchTerm, selectedBarangay, selectedSectors, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch {
       toast.error("Promotion failed.");
     }
@@ -360,7 +368,7 @@ const handleSectorSelect = (value) => {
       await api.delete(`/assistances/${id}`);
       toast.success("Assistance record deleted.");
       setDeleteAssistanceModal({ isOpen: false, assistance: null });
-      fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+      fetchResidents(searchTerm, selectedBarangay, selectedSectors, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch {
       toast.error("Failed to delete assistance.");
     }
@@ -604,7 +612,7 @@ const handleSectorSelect = (value) => {
            {(isAdmin || isSuperAdmin) && (
             <ExportButton 
               barangay={selectedBarangay} 
-              sector={selectedSector}
+              sectors={selectedSectors}
               status={selectedStatus}
               className="flex-1 md:flex-none justify-center bg-red-700 text-white font-medium hover:bg-red-800 rounded-xl shadow-md transition-all" 
             />
@@ -643,7 +651,13 @@ const handleSectorSelect = (value) => {
                    onClick={() => setIsSectorDropdownOpen(!isSectorDropdownOpen)}
                    className="w-full flex items-center justify-between pl-3 md:pl-4 pr-3 md:pr-4 py-3 bg-white border border-stone-300 rounded-xl text-[11px] md:text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all shadow-sm uppercase truncate"
                  >
-                   <span className="truncate">{selectedSector || "ALL SECTORS"}</span>
+                   <span className="truncate">
+                     {selectedSectors.length === 0
+                       ? "ALL SECTORS"
+                       : selectedSectors.length === 1
+                         ? selectedSectors[0]
+                         : `${selectedSectors.length} SECTORS SELECTED`}
+                   </span>
                    <ChevronDown className="text-stone-400 shrink-0" size={18} strokeWidth={2} />
                  </button>
 
@@ -664,8 +678,8 @@ const handleSectorSelect = (value) => {
                      </div>
                      <div className="max-h-60 overflow-y-auto py-1">
                        <div
-                         onClick={() => handleSectorSelect(sector.name)}
-                         className={`px-4 py-2 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors ${selectedSector === "" ? "bg-rose-50 text-rose-700 font-medium" : "text-stone-700"}`}
+                         onClick={clearSectorFilters}
+                         className={`px-4 py-2 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors ${selectedSectors.length === 0 ? "bg-rose-50 text-rose-700 font-medium" : "text-stone-700"}`}
                        >
                          ALL SECTORS
                        </div>
@@ -677,8 +691,9 @@ const handleSectorSelect = (value) => {
                            <div
                              key={sector.id}
                              onClick={() => handleSectorSelect(sector.name)}
-                             className={`px-4 py-2 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors ${selectedSector === sector.name ? "bg-rose-50 text-rose-700 font-medium" : "text-stone-700"}`}
+                             className={`px-4 py-2 text-xs md:text-sm cursor-pointer uppercase hover:bg-rose-50 hover:text-rose-700 transition-colors flex items-center gap-2 ${selectedSectors.includes(sector.name) ? "bg-rose-50 text-rose-700 font-medium" : "text-stone-700"}`}
                            >
+                             <input type="checkbox" checked={selectedSectors.includes(sector.name)} readOnly className="accent-rose-700 pointer-events-none" />
                              {sector.name}
                            </div>
                          ))
@@ -968,7 +983,7 @@ const handleSectorSelect = (value) => {
                   toast.success("Assistance recorded.");
                 }
                 setAssistanceModal({ isOpen: false, resident: null, assistance: null });
-                fetchResidents(searchTerm, selectedBarangay, selectedSector, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
+                fetchResidents(searchTerm, selectedBarangay, selectedSectors, selectedStatus, currentPage, itemsPerPage, sortBy, sortOrder);
               } catch (error) {
                 // NEW: Show the actual backend error message (e.g. "ALREADY CLAIMED")
                 const errorMsg = error.response?.data?.detail || "Operation failed.";
