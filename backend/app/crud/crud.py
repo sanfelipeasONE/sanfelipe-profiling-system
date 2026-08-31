@@ -116,6 +116,13 @@ def apply_sector_filter(query, sector: str):
             others_detail_match
         )
     )
+
+
+def apply_sectors_filter(query, sectors: list[str] | None = None):
+    """Require every selected sector to match the resident (AND logic)."""
+    for sector in dict.fromkeys(sectors or []):
+        query = apply_sector_filter(query, sector)
+    return query
     
 def normalize_sector_name(name: str) -> str:
     normalized = " ".join((name or "").strip().upper().split())
@@ -476,6 +483,7 @@ def get_resident_count(
     search: str = None,
     barangay: str = None,
     sector: str = None,
+    sectors: list[str] | None = None,
     filter_status: str = "all",
     allowed_sector_names: list[str] | None = None
 ):
@@ -486,6 +494,7 @@ def get_resident_count(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
+    query = apply_sectors_filter(query, sectors)
     query = apply_status_filter(query, filter_status)
     query = apply_allowed_sector_filter(query, allowed_sector_names)
 
@@ -502,6 +511,7 @@ def get_residents(
     search: str = None,
     barangay: str = None,
     sector: str = None,
+    sectors: list[str] | None = None,
     filter_status: str = "all",
     sort_by: str = "last_name",
     sort_order: str = "asc",
@@ -516,6 +526,7 @@ def get_residents(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
+    query = apply_sectors_filter(query, sectors)
     query = apply_status_filter(query, filter_status)
     query = apply_allowed_sector_filter(query, allowed_sector_names)
 

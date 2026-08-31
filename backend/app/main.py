@@ -897,6 +897,7 @@ def read_residents(skip: int = 0,
                    search: str = None,
                    barangay: str = Query(None),
                    sector: str = Query(None),
+                   sectors: List[str] = Query(default=[]),
                    filter_status: str = Query("all"),
                    sort_by: str = Query("last_name"),
                    sort_order: str = Query("asc"),
@@ -920,6 +921,7 @@ def read_residents(skip: int = 0,
         search=search,
         barangay=filter_barangay,
         sector=sector,
+        sectors=sectors,
         filter_status=filter_status,
         allowed_sector_names=allowed_sectors
     )
@@ -931,6 +933,7 @@ def read_residents(skip: int = 0,
         search=search,
         barangay=filter_barangay,
         sector=sector,
+        sectors=sectors,
         filter_status=filter_status,
         sort_by=sort_by,
         sort_order=sort_order,
@@ -1174,6 +1177,7 @@ def get_stats(db: Session = Depends(get_db),
 def export_residents_excel(
     barangay: str = Query(None),
     sector: str = Query(None), # NEW
+    sectors: List[str] = Query(default=[]),
     filter_status: str = Query(None), # NEW
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
@@ -1188,13 +1192,14 @@ def export_residents_excel(
             db,
             barangay_name=target_barangay,
             sector=sector,
+            sectors=sectors,
             filter_status=filter_status,
             is_super_admin=(current_user.role == "super_admin")
         )
 
         # Create a descriptive filename
         status_part = "Updated_" if filter_status == "updated" else ""
-        sector_part = f"{sector}_" if sector else ""
+        sector_part = f"{'_'.join(sectors or [sector])}_" if (sectors or sector) else ""
         brgy_part = target_barangay.replace(" ", "_") if target_barangay else "All"
         filename = f"SanFelipe_{status_part}{sector_part}{brgy_part}.xlsx"
 

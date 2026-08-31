@@ -38,6 +38,7 @@ def generate_household_excel(
     db: Session, 
     barangay_name: str = None, 
     sector: str = None, 
+    sectors: list[str] | None = None,
     filter_status: str = None,
     is_super_admin: bool = False
 ):
@@ -58,6 +59,8 @@ def generate_household_excel(
             (models.ResidentProfile.sector_summary.ilike(f"%{sector}%")) |
             (models.ResidentProfile.other_sector_details.ilike(f"%{sector}%"))
         )
+
+    query = crud.apply_sectors_filter(query, sectors)
 
     # Filter by "Updated" status
     if filter_status == "updated":
