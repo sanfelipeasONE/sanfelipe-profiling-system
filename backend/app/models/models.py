@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Table, UniqueConstraint, Float
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Table, Index, Float, text
 from sqlalchemy.orm import relationship as orm_relationship, relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -51,12 +51,14 @@ class ResidentProfile(Base):
     __tablename__ = "resident_profiles"
     
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "unique_resident_identity_active",
             "last_name",
             "first_name",
-            "birthdate",
+            "middle_name",
             "barangay",
-            name="uq_resident_identity"
+            unique=True,
+            postgresql_where=text("is_deleted = false")
         ),
     )
 
