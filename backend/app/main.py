@@ -5,6 +5,7 @@ from typing import List, Union
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text, func, inspect, or_
+from sqlalchemy.exc import IntegrityError
 from services.import_service import process_excel_import
 import io
 import qrcode
@@ -775,7 +776,8 @@ def promote_family_head(
         member_id = int(new_head_member_id)
 
         family_member = db.query(models.FamilyMember).filter(
-            models.FamilyMember.id == member_id
+            models.FamilyMember.id == member_id,
+            models.FamilyMember.profile_id == resident.id
         ).first()
 
         if not family_member:
@@ -785,6 +787,7 @@ def promote_family_head(
         new_last_name = family_member.last_name
         new_middle_name = family_member.middle_name
         new_ext_name = family_member.ext_name
+        new_birthdate = family_member.birthdate
 
         # REMOVE promoted member from family table
         db.delete(family_member)
@@ -798,8 +801,13 @@ def promote_family_head(
     resident.middle_name = new_middle_name
     resident.ext_name = new_ext_name
 
-    # CLEAR ALL PERSONAL DETAILS
-    resident.birthdate = None
+    # A resident profile requires a birthdate in the deployed database. Use the
+    # promoted member's date when available; otherwise retain the existing value
+    # until the new head's details can be completed.
+    if new_head_member_id != "spouse" and new_birthdate is not None:
+        resident.birthdate = new_birthdate
+
+    # CLEAR PERSONAL DETAILS THAT BELONG TO THE FORMER HEAD
     resident.occupation = None
     resident.civil_status = None
     resident.religion = None
@@ -816,8 +824,16 @@ def promote_family_head(
 
     resident.status = "Active"
     resident.is_archived = False
+    resident.is_family_head = True
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to promote this family member because it conflicts with an existing resident record."
+        ) from e
 
     return {"message": "Family head successfully replaced"}
 
@@ -881,8 +897,16 @@ def promote_spouse_to_head(
 
     resident.status = "Active"
     resident.is_archived = False
+    resident.is_family_head = True
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to promote the spouse because it conflicts with an existing resident record."
+        ) from e
 
     return {"message": "Spouse promoted to head successfully"}
 
